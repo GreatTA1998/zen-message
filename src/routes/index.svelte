@@ -5,16 +5,17 @@
     {:else}
       <h2>Friends</h2>
       {#each currentUser.friends as friend}
-        <div on:click={() => currentFriendUID = friend.uid}>
+        <span on:click={() => currentFriendUID = friend.uid} class:highlighted-box={currentFriendUID}>
           {friend.name}
-        </div>
+        </span>
       {/each}
 
-      <button on:click={() => isAddingFriend = true}>Add new friend</button>
+      <button style="margin-top: 20px;" on:click={() => isAddingFriend = true}>Add new friend</button>
 
       {#if isAddingFriend}
+        Below are all the accounts that exist on Zen Messenger, click to add as friend:
         {#each accounts as account} 
-          <div on:click={() => addFriend(account)}>
+          <div on:click={() => addFriend(account)} style="margin-left: 20px;">
             {account.name}
           </div>
         {/each}
@@ -28,9 +29,14 @@
     {/if}
   </div>
 
-  <div>
-    {#if currentFriendUID}
-      <ChatWindow friendUID={currentFriendUID}/>
+  <div style="width: 80%; margin-left: 20px">
+    {#if currentFriendUID && currentUser}
+      <ChatWindow 
+        friendUID={currentFriendUID} 
+        {currentUser}
+      />
+    {:else}
+      By default no messages will be displayed until you click something, so you don't get distracted by something just because it's the most recent interaction you had. 
     {/if}
   </div>
   <!-- Place to type new message -->
@@ -48,6 +54,7 @@
   import { GoogleAuthProvider, signInWithPopup, getAuth, onAuthStateChanged } from "firebase/auth"
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion } from "firebase/firestore"
   import ChatWindow from '../chatWindow.svelte'
+  import { getRandomID } from '../helpers.js'
 
   const provider = new GoogleAuthProvider()
   const auth = getAuth();
@@ -59,7 +66,7 @@
 
 
   const docsRef = collection(db, 'users')
-  const users = getDocs(docsRef).then(snap => {
+  getDocs(docsRef).then(snap => {
     snap.docs.forEach(doc => {
       accounts.push({ uid: doc.id, ...doc.data() })
     })
@@ -67,12 +74,26 @@
   })
 
   async function addFriend ({ name, uid }) {
+    for (const friend of currentUser.friends) {
+      if (friend.uid === uid) {
+        alert("You're already friends")
+        isAddingFriend = false
+        return 
+      }
+    }
+
     const ref = doc(db, 'users', currentUser.uid)
     console.log('name, uid =', name, uid)
     await updateDoc(ref, {
       friends: arrayUnion({ name, uid })
     })
-    alert('added friend successfully')
+
+    // create a chat room 
+    const chatRef = doc(db, 'chats', getRandomID())
+    await setDoc(chatRef, {
+      participantUIDs: [uid, currentUser.uid],
+      messages: []
+    })
     isAddingFriend = false
   }
 
@@ -129,3 +150,12 @@
   }
 </script>
 
+<style>
+  .highlighted-box {
+    background-color: orange;
+  }
+
+  span:hover {
+    background-color: cyan;
+  }
+</style>
