@@ -1,71 +1,44 @@
-<div>{currentFriendUID}</div>
-{#if !currentUser}
-  <button on:click={signUp}>Sign up</button>
-{:else}
-  <h1>Messenger</h1>
+<div style="display: flex;">
+  <div>
+    {#if !currentUser}
+      <button on:click={signUp}>Sign up</button>
+    {:else}
+      <h2>Friends</h2>
+      {#each currentUser.friends as friend}
+        <div on:click={() => currentFriendUID = friend.uid}>
+          {friend.name}
+        </div>
+      {/each}
 
-  <h3>Friends</h3>
-  {#each currentUser.friends as friend}
-    <button on:click={() => currentFriendUID = friend.uid}>{friend.name}</button>
-  {/each}
+      <button on:click={() => isAddingFriend = true}>Add new friend</button>
 
-  <button on:click={() => isAddingFriend = true}>Add friend</button>
+      {#if isAddingFriend}
+        {#each accounts as account} 
+          <div on:click={() => addFriend(account)}>
+            {account.name}
+          </div>
+        {/each}
+      {/if}
 
-  {#if isAddingFriend}
-    {#each accounts as account} 
-      <div on:click={() => addFriend(account)}>
-        {account.name}
-      </div>
-    {/each}
-  {/if}
+      <h2>Family</h2>
 
-  <h3>Family</h3>
+      <h2>Other VIPs</h2>
 
-  <h3>Other VIPs</h3>
+      <h2>Everyone else</h2>
+    {/if}
+  </div>
 
-  <h3>Everyone else</h3>
-
-  {#if currentFriendUID}
-    <ChatUI friendUID={currentFriendUID}/>
-  {/if}
-
-  <!-- Create an account -->
-
-  <!-- Add new person UI 
-    Irreversible for now
-  -->
-
-  <!-- Message UI -->
-  <!-- Display all messages from the chat room 
-    participants: [<uid-1>, <uid-2>]
-    chatRooms.where('participants', 'array-contains', uid) // what if they have multiple chats? ignore if it doesn't contain my ID
-  -->
+  <div>
+    {#if currentFriendUID}
+      <ChatWindow friendUID={currentFriendUID}/>
+    {/if}
+  </div>
   <!-- Place to type new message -->
   <!-- Place to specify frequency -->
-  <div>
-    As soon as you can
-  </div>
-  <div>
-    1 hour 
-  </div>
-  <div>
-    Today
-  </div>
-  <div>
-    This week
-  </div>
-  <div>
-    This month
-  </div>
-  <div>
-    Anytime
-  </div>
-{/if}
+</div>
+
 
 <script>
-  // fetch the user doc
-
-
   const chatID = ''
   const allFriends = [] 
   const allFamily = [] 
@@ -74,7 +47,7 @@
   import db from '../db.js'
   import { GoogleAuthProvider, signInWithPopup, getAuth, onAuthStateChanged } from "firebase/auth"
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion } from "firebase/firestore"
-  import ChatUI from '../ChatUI.svelte'
+  import ChatWindow from '../chatWindow.svelte'
 
   const provider = new GoogleAuthProvider()
   const auth = getAuth();
