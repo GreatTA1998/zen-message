@@ -1,13 +1,37 @@
-<div style="display: flex;">
-  <div>
+<div style="display: flex; padding-left: 20px; padding-right: 20px;">
+  <div style="width: 250px">
     {#if !currentUser}
-      <button on:click={signUp}>Sign up</button>
+      {#if !phoneConfirmationResult}
+        <div style="display: flex; justify-content: center; align-items: center; margin-top: 24px; margin-right: 6px; margin-left: auto;">
+          <div style="margin-right: 10px; font-family: Roboto, sans-serif; font-size: 2rem">+1 </div>
+
+          <input type="tel" id="phone-input-1" minlength="2" maxlength="3" placeholder="+1" bind:value={countryCode} style="width: 36px; height: 40px; font-size: 2rem; margin-right: 10px">
+
+          <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="339" bind:value={phoneNumSegment1} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
+
+          <input type="tel" id="phone-input-2" minlength="3" maxlength="3" placeholder="676" bind:value={phoneNumSegment2} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
+
+          <input type="tel" id="phone-input-3" minlength="4" maxlength="4" placeholder="1234" bind:value={phoneNumSegment3} style="width: 76px; height: 40px; font-size: 2rem; margin-right: 10px">
+        
+          <div id="sign-in-button" on:click={signInWithPhone} style="border: solid;">
+            Sign Up
+          </div>
+        </div>
+      {:else}
+        <div style="display: flex">
+          <input label="6-digit code" bind:value={phoneConfirmCode}>
+          <div on:click={verifyConfirmationCode}>Confirm code</div>
+        </div>
+      {/if}  
+
     {:else}
-      <h2>Friends</h2>
+      <h2 class="message-group-title">Friends</h2>
       {#each currentUser.friends as friend}
-        <span on:click={() => currentFriendUID = friend.uid} class:highlighted-box={currentFriendUID}>
-          {friend.name}
-        </span>
+        <div on:click={() => currentFriendUID = friend.uid} style="border: solid orange; height: 40px; display: flex; align-items: center;" class:highlighted-box={currentFriendUID}>
+          <span style="margin-left: 5px">
+            {friend.name}{friendUIDsWithNewMessages.includes(friend.uid) ? 'New messages' : ''}
+          </span>
+        </div>
       {/each}
 
       <button style="margin-top: 20px;" on:click={() => isAddingFriend = true}>Add new friend</button>
@@ -21,22 +45,27 @@
         {/each}
       {/if}
 
-      <h2>Family</h2>
+      <h2 class="message-group-title" style="margin-top: 50px;">Family</h2>
+      No family...
 
-      <h2>Other VIPs</h2>
+      <h2 class="message-group-title" style="margin-top: 50px;">Other VIPs</h2>
+      No VIPs yet...
 
-      <h2>Everyone else</h2>
+      <h2 class="message-group-title" style="margin-top: 50px;">Everyone else</h2>
+      No new message requests yet...
     {/if}
   </div>
 
-  <div style="width: 80%; margin-left: 20px">
+  <div style="width: 60%; margin-left: 20px; margin-top: 5px;">
     {#if currentFriendUID && currentUser}
       <ChatWindow 
         friendUID={currentFriendUID} 
         {currentUser}
       />
-    {:else}
-      By default no messages will be displayed until you click something, so you don't get distracted by something just because it's the most recent interaction you had. 
+    {:else if currentUser}
+      <div style="margin-top: 18px;">
+        Click any chat on the left-side
+      </div> 
     {/if}
   </div>
   <!-- Place to type new message -->
@@ -51,10 +80,81 @@
   const everyoneElse = [] 
 
   import db from '../db.js'
-  import { GoogleAuthProvider, signInWithPopup, getAuth, onAuthStateChanged } from "firebase/auth"
-  import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion } from "firebase/firestore"
+  import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"	
+  import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore"
   import ChatWindow from '../chatWindow.svelte'
   import { getRandomID } from '../helpers.js'
+
+  let unsub
+
+  let appVerifier
+  let countryCode = '+1'
+  let phoneNumSegment1
+  let phoneNumSegment2
+  let phoneNumSegment3
+  let phoneConfirmationResult
+	let phoneConfirmCode = ''
+
+  let friendUIDsWithNewMessages = [] 
+  
+  function signInWithPhone () {
+    if (!window.recaptchaVerifier) {
+			window.recaptchaVerifier = new RecaptchaVerifier('sign-in-button', {
+				'size': 'invisible',
+				'callback': (response) => {
+					// reCAPTCHA solved, allow signInWithPhoneNumber.
+					console.log('reCAPTCHA solved =', response)
+					// onSignInSubmit()
+				}
+			}, getAuth())
+			appVerifier = window.recaptchaVerifier;
+		}
+		onSignInSubmit();
+		function onSignInSubmit () {
+			const phoneNumber = `${countryCode} ${phoneNumSegment1}-${phoneNumSegment2}-${phoneNumSegment3}`
+			print(getAuth(), phoneNumber, appVerifier)
+			signInWithPhoneNumber(getAuth(), phoneNumber, appVerifier)
+				.then((confirmationResult) => {
+					console.log('confirmation result =', confirmationResult)
+					phoneConfirmationResult = confirmationResult
+					// SMS sent. Prompt user to type the code from the message, then sign the
+					// user in with confirmationResult.confirm(code).
+					window.confirmationResult = confirmationResult
+					// ...
+				}).catch((error) => {
+					alert(error)
+					console.log('error =', error)
+					// Error; SMS not sent
+					// ...
+			
+					// if it fails, reset 
+					// grecaptcha.reset(window.recaptchaWidgetId);
+			
+					// Or, if you haven't stored the widget ID:
+					window.recaptchaVerifier.render().then(function(widgetId) {
+						grecaptcha.reset(widgetId);
+					})
+				});
+			}
+		}
+		// SIGN IN WITH CONFIRMATION CODE
+		function verifyConfirmationCode () {
+			console.log('phoneConfirmCode =', phoneConfirmCode)
+			window.confirmationResult.confirm(phoneConfirmCode).then((result) => {
+				// User signed in successfully
+        // `authStateChange` will handle the rest
+
+				// const user = result.user;
+				// console.log('redirecting, user =', user)
+				// goto('AsUl1VWQ7zzxZsD5epL7/AsUl1VWQ7zzxZsD5epL7', { replaceState: true })
+				// ...
+			}).catch((error) => {
+				alert(error)
+				// User couldn't sign in (bad verification code?)
+				// ...
+			});
+
+  }
 
   const provider = new GoogleAuthProvider()
   const auth = getAuth();
@@ -99,55 +199,32 @@
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      console.log('auth user =', user)
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        console.log("Document data:", docSnap.data());
         currentUser = docSnap.data()
       } else {
-        // doc.data() will be undefined in this case
-        console.log("No such document!");
-        
         const initialUserDoc =  {
           uid: user.uid,
-          name: user.displayName,
+          name: user.displayName || 'John Apple',
           friends: [],
           family: [],
           VIPs: [],
           everyoneElse: []
         }
-      
         await setDoc(doc(db, 'users', user.uid), initialUserDoc)
         currentUser = initialUserDoc
       }
-      console.log('currentUser =', currentUser)
+
+      unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+        currentUser = snap.data()
+        if (currentUser.friendUIDsWithNewMessages) {
+          friendUIDsWithNewMessages = currentUser.friendUIDsWithNewMessages
+        }
+      });
     } 
   })
-
-  function signUp () {
-    signInWithPopup(auth, provider)
-    .then((result) => {
-      alert(result)
-      // This gives you a Google Access Token. You can use it to access the Google API.
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      const token = credential.accessToken;
-      // The signed-in user info.
-      const user = result.user;
-      // ...
-    }).catch((error) => {
-      alert(error)
-      // Handle Errors here.
-      const errorCode = error.code;
-      const errorMessage = error.message;
-      // The email of the user's account used.
-      const email = error.email;
-      // The AuthCredential type that was used.
-      const credential = GoogleAuthProvider.credentialFromError(error);
-      // ...
-    });
-  }
 </script>
 
 <style>
@@ -157,5 +234,12 @@
 
   span:hover {
     background-color: cyan;
+  }
+
+  .message-group-title {
+    font-family: Roboto, sans-serif; 
+    font-weight: 600; 
+    color: rgb(119, 110, 110);
+    margin-bottom: 5px;
   }
 </style>
