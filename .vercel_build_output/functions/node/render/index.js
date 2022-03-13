@@ -39484,7 +39484,18 @@ var init_index_svelte = __esm({
           signInWithPhone();
         }
       }
-      return `<div style="${"display: flex; padding-left: 20px; padding-right: 20px;"}"><div style="${"width: 400px"}">${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"display: flex; justify-content: center; align-items: center;"}"><input type="${"tel"}" id="${"phone-input-1"}" minlength="${"2"}" maxlength="${"3"}" placeholder="${"+1"}" style="${"width: 36px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", countryCode, 0)}>
+      return `<div style="${"display: flex; padding-left: 20px; padding-right: 20px;"}"><div>${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
+          Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
+          Even if you try to ignore it, visually they go to the top of our chat list; multiply that by all the people you message across time, and it&#39;s a disaster for productivity and mental health.
+
+          <br><br>
+          <b>How this app is different</b>
+          <ol><li>Messages have no notifications by default unless the other person specifies it&#39;s time-sensitive e.g. &quot;Before Monday&quot; / &quot;This week&quot;
+            </li>
+            <li>Left-side is organized intentionally - NOT by whoever messaged you most recently
+            </li></ol></div>
+
+        <div style="${"display: flex; justify-content: center; align-items: center; width: 400px; margin-top: 25px;"}"><input type="${"tel"}" id="${"phone-input-1"}" minlength="${"2"}" maxlength="${"3"}" placeholder="${"+1"}" style="${"width: 36px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", countryCode, 0)}>
 
           <input type="${"tel"}" id="${"phone-input-1"}" minlength="${"3"}" maxlength="${"3"}" placeholder="${"339"}" style="${"width: 54px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", phoneNumSegment1, 0)}>
 
@@ -39535,8 +39546,8 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-fb0f0d6d.js";
-    js3 = ["pages/index.svelte-fb0f0d6d.js", "chunks/vendor-398c4e20.js"];
+    entry3 = "pages/index.svelte-5adbe1fc.js";
+    js3 = ["pages/index.svelte-5adbe1fc.js", "chunks/vendor-398c4e20.js"];
     css4 = ["assets/pages/index.svelte-05b74825.css"];
   }
 });
@@ -41606,7 +41617,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-e3a122d0.js", "js": ["start-e3a122d0.js", "chunks/vendor-398c4e20.js"], "css": [] },
+    entry: { "file": "start-cf89ff25.js", "js": ["start-cf89ff25.js", "chunks/vendor-398c4e20.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
