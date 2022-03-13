@@ -1,8 +1,25 @@
 <div style="display: flex; padding-left: 20px; padding-right: 20px;">
-  <div style="width: 400px">
+  <div>
     {#if !currentUser}
       {#if !phoneConfirmationResult}
-        <div style="display: flex; justify-content: center; align-items: center;">
+        <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
+          <b>What problem does this solve:</b>
+          Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
+          Even if you try to ignore it, visually they go to the top of our chat list; multiply that by all the people you message across time, and it's a disaster for productivity and mental health.
+
+          <br><br>
+          <b>How this app is different</b>
+          <ol>
+            <li>
+            Messages have no notifications by default unless the other person specifies it's time-sensitive e.g. "Before Monday" / "This week"
+            </li>
+            <li>
+            Left-side is organized intentionally - NOT by whoever messaged you most recently
+            </li>
+          </ol>
+        </div>
+
+        <div style="display: flex; justify-content: center; align-items: center; width: 400px; margin-top: 25px;">
           <input type="tel" id="phone-input-1" minlength="2" maxlength="3" placeholder="+1" bind:value={countryCode} style="width: 36px; height: 40px; font-size: 2rem; margin-right: 10px">
 
           <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="339" bind:value={phoneNumSegment1} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
@@ -70,7 +87,6 @@
     {/if}
   </div>
 </div>
-
 
 <script>
   let newUserName = ''
