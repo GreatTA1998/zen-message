@@ -1,10 +1,8 @@
 <div style="display: flex; padding-left: 20px; padding-right: 20px;">
-  <div style="width: 250px">
+  <div style="width: 400px">
     {#if !currentUser}
       {#if !phoneConfirmationResult}
-        <div style="display: flex; justify-content: center; align-items: center; margin-top: 24px; margin-right: 6px; margin-left: auto;">
-          <div style="margin-right: 10px; font-family: Roboto, sans-serif; font-size: 2rem">+1 </div>
-
+        <div style="display: flex; justify-content: center; align-items: center;">
           <input type="tel" id="phone-input-1" minlength="2" maxlength="3" placeholder="+1" bind:value={countryCode} style="width: 36px; height: 40px; font-size: 2rem; margin-right: 10px">
 
           <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="339" bind:value={phoneNumSegment1} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
@@ -12,14 +10,14 @@
           <input type="tel" id="phone-input-2" minlength="3" maxlength="3" placeholder="676" bind:value={phoneNumSegment2} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
 
           <input type="tel" id="phone-input-3" minlength="4" maxlength="4" placeholder="1234" bind:value={phoneNumSegment3} style="width: 76px; height: 40px; font-size: 2rem; margin-right: 10px">
-        
-          <div id="sign-in-button" on:click={signInWithPhone} style="border: solid;">
+          
+          <div id="sign-in-button" on:click={signInWithPhone} style="border: solid; padding: 6px;">
             Sign Up
           </div>
-        </div>
+        </div>  
       {:else}
         <div style="display: flex">
-          <input label="6-digit code" bind:value={phoneConfirmCode}>
+          <input label="6-digit code" placeholder="123456" bind:value={phoneConfirmCode}>
           <div on:click={verifyConfirmationCode}>Confirm code</div>
         </div>
       {/if}  
@@ -66,21 +64,24 @@
       <div style="margin-top: 18px;">
         Click any chat on the left-side
       </div> 
+      <div>Set your name here</div>
+      <input placeholder="John Apple" bind:value={newUserName}>
+      <button on:click={updateUserName}>Update name</button>
     {/if}
   </div>
-  <!-- Place to type new message -->
-  <!-- Place to specify frequency -->
 </div>
 
 
 <script>
+  let newUserName = ''
+
   const chatID = ''
   const allFriends = [] 
   const allFamily = [] 
   const everyoneElse = [] 
 
   import db from '../db.js'
-  import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"	
+  import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore"
   import ChatWindow from '../chatWindow.svelte'
   import { getRandomID } from '../helpers.js'
@@ -89,15 +90,26 @@
 
   let appVerifier
   let countryCode = '+1'
-  let phoneNumSegment1
-  let phoneNumSegment2
-  let phoneNumSegment3
+  let phoneNumSegment1 = ''
+  let phoneNumSegment2 = ''
+  let phoneNumSegment3 = ''
   let phoneConfirmationResult
 	let phoneConfirmCode = ''
 
   let friendUIDsWithNewMessages = [] 
+
+  $: if (phoneNumSegment1.length === 3) {
+		document.getElementById('phone-input-2').focus()
+	}
+	$: if (phoneNumSegment2.length === 3) {
+		document.getElementById('phone-input-3').focus()
+	}
+	$: if (phoneNumSegment3.length === 4) {
+		signInWithPhone()
+	}
   
   function signInWithPhone () {
+    console.log('signInWithPhone()')
     if (!window.recaptchaVerifier) {
 			window.recaptchaVerifier = new RecaptchaVerifier('sign-in-button', {
 				'size': 'invisible',
@@ -156,7 +168,6 @@
 
   }
 
-  const provider = new GoogleAuthProvider()
   const auth = getAuth();
 
   let currentUser = null
@@ -164,13 +175,11 @@
   let accounts = []
   let isAddingFriend = false 
 
-
   const docsRef = collection(db, 'users')
   getDocs(docsRef).then(snap => {
     snap.docs.forEach(doc => {
       accounts.push({ uid: doc.id, ...doc.data() })
     })
-    console.log('accounts =', accounts)
   })
 
   async function addFriend ({ name, uid }) {
@@ -208,6 +217,7 @@
         const initialUserDoc =  {
           uid: user.uid,
           name: user.displayName || 'John Apple',
+          phoneNumber: user.phoneNumber,
           friends: [],
           family: [],
           VIPs: [],
@@ -225,6 +235,15 @@
       });
     } 
   })
+  
+  async function updateUserName () {
+    const ref = 
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      name: newUserName
+    })
+    newUserName = ''
+    alert('successfully updated')
+  }
 </script>
 
 <style>

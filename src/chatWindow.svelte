@@ -9,7 +9,7 @@
   <input style="width: 100%" placeholder="Type message here..." bind:value={newMessage}>
 
   <div style="display: flex; margin-top: 10px; align-items: center;">
-    <div style="color: grey;">Need a reply:</div> 
+    <div style="color: grey;">Hope for a reply:</div> 
     {#each replyTimingOptions as replyTimingOption}
       <div on:click={() => replyWithin = replyTimingOption} 
         class:highlighted-box={replyWithin === replyTimingOption} 
@@ -27,10 +27,15 @@
   export let friendUID
   export let currentUser
 
-  import { where, getDocs, query, collection, doc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from 'firebase/firestore'
+  import { where, getDoc, getDocs, query, collection, doc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from 'firebase/firestore'
   import db from './db';
   import { onMount } from 'svelte'
   import { displayDate } from './helpers.js'
+
+  import { getFunctions, httpsCallable } from "firebase/functions";
+
+  const functions = getFunctions()
+  const sendTextMessage = httpsCallable(functions, 'sendTextMessage');
 
   let chatID
   let newMessage
@@ -64,7 +69,7 @@
     })
   })
 
-  function sendMessage () {
+  async function sendMessage () {
     console.log('sendMessage()')
     const ref = doc(db, 'chats', chatID)
     updateDoc(ref, {
@@ -73,30 +78,39 @@
         timestamp: Date.now()
       })
     })
-    newMessage = ''
 
     // somehow visibly show there's a new message in that chat room 
-    const [otherPersonUID] = chatDoc.participantUIDs.filter(uid => uid !== currentUser.uid)
-    // const otherPersonUID = currentUser.uid
+    // const [otherPersonUID] = chatDoc.participantUIDs.filter(uid => uid !== currentUser.uid)
+    const otherPersonUID = currentUser.uid
     const personRef = doc(db, 'users', otherPersonUID)
     updateDoc(personRef, {
       friendUIDsWithNewMessages: arrayUnion(chatID)
     })  
 
+    // get the other person's phone number
+    const otherPersonSnap = await getDoc(personRef)
+
     // HANDLE SMS NOTIFICATION
-    // find the other person who will receive the message
-    // calculate whether to send a text, and if so when
     switch (replyWithin) {
-      case 'anytime': return
+      case 'anytime': 
+        break
       case 'real-time': 
-        console.log('ASAP, sending text immediately')
+        console.log('sending text to ,', otherPersonSnap.data().phoneNumber)
+        sendTextMessage({ 
+          content: `${currentUser.name} wrote "${newMessage}"`,
+          toWho: otherPersonSnap.data().phoneNumber
+        })
       case 'today':
         // create an scheduled deadline for that person
         // leave this for the future
       case 'this week':
         // create a trap such that, if the person doesn't reply within the deadline, the function will send a notification
         // can leave this for the future
+      default: 
+        break
     }
+
+    newMessage = ''
   }
 </script>
 
