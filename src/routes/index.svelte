@@ -35,36 +35,48 @@
       {:else}
         <div style="display: flex">
           <input label="6-digit code" placeholder="123456" bind:value={phoneConfirmCode}>
-          <div on:click={verifyConfirmationCode}>Confirm code</div>
+          <button on:click={verifyConfirmationCode}>Confirm code</button>
         </div>
       {/if}  
 
     {:else}
-      <h2 class="message-group-title">Friends</h2>
+      <h2 class="message-group-title">
+        Friends
+      </h2>
       {#each currentUser.friends as friend}
-        <div on:click={() => currentFriendUID = friend.uid} style="border: solid orange; height: 40px; display: flex; align-items: center;" class:highlighted-box={currentFriendUID}>
+        <div 
+          on:click={() => currentFriendUID = friend.uid} 
+          style="border: solid orange; height: 40px; display: flex; align-items: center;"
+          class:highlighted-box={friend.uid === currentFriendUID}
+        >
           <span style="margin-left: 5px">
             {friend.name}{friendUIDsWithNewMessages.includes(friend.uid) ? 'New messages' : ''}
           </span>
         </div>
       {/each}
 
-      <button style="margin-top: 20px;" on:click={() => isAddingFriend = true}>Add new friend</button>
+      <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
+        Add person
+      </button>
 
       {#if isAddingFriend}
-        Below are all the accounts that exist on Zen Messenger, click to add as friend:
+        <div>Here are all accounts:</div>
         {#each accounts as account} 
-          <div on:click={() => addFriend(account)} style="margin-left: 20px;">
-            {account.name}
-          </div>
+          {#if account.uid !== currentUser.uid}
+            <div style="margin-top: 10px;">
+              <button on:click={() => addFriend(account)} style="margin-left: 20px;">
+                {account.name}
+              </button>
+            </div>
+          {/if}
         {/each}
       {/if}
 
       <h2 class="message-group-title" style="margin-top: 50px;">Family</h2>
       No family...
 
-      <h2 class="message-group-title" style="margin-top: 50px;">Other VIPs</h2>
-      No VIPs yet...
+      <h2 class="message-group-title" style="margin-top: 50px;">Editable category</h2>
+      Coming soon...
 
       <h2 class="message-group-title" style="margin-top: 50px;">Everyone else</h2>
       No new message requests yet...
@@ -72,11 +84,14 @@
   </div>
 
   <div style="width: 60%; margin-left: 20px; margin-top: 5px;">
-    {#if currentFriendUID && currentUser}
-      <ChatWindow 
-        friendUID={currentFriendUID} 
-        {currentUser}
-      />
+    {#if currentFriendUID && currentUser && chatRoomID}
+      {#key currentFriendUID}
+        <ChatWindow 
+          {chatRoomID}
+          friendUID={currentFriendUID} 
+          {currentUser}
+        />
+      {/key}
     {:else if currentUser}
       <div style="margin-top: 18px;">
         Click any chat on the left-side
@@ -111,6 +126,14 @@
   let phoneNumSegment3 = ''
   let phoneConfirmationResult
 	let phoneConfirmCode = ''
+
+  let chatRoomID = ''
+
+  $: if (currentFriendUID) {
+    chatRoomID = currentUser.uid < currentFriendUID ? (currentUser.uid + currentFriendUID) : (currentFriendUID + currentUser.uid)
+    console.log('chatRoomID =', chatRoomID)
+  }
+
 
   let friendUIDsWithNewMessages = [] 
 
@@ -208,13 +231,12 @@
     }
 
     const ref = doc(db, 'users', currentUser.uid)
-    console.log('name, uid =', name, uid)
     await updateDoc(ref, {
       friends: arrayUnion({ name, uid })
     })
 
-    // create a chat room 
-    const chatRef = doc(db, 'chats', getRandomID())
+    const chatRoomID = currentUser.uid < uid ? (currentUser.uid + uid) : (uid + currentUser.uid)
+    const chatRef = doc(db, 'chats', chatRoomID)
     await setDoc(chatRef, {
       participantUIDs: [uid, currentUser.uid],
       messages: []

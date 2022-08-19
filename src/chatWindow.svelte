@@ -1,10 +1,14 @@
 <div>
-  {#each chatDoc.messages as message}
-    <div style="display: flex;">
-      <p>{message.content}</p>
-      <p style="margin-left: auto; margin-right: 0;">{displayDate(message.timestamp)}</p>
-    </div>
-  {/each}
+  {#if chatDoc.messages}
+    {#each chatDoc.messages as message}
+      <div style="display: flex;">
+        <p>{message.content}</p>
+        <p style="margin-left: auto; margin-right: 0;">
+          {displayDate(message.timestamp)}
+        </p>
+      </div>
+    {/each}
+  {/if}
 
   <input style="width: 100%" placeholder="Type message here..." bind:value={newMessage}>
 
@@ -20,12 +24,15 @@
     {/each}
   </div>
 
-  <button on:click={sendMessage} style="margin-top: 12px; height: 30px; width: 410px;">Send message</button>
+  <button on:click={sendMessage} style="margin-top: 12px; height: 30px; width: 410px;">
+    Send message
+  </button>
 </div>
 
 <script>
   export let friendUID
   export let currentUser
+  export let chatRoomID
 
   import { where, getDoc, getDocs, query, collection, doc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from 'firebase/firestore'
   import db from './db';
@@ -45,33 +52,34 @@
   let chatDoc = { messages: [] }
 
   onMount(() => {
-    const ref = collection(db, 'chats')
-    const q = query(ref, where('participantUIDs', 'array-contains', friendUID))
-    getDocs(q).then(result => {
-      console.log('result =', result)
-      result.docs.forEach(doc => {
-        console.log('doc =', doc)
-        if (doc.data().participantUIDs.includes(currentUser.uid)) {
-          chatID = doc.id
-        }
-      })
-
-      unsub = onSnapshot(doc(db, 'chats', chatID), (snap) => {
-        console.log("Current data: ", snap.data());
+    unsub = onSnapshot(doc(db, 'chats', chatRoomID), (snap) => {
+      console.log("Current data: ", snap.data());
+      if (snap.data()) {
         chatDoc = snap.data()
 
         // mark chat as read
         const myRef = doc(db, 'users', currentUser.uid)
         updateDoc(myRef, {
-          friendUIDsWithNewMessages: arrayRemove(chatID)
+          friendUIDsWithNewMessages: arrayRemove(chatRoomID)
         })
-      });
-    })
+      }
+    });
+    // const q = query(ref, where('participantUIDs', 'array-contains', friendUID))
+    // getDocs(q).then(result => {
+    //   console.log('result =', result)
+    //   console.log('result.docs.length should be 1 =', result.docs.length)
+    //   result.docs.forEach(doc => {
+    //     console.log('doc =', doc)
+    //     if (doc.data().participantUIDs.includes(currentUser.uid)) {
+    //       chatID = doc.id
+    //     }
+    //   })
+    // })
   })
 
   async function sendMessage () {
     console.log('sendMessage()')
-    const ref = doc(db, 'chats', chatID)
+    const ref = doc(db, 'chats', chatRoomID)
     updateDoc(ref, {
       messages: arrayUnion({
         content: newMessage,
@@ -84,7 +92,7 @@
     const otherPersonUID = currentUser.uid
     const personRef = doc(db, 'users', otherPersonUID)
     updateDoc(personRef, {
-      friendUIDsWithNewMessages: arrayUnion(chatID)
+      friendUIDsWithNewMessages: arrayUnion(chatRoomID)
     })  
 
     // get the other person's phone number

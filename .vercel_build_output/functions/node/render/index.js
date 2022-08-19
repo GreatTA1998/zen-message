@@ -5565,8 +5565,8 @@ var entry, js, css;
 var init__ = __esm({
   ".svelte-kit/output/server/nodes/0.js"() {
     init_layout_svelte();
-    entry = "layout.svelte-722adb93.js";
-    js = ["layout.svelte-722adb93.js", "chunks/vendor-398c4e20.js"];
+    entry = "layout.svelte-e08c0c13.js";
+    js = ["layout.svelte-e08c0c13.js", "chunks/vendor-7aec64b3.js"];
     css = [];
   }
 });
@@ -5615,8 +5615,8 @@ var entry2, js2, css2;
 var init__2 = __esm({
   ".svelte-kit/output/server/nodes/1.js"() {
     init_error_svelte();
-    entry2 = "error.svelte-62ff6c58.js";
-    js2 = ["error.svelte-62ff6c58.js", "chunks/vendor-398c4e20.js"];
+    entry2 = "error.svelte-8a41d656.js";
+    js2 = ["error.svelte-8a41d656.js", "chunks/vendor-7aec64b3.js"];
     css2 = [];
   }
 });
@@ -39434,6 +39434,7 @@ var init_index_svelte = __esm({
       }
       const auth = getAuth();
       let currentUser = null;
+      let currentFriendUID = "";
       let accounts = [];
       const docsRef = collection(db, "users");
       getDocs(docsRef).then((snap) => {
@@ -39505,21 +39506,23 @@ var init_index_svelte = __esm({
           
           <div id="${"sign-in-button"}" style="${"border: solid; padding: 6px;"}">Sign Up
           </div></div>` : `<div style="${"display: flex"}"><input label="${"6-digit code"}" placeholder="${"123456"}"${add_attribute("value", phoneConfirmCode, 0)}>
-          <div>Confirm code</div></div>`}` : `<h2 class="${"message-group-title svelte-ewe8mg"}">Friends</h2>
+          <button>Confirm code</button></div>`}` : `<h2 class="${"message-group-title svelte-ewe8mg"}">Friends
+      </h2>
       ${each(currentUser.friends, (friend) => {
-        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-ewe8mg", ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-ewe8mg"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
+        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-ewe8mg", friend.uid === currentFriendUID ? "highlighted-box" : ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-ewe8mg"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
         </div>`;
       })}
 
-      <button style="${"margin-top: 20px;"}">Add new friend</button>
+      <button style="${"margin-top: 20px;"}">Add person
+      </button>
 
       ${``}
 
       <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Family</h2>
       No family...
 
-      <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Other VIPs</h2>
-      No VIPs yet...
+      <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Editable category</h2>
+      Coming soon...
 
       <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Everyone else</h2>
       No new message requests yet...`}</div>
@@ -39546,8 +39549,8 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-5adbe1fc.js";
-    js3 = ["pages/index.svelte-5adbe1fc.js", "chunks/vendor-398c4e20.js"];
+    entry3 = "pages/index.svelte-afc197a6.js";
+    js3 = ["pages/index.svelte-afc197a6.js", "chunks/vendor-7aec64b3.js"];
     css4 = ["assets/pages/index.svelte-05b74825.css"];
   }
 });
@@ -41617,7 +41620,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-cf89ff25.js", "js": ["start-cf89ff25.js", "chunks/vendor-398c4e20.js"], "css": [] },
+    entry: { "file": "start-3682f4b2.js", "js": ["start-3682f4b2.js", "chunks/vendor-7aec64b3.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
