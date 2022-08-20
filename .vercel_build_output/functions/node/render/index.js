@@ -39498,7 +39498,7 @@ var init_index_svelte = __esm({
             <li>Left-side is organized intentionally - NOT by whoever messaged you most recently
             </li></ol></div>
 
-        <div style="${"display: flex; justify-content: center; align-items: center; width: 400px; margin-top: 25px;"}"><input type="${"tel"}" id="${"phone-input-1"}" minlength="${"2"}" maxlength="${"3"}" placeholder="${"+1"}" style="${"width: 36px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", countryCode, 0)}>
+        <div style="${"display: flex; justify-content: center; align-items: center; width: 400px; margin-top: 25px;"}"><input type="${"tel"}" id="${"phone-input-1"}" minlength="${"2"}" maxlength="${"4"}" placeholder="${"+1"}" style="${"width: 36px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", countryCode, 0)}>
 
           <input type="${"tel"}" id="${"phone-input-1"}" minlength="${"3"}" maxlength="${"3"}" placeholder="${"339"}" style="${"width: 54px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", phoneNumSegment1, 0)}>
 
@@ -39550,8 +39550,8 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-deabb10d.js";
-    js3 = ["pages/index.svelte-deabb10d.js", "chunks/vendor-5e8b3037.js"];
+    entry3 = "pages/index.svelte-bc2ae056.js";
+    js3 = ["pages/index.svelte-bc2ae056.js", "chunks/vendor-5e8b3037.js"];
     css4 = ["assets/pages/index.svelte-05b74825.css"];
   }
 });
@@ -41621,7 +41621,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-75009cb8.js", "js": ["start-75009cb8.js", "chunks/vendor-5e8b3037.js"], "css": [] },
+    entry: { "file": "start-84738e21.js", "js": ["start-84738e21.js", "chunks/vendor-5e8b3037.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
