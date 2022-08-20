@@ -95,10 +95,10 @@
 
         focusAndOpenKeyboard(MessageField, 300)
         // MessageField.focus()
-        MessageField.scrollIntoView({
-          block: 'center',
-          behavior: 'smooth'
-        })
+        // MessageField.scrollIntoView({
+        //   block: 'center',
+        //   behavior: 'smooth'
+        // })
 
         AutoscrollTargetElem.scrollIntoView({
           block: 'center',
@@ -137,7 +137,6 @@
   }
 
   async function sendMessage () {
-    console.log('sendMessage()')
     const ref = doc(db, 'chats', chatRoomID)
     updateDoc(ref, {
       messages: arrayUnion({
@@ -162,7 +161,7 @@
     switch (replyWithin) {
       case 'any time': 
         break
-      case 'real-time': 
+      case 'now': 
         console.log('sending text to ,', otherPersonSnap.data().phoneNumber)
         sendTextMessage({ 
           content: `${currentUser.name} wrote "${newMessage}"`,
