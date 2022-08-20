@@ -5565,8 +5565,8 @@ var entry, js, css;
 var init__ = __esm({
   ".svelte-kit/output/server/nodes/0.js"() {
     init_layout_svelte();
-    entry = "layout.svelte-e08c0c13.js";
-    js = ["layout.svelte-e08c0c13.js", "chunks/vendor-7aec64b3.js"];
+    entry = "layout.svelte-bceffa4c.js";
+    js = ["layout.svelte-bceffa4c.js", "chunks/vendor-5e8b3037.js"];
     css = [];
   }
 });
@@ -5615,8 +5615,8 @@ var entry2, js2, css2;
 var init__2 = __esm({
   ".svelte-kit/output/server/nodes/1.js"() {
     init_error_svelte();
-    entry2 = "error.svelte-8a41d656.js";
-    js2 = ["error.svelte-8a41d656.js", "chunks/vendor-7aec64b3.js"];
+    entry2 = "error.svelte-688ad5f6.js";
+    js2 = ["error.svelte-688ad5f6.js", "chunks/vendor-5e8b3037.js"];
     css2 = [];
   }
 });
@@ -39487,11 +39487,13 @@ var init_index_svelte = __esm({
       }
       return `<div style="${"display: flex; padding-left: 20px; padding-right: 20px;"}"><div>${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
-          Even if you try to ignore it, visually they go to the top of our chat list; multiply that by all the people you message across time, and it&#39;s a disaster for productivity and mental health.
+          Even if you try to ignore it, visually they go to the top of our chat list; 
+          if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
+          Multiply that by all the people you message across time, and it&#39;s a disaster . 
 
           <br><br>
-          <b>How this app is different</b>
-          <ol><li>Messages have no notifications by default unless the other person specifies it&#39;s time-sensitive e.g. &quot;Before Monday&quot; / &quot;This week&quot;
+          <b>How this app differs</b>
+          <ol><li>Messages have no notifications by default unless the other person specifies it&#39;s time-sensitive e.g. &quot;Before today&quot; / &quot;This week&quot;
             </li>
             <li>Left-side is organized intentionally - NOT by whoever messaged you most recently
             </li></ol></div>
@@ -39506,7 +39508,7 @@ var init_index_svelte = __esm({
           
           <div id="${"sign-in-button"}" style="${"border: solid; padding: 6px;"}">Sign Up
           </div></div>` : `<div style="${"display: flex"}"><input label="${"6-digit code"}" placeholder="${"123456"}"${add_attribute("value", phoneConfirmCode, 0)}>
-          <button>Confirm code</button></div>`}` : `<h2 class="${"message-group-title svelte-ewe8mg"}">Friends
+          <button>Confirm code</button></div>`}` : `<h2 class="${"message-group-title svelte-ewe8mg"}">People
       </h2>
       ${each(currentUser.friends, (friend) => {
         return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-ewe8mg", friend.uid === currentFriendUID ? "highlighted-box" : ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-ewe8mg"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
@@ -39518,8 +39520,7 @@ var init_index_svelte = __esm({
 
       ${``}
 
-      <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Family</h2>
-      No family...
+      
 
       <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Editable category</h2>
       Coming soon...
@@ -39527,7 +39528,7 @@ var init_index_svelte = __esm({
       <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Everyone else</h2>
       No new message requests yet...`}</div>
 
-  <div style="${"width: 60%; margin-left: 20px; margin-top: 5px;"}">${`${currentUser ? `<div style="${"margin-top: 18px;"}">Click any chat on the left-side
+  <div style="${"width: 420px; margin-left: 20px; margin-top: 5px;"}">${`${currentUser ? `<div style="${"margin-top: 18px;"}">Click any chat on the left-side
       </div> 
       <div>Set your name here</div>
       <input placeholder="${"John Apple"}"${add_attribute("value", newUserName, 0)}>
@@ -39549,8 +39550,8 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-afc197a6.js";
-    js3 = ["pages/index.svelte-afc197a6.js", "chunks/vendor-7aec64b3.js"];
+    entry3 = "pages/index.svelte-deabb10d.js";
+    js3 = ["pages/index.svelte-deabb10d.js", "chunks/vendor-5e8b3037.js"];
     css4 = ["assets/pages/index.svelte-05b74825.css"];
   }
 });
@@ -41620,7 +41621,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-3682f4b2.js", "js": ["start-3682f4b2.js", "chunks/vendor-7aec64b3.js"], "css": [] },
+    entry: { "file": "start-75009cb8.js", "js": ["start-75009cb8.js", "chunks/vendor-5e8b3037.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
