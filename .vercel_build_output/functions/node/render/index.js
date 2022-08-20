@@ -39391,7 +39391,7 @@ var init_index_svelte = __esm({
     initializeApp(firebaseConfig);
     db = getFirestore();
     css3 = {
-      code: ".highlighted-box.svelte-ewe8mg{background-color:orange}span.svelte-ewe8mg:hover{background-color:cyan}.message-group-title.svelte-ewe8mg{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-bottom:5px}",
+      code: ".highlighted-box.svelte-odgpo{background-color:orange}span.svelte-odgpo:hover{background-color:cyan}.message-group-title.svelte-odgpo{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
       map: null
     };
     Routes = create_ssr_component(($$result, $$props, $$bindings, slots) => {
@@ -39485,7 +39485,7 @@ var init_index_svelte = __esm({
           signInWithPhone();
         }
       }
-      return `<div style="${"display: flex; padding-left: 20px; padding-right: 20px;"}"><div>${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
+      return `<div style="${"display: flex; padding-left: 5px; padding-right: 5px;"}"><div>${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
           Even if you try to ignore it, visually they go to the top of our chat list; 
           if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
@@ -39508,29 +39508,30 @@ var init_index_svelte = __esm({
           
           <div id="${"sign-in-button"}" style="${"border: solid; padding: 6px;"}">Sign Up
           </div></div>` : `<div style="${"display: flex"}"><input label="${"6-digit code"}" placeholder="${"123456"}"${add_attribute("value", phoneConfirmCode, 0)}>
-          <button>Confirm code</button></div>`}` : `<h2 class="${"message-group-title svelte-ewe8mg"}">People
-      </h2>
-      ${each(currentUser.friends, (friend) => {
-        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-ewe8mg", friend.uid === currentFriendUID ? "highlighted-box" : ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-ewe8mg"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
-        </div>`;
+          <button>Confirm code</button></div>`}` : `<div style="${"width: 100px;"}"><h2 class="${"message-group-title svelte-odgpo"}">People
+        </h2>
+        ${each(currentUser.friends, (friend) => {
+        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-odgpo", friend.uid === currentFriendUID ? "highlighted-box" : ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-odgpo"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
+          </div>`;
       })}
 
-      <button style="${"margin-top: 20px;"}">Add person
-      </button>
+        <button style="${"margin-top: 20px;"}">Add person
+        </button>
 
-      ${``}
+        ${``}
 
-      
+        
 
-      <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Editable category</h2>
-      Coming soon...
+        <h2 class="${"message-group-title svelte-odgpo"}" style="${"margin-top: 50px;"}">Editable category</h2>
+        Coming soon...
 
-      <h2 class="${"message-group-title svelte-ewe8mg"}" style="${"margin-top: 50px;"}">Everyone else</h2>
-      No new message requests yet...`}</div>
+        <h2 class="${"message-group-title svelte-odgpo"}" style="${"margin-top: 50px;"}">Everyone else</h2>
+        No new message requests yet...
+      </div>`}</div>
 
-  <div style="${"width: 420px; margin-left: 20px; margin-top: 5px;"}">${`${currentUser ? `<div style="${"margin-top: 18px;"}">Click any chat on the left-side
+  <div style="${"width: 320px; margin-left: 5px; margin-top: 5px;"}">${`${currentUser ? `<div style="${"margin-top: 5px; margin-bottom: 12px;"}">Click any chat on the left-side
       </div> 
-      <div>Set your name here</div>
+      
       <input placeholder="${"John Apple"}"${add_attribute("value", newUserName, 0)}>
       <button>Update name</button>` : ``}`}</div>
 </div>`;
@@ -39550,9 +39551,9 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-bc2ae056.js";
-    js3 = ["pages/index.svelte-bc2ae056.js", "chunks/vendor-5e8b3037.js"];
-    css4 = ["assets/pages/index.svelte-05b74825.css"];
+    entry3 = "pages/index.svelte-0eb63707.js";
+    js3 = ["pages/index.svelte-0eb63707.js", "chunks/vendor-5e8b3037.js"];
+    css4 = ["assets/pages/index.svelte-b275861a.css"];
   }
 });
 
@@ -41621,7 +41622,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-84738e21.js", "js": ["start-84738e21.js", "chunks/vendor-5e8b3037.js"], "css": [] },
+    entry: { "file": "start-02712eac.js", "js": ["start-02712eac.js", "chunks/vendor-5e8b3037.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
