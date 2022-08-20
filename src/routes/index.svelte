@@ -22,7 +22,7 @@
         </div>
 
         <div style="display: flex; justify-content: center; align-items: center; width: 400px; margin-top: 25px;">
-          <input type="tel" id="phone-input-1" minlength="2" maxlength="3" placeholder="+1" bind:value={countryCode} style="width: 36px; height: 40px; font-size: 2rem; margin-right: 10px">
+          <input type="tel" id="phone-input-1" minlength="2" maxlength="4" placeholder="+1" bind:value={countryCode} style="width: 36px; height: 40px; font-size: 2rem; margin-right: 10px">
 
           <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="339" bind:value={phoneNumSegment1} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
 
