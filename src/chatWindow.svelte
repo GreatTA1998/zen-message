@@ -1,19 +1,36 @@
-<div>
+<div style="width: 410px">
   {#if chatDoc.messages}
     {#each chatDoc.messages as message}
-      <div style="display: flex;">
-        <p>{message.content}</p>
-        <p style="margin-left: auto; margin-right: 0;">
-          {displayDate(message.timestamp)}
-        </p>
+      <div style="display: flex; width: 410px;">
+        {#if message.authorUID === currentUser.uid}
+          <p style="margin-left: auto; margin-right: 0; margin-bottom: 4px">
+            {message.content} 
+          </p>
+          <p style="font-size: 0.8rem; color: grey; margin-left: 4px; margin-bottom: 0px; margin-top: 18px">
+            {' ' + displayDate(message.timestamp)}
+          </p>
+        {:else}
+          <p style="margin-right: 4px; margin-left: 0; margin-bottom: 4px">
+            {message.content}
+          </p>
+          <p style="font-size: 0.8rem; color: grey; margin-left: 0; margin-right: auto; margin-top: 18px">
+            {' ' + displayDate(message.timestamp)}
+          </p>
+        {/if}
       </div>
     {/each}
   {/if}
 
-  <input style="width: 100%" placeholder="Type message here..." bind:value={newMessage}>
+  <!-- border-box needed otherwise 410px <input> isn't equivalent to 410px on <button> -->
+  <input 
+    style="width: 405px; box-sizing: border-box" 
+    placeholder="Type message here..." 
+    bind:value={newMessage}
+    bind:this={MessageField}
+  >
 
   <div style="display: flex; margin-top: 10px; align-items: center;">
-    <div style="color: grey;">Hope for a reply:</div> 
+    <div style="color: grey;">Want reply:</div> 
     {#each replyTimingOptions as replyTimingOption}
       <div on:click={() => replyWithin = replyTimingOption} 
         class:highlighted-box={replyWithin === replyTimingOption} 
@@ -24,7 +41,7 @@
     {/each}
   </div>
 
-  <button on:click={sendMessage} style="margin-top: 12px; height: 30px; width: 410px;">
+  <button on:click={sendMessage} style="margin-top: 12px; height: 30px; width: 405px;">
     Send message
   </button>
 </div>
@@ -40,18 +57,22 @@
   import { displayDate } from './helpers.js'
 
   import { getFunctions, httpsCallable } from "firebase/functions";
+  import { updateCurrentUser } from 'firebase/auth';
 
   const functions = getFunctions()
   const sendTextMessage = httpsCallable(functions, 'sendTextMessage');
 
+  let MessageField
   let chatID
   let newMessage
-  let replyTimingOptions = ['real-time', 'today', 'this week', 'anytime']
-  let replyWithin = 'anytime'
+  let replyTimingOptions = ['real-time', 'today', 'this week', 'any time']
+  let replyWithin = 'any time'
   let unsub
   let chatDoc = { messages: [] }
 
   onMount(() => {
+    MessageField.focus()
+
     unsub = onSnapshot(doc(db, 'chats', chatRoomID), (snap) => {
       console.log("Current data: ", snap.data());
       if (snap.data()) {
@@ -83,14 +104,15 @@
     updateDoc(ref, {
       messages: arrayUnion({
         content: newMessage,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        authorUID: currentUser.uid
       })
     })
 
     // somehow visibly show there's a new message in that chat room 
     // const [otherPersonUID] = chatDoc.participantUIDs.filter(uid => uid !== currentUser.uid)
-    const otherPersonUID = currentUser.uid
-    const personRef = doc(db, 'users', otherPersonUID)
+    // const otherPersonUID = currentUser.uid
+    const personRef = doc(db, 'users', friendUID)
     updateDoc(personRef, {
       friendUIDsWithNewMessages: arrayUnion(chatRoomID)
     })  
@@ -100,7 +122,7 @@
 
     // HANDLE SMS NOTIFICATION
     switch (replyWithin) {
-      case 'anytime': 
+      case 'any time': 
         break
       case 'real-time': 
         console.log('sending text to ,', otherPersonSnap.data().phoneNumber)

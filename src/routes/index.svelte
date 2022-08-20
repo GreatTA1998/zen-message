@@ -5,13 +5,15 @@
         <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
           <b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
-          Even if you try to ignore it, visually they go to the top of our chat list; multiply that by all the people you message across time, and it's a disaster for productivity and mental health.
+          Even if you try to ignore it, visually they go to the top of our chat list; 
+          if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
+          Multiply that by all the people you message across time, and it's a disaster . 
 
           <br><br>
-          <b>How this app is different</b>
+          <b>How this app differs</b>
           <ol>
             <li>
-            Messages have no notifications by default unless the other person specifies it's time-sensitive e.g. "Before Monday" / "This week"
+            Messages have no notifications by default unless the other person specifies it's time-sensitive e.g. "Before today" / "This week"
             </li>
             <li>
             Left-side is organized intentionally - NOT by whoever messaged you most recently
@@ -41,7 +43,7 @@
 
     {:else}
       <h2 class="message-group-title">
-        Friends
+        People
       </h2>
       {#each currentUser.friends as friend}
         <div 
@@ -72,8 +74,8 @@
         {/each}
       {/if}
 
-      <h2 class="message-group-title" style="margin-top: 50px;">Family</h2>
-      No family...
+      <!-- <h2 class="message-group-title" style="margin-top: 50px;">Family</h2>
+      No family... -->
 
       <h2 class="message-group-title" style="margin-top: 50px;">Editable category</h2>
       Coming soon...
@@ -83,12 +85,13 @@
     {/if}
   </div>
 
-  <div style="width: 60%; margin-left: 20px; margin-top: 5px;">
+  <div style="width: 420px; margin-left: 20px; margin-top: 5px;">
     {#if currentFriendUID && currentUser && chatRoomID}
       {#key currentFriendUID}
         <ChatWindow 
           {chatRoomID}
           friendUID={currentFriendUID} 
+          otherPersonUID={currentFriendUID}
           {currentUser}
         />
       {/key}
