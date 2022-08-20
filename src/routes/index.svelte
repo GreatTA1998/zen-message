@@ -1,4 +1,4 @@
-<div style="display: flex; padding-left: 5px; padding-right: 5px;">
+<div style="display: flex; padding-left: 0px; padding-right: 0px;">
   <div>
     {#if !currentUser}
       {#if !phoneConfirmationResult}
