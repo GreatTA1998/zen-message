@@ -1,4 +1,4 @@
-<div style="display: flex; padding-left: 20px; padding-right: 20px;">
+<div style="display: flex; padding-left: 5px; padding-right: 5px;">
   <div>
     {#if !currentUser}
       {#if !phoneConfirmationResult}
@@ -42,50 +42,52 @@
       {/if}  
 
     {:else}
-      <h2 class="message-group-title">
-        People
-      </h2>
-      {#each currentUser.friends as friend}
-        <div 
-          on:click={() => currentFriendUID = friend.uid} 
-          style="border: solid orange; height: 40px; display: flex; align-items: center;"
-          class:highlighted-box={friend.uid === currentFriendUID}
-        >
-          <span style="margin-left: 5px">
-            {friend.name}{friendUIDsWithNewMessages.includes(friend.uid) ? 'New messages' : ''}
-          </span>
-        </div>
-      {/each}
-
-      <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
-        Add person
-      </button>
-
-      {#if isAddingFriend}
-        <div>Here are all accounts:</div>
-        {#each accounts as account} 
-          {#if account.uid !== currentUser.uid}
-            <div style="margin-top: 10px;">
-              <button on:click={() => addFriend(account)} style="margin-left: 20px;">
-                {account.name}
-              </button>
-            </div>
-          {/if}
+      <div style="width: 100px;">
+        <h2 class="message-group-title">
+          People
+        </h2>
+        {#each currentUser.friends as friend}
+          <div 
+            on:click={() => currentFriendUID = friend.uid} 
+            style="border: solid orange; height: 40px; display: flex; align-items: center;"
+            class:highlighted-box={friend.uid === currentFriendUID}
+          >
+            <span style="margin-left: 5px">
+              {friend.name}{friendUIDsWithNewMessages.includes(friend.uid) ? 'New messages' : ''}
+            </span>
+          </div>
         {/each}
-      {/if}
 
-      <!-- <h2 class="message-group-title" style="margin-top: 50px;">Family</h2>
-      No family... -->
+        <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
+          Add person
+        </button>
 
-      <h2 class="message-group-title" style="margin-top: 50px;">Editable category</h2>
-      Coming soon...
+        {#if isAddingFriend}
+          <div>Here are all accounts:</div>
+          {#each accounts as account} 
+            {#if account.uid !== currentUser.uid}
+              <div style="margin-top: 10px;">
+                <button on:click={() => addFriend(account)} style="margin-left: 20px;">
+                  {account.name}
+                </button>
+              </div>
+            {/if}
+          {/each}
+        {/if}
 
-      <h2 class="message-group-title" style="margin-top: 50px;">Everyone else</h2>
-      No new message requests yet...
+        <!-- <h2 class="message-group-title" style="margin-top: 50px;">Family</h2>
+        No family... -->
+
+        <h2 class="message-group-title" style="margin-top: 50px;">Editable category</h2>
+        Coming soon...
+
+        <h2 class="message-group-title" style="margin-top: 50px;">Everyone else</h2>
+        No new message requests yet...
+      </div>
     {/if}
   </div>
 
-  <div style="width: 420px; margin-left: 20px; margin-top: 5px;">
+  <div style="width: 320px; margin-left: 5px; margin-top: 5px;">
     {#if currentFriendUID && currentUser && chatRoomID}
       {#key currentFriendUID}
         <ChatWindow 
@@ -96,10 +98,10 @@
         />
       {/key}
     {:else if currentUser}
-      <div style="margin-top: 18px;">
+      <div style="margin-top: 5px; margin-bottom: 12px;">
         Click any chat on the left-side
       </div> 
-      <div>Set your name here</div>
+      <!-- <div>Set your name here</div> -->
       <input placeholder="John Apple" bind:value={newUserName}>
       <button on:click={updateUserName}>Update name</button>
     {/if}
@@ -300,6 +302,7 @@
     font-family: Roboto, sans-serif; 
     font-weight: 600; 
     color: rgb(119, 110, 110);
+    margin-top: 5px;
     margin-bottom: 5px;
   }
 </style>
