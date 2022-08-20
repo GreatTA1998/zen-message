@@ -39485,7 +39485,7 @@ var init_index_svelte = __esm({
           signInWithPhone();
         }
       }
-      return `<div style="${"display: flex; padding-left: 5px; padding-right: 5px;"}"><div>${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
+      return `<div style="${"display: flex; padding-left: 0px; padding-right: 0px;"}"><div>${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
           Even if you try to ignore it, visually they go to the top of our chat list; 
           if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
@@ -39551,8 +39551,8 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-0eb63707.js";
-    js3 = ["pages/index.svelte-0eb63707.js", "chunks/vendor-5e8b3037.js"];
+    entry3 = "pages/index.svelte-685b9917.js";
+    js3 = ["pages/index.svelte-685b9917.js", "chunks/vendor-5e8b3037.js"];
     css4 = ["assets/pages/index.svelte-b275861a.css"];
   }
 });
@@ -41622,7 +41622,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-02712eac.js", "js": ["start-02712eac.js", "chunks/vendor-5e8b3037.js"], "css": [] },
+    entry: { "file": "start-655f8a0b.js", "js": ["start-655f8a0b.js", "chunks/vendor-5e8b3037.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
