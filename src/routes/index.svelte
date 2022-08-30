@@ -1,13 +1,13 @@
 <div style="display: flex; padding-left: 0px; padding-right: 0px;">
   <div>
-    {#if !currentUser}
+    {#if !$user}
       {#if !phoneConfirmationResult}
         <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
           <b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
           Even if you try to ignore it, visually they go to the top of our chat list; 
           if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
-          Multiply that by all the people you message across time, and it's a disaster . 
+          Multiply that by all the people you message across time, and it's a disaster.
 
           <br><br>
           <b>How this app differs</b>
@@ -37,7 +37,9 @@
       {:else}
         <div style="display: flex">
           <input label="6-digit code" placeholder="123456" bind:value={phoneConfirmCode}>
-          <button on:click={verifyConfirmationCode}>Confirm code</button>
+          <button on:click={verifyConfirmationCode}>
+            Confirm code
+          </button>
         </div>
       {/if}  
 
@@ -46,7 +48,7 @@
         <h2 class="message-group-title">
           People
         </h2>
-        {#each currentUser.friends as friend}
+        {#each $user.friends as friend}
           <div 
             on:click={() => currentFriendUID = friend.uid} 
             style="border: solid orange; height: 40px; display: flex; align-items: center;"
@@ -65,7 +67,7 @@
         {#if isAddingFriend}
           <div>Here are all accounts:</div>
           {#each accounts as account} 
-            {#if account.uid !== currentUser.uid}
+            {#if account.uid !== $user.uid}
               <div style="margin-top: 10px;">
                 <button on:click={() => addFriend(account)} style="margin-left: 20px;">
                   {account.name}
@@ -75,35 +77,66 @@
           {/each}
         {/if}
 
-        <!-- <h2 class="message-group-title" style="margin-top: 50px;">Family</h2>
-        No family... -->
-
-        <h2 class="message-group-title" style="margin-top: 50px;">Editable category</h2>
+        <h2 class="message-group-title" style="margin-top: 50px;">
+          Editable category
+        </h2>
         Coming soon...
 
-        <h2 class="message-group-title" style="margin-top: 50px;">Everyone else</h2>
-        No new message requests yet...
+        <h2 class="message-group-title" style="margin-top: 50px;">
+          Outside Messages
+        </h2>
+        
+        {#if $user.messageRequestNames instanceof Array}
+          {#each $user.messageRequestNames as newName}
+            <div 
+              on:click={() => showMessageRequest(newName)}
+              style="border: solid blue; height: 40px; display: flex; align-items: center;"
+            >
+              {newName}
+            </div>
+          {/each}
+        {/if}
       </div>
     {/if}
   </div>
 
   <div style="width: 320px; margin-left: 5px; margin-top: 5px;">
-    {#if currentFriendUID && currentUser && chatRoomID}
+    {#if currentFriendUID && $user && chatRoomID}
       {#key currentFriendUID}
         <ChatWindow 
           {chatRoomID}
           friendUID={currentFriendUID} 
           otherPersonUID={currentFriendUID}
-          {currentUser}
+          currentUser={$user}
         />
       {/key}
-    {:else if currentUser}
+    {:else if currentMessageRequestName}
+      <div>
+        {currentMessageRequestContent}
+      </div>
+
+      <button on:click={() => resolveMessageRequest(currentMessageRequestName)}>
+        Resolve and delete
+      </button>
+
+    {:else if $user}
       <div style="margin-top: 5px; margin-bottom: 12px;">
         Click any chat on the left-side
       </div> 
-      <!-- <div>Set your name here</div> -->
+
       <input placeholder="John Apple" bind:value={newUserName}>
-      <button on:click={updateUserName}>Update name</button>
+
+      <button on:click={updateUserName}>
+        Update name
+      </button>
+
+      <div style="margin-top: 10px;">
+        Give this link to your friends & family so they can message you without a zen-message account:
+      </div>
+
+      <div style="font-size: 0.8rem; color: blue">
+        zen-message.com/{$user.uid}
+      </div>
     {/if}
   </div>
 </div>
@@ -118,8 +151,9 @@
 
   import db from '../db.js'
   import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
-  import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore"
+  import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
   import ChatWindow from '../chatWindow.svelte'
+  import { user } from '../store.js'
   import { getRandomID } from '../helpers.js'
 
   let unsub
@@ -134,8 +168,11 @@
 
   let chatRoomID = ''
 
+  let currentMessageRequestContent = '' 
+  let currentMessageRequestName = ''
+
   $: if (currentFriendUID) {
-    chatRoomID = currentUser.uid < currentFriendUID ? (currentUser.uid + currentFriendUID) : (currentFriendUID + currentUser.uid)
+    chatRoomID = $user.uid < currentFriendUID ? ($user.uid + currentFriendUID) : (currentFriendUID + $user.uid)
     console.log('chatRoomID =', chatRoomID)
   }
 
@@ -214,7 +251,6 @@
 
   const auth = getAuth();
 
-  let currentUser = null
   let currentFriendUID = ''
   let accounts = []
   let isAddingFriend = false 
@@ -227,7 +263,7 @@
   })
 
   async function addFriend ({ name, uid }) {
-    for (const friend of currentUser.friends) {
+    for (const friend of $user.friends) {
       if (friend.uid === uid) {
         alert("You're already friends")
         isAddingFriend = false
@@ -235,45 +271,47 @@
       }
     }
 
-    const ref = doc(db, 'users', currentUser.uid)
+    const ref = doc(db, 'users', $user.uid)
     await updateDoc(ref, {
       friends: arrayUnion({ name, uid })
     })
 
-    const chatRoomID = currentUser.uid < uid ? (currentUser.uid + uid) : (uid + currentUser.uid)
+    const chatRoomID = $user.uid < uid ? ($user.uid + uid) : (uid + $user.uid)
     const chatRef = doc(db, 'chats', chatRoomID)
     await setDoc(chatRef, {
-      participantUIDs: [uid, currentUser.uid],
+      participantUIDs: [uid, $user.uid],
       messages: []
     })
     isAddingFriend = false
   }
 
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const docRef = doc(db, "users", user.uid);
+  onAuthStateChanged(auth, async (resultUser) => {
+    if (resultUser) {
+      const docRef = doc(db, "users", resultUser.uid);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        currentUser = docSnap.data()
+        user.set(docSnap.data())
+        // $user = docSnap.data()
       } else {
         const initialUserDoc =  {
-          uid: user.uid,
-          name: user.displayName || 'John Apple',
-          phoneNumber: user.phoneNumber,
+          uid: resultUser.uid,
+          name: resultUser.displayName || 'John Apple',
+          phoneNumber: resultUser.phoneNumber,
           friends: [],
           family: [],
           VIPs: [],
           everyoneElse: []
         }
-        await setDoc(doc(db, 'users', user.uid), initialUserDoc)
-        currentUser = initialUserDoc
+        await setDoc(doc(db, 'users', resultUser.uid), initialUserDoc)
+        // $user = initialUserDoc
+        user.set(initialUserDoc)
       }
 
-      unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-        currentUser = snap.data()
-        if (currentUser.friendUIDsWithNewMessages) {
-          friendUIDsWithNewMessages = currentUser.friendUIDsWithNewMessages
+      unsub = onSnapshot(doc(db, 'users', resultUser.uid), (snap) => {
+        user.set(snap.data())
+        if ($user.friendUIDsWithNewMessages) {
+          friendUIDsWithNewMessages = $user.friendUIDsWithNewMessages
         }
       });
     } 
@@ -281,17 +319,42 @@
   
   async function updateUserName () {
     const ref = 
-    await updateDoc(doc(db, 'users', currentUser.uid), {
+    await updateDoc(doc(db, 'users', $user.uid), {
       name: newUserName
     })
     newUserName = ''
     alert('successfully updated')
+  }
+
+  function showMessageRequest (name) {
+    currentFriendUID = '' 
+    currentMessageRequestName = name
+    currentMessageRequestContent = $user.messageRequestObjects.filter(obj => obj.senderName === name)[0].content
+  }
+
+  function resolveMessageRequest (name) {
+    const userRef = doc(db, 'users', $user.uid)
+    // const target = $user.messageRequestObjects.filter(obj => obj.senderName === name)[0]
+    updateDoc(userRef, {
+      messageRequestObjects: arrayRemove({
+        content: currentMessageRequestContent,
+        senderName: currentMessageRequestName
+      }),
+      messageRequestNames: arrayRemove(currentMessageRequestName)
+    })
+
+    currentMessageRequestName = '' 
+    currentMessageRequestContent = ''
   }
 </script>
 
 <style>
   .highlighted-box {
     background-color: orange;
+  }
+
+  .highlighted-blue {
+    background-color: lightseagreen;
   }
 
   span:hover {
