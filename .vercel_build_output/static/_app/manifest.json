@@ -1,48 +1,66 @@
 {
   ".svelte-kit/runtime/client/start.js": {
-    "file": "start-655f8a0b.js",
+    "file": "start-82afb7a7.js",
     "src": ".svelte-kit/runtime/client/start.js",
     "isEntry": true,
     "imports": [
-      "_vendor-5e8b3037.js"
+      "_vendor-87f020b6.js"
     ],
     "dynamicImports": [
       ".svelte-kit/runtime/components/layout.svelte",
       ".svelte-kit/runtime/components/error.svelte",
-      "src/routes/index.svelte"
+      "src/routes/index.svelte",
+      "src/routes/[uid].svelte"
     ]
   },
   ".svelte-kit/runtime/components/layout.svelte": {
-    "file": "layout.svelte-bceffa4c.js",
+    "file": "layout.svelte-35ac87e8.js",
     "src": ".svelte-kit/runtime/components/layout.svelte",
     "isEntry": true,
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-5e8b3037.js"
+      "_vendor-87f020b6.js"
     ]
   },
   ".svelte-kit/runtime/components/error.svelte": {
-    "file": "error.svelte-688ad5f6.js",
+    "file": "error.svelte-ad85eac2.js",
     "src": ".svelte-kit/runtime/components/error.svelte",
     "isEntry": true,
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-5e8b3037.js"
+      "_vendor-87f020b6.js"
     ]
   },
   "src/routes/index.svelte": {
-    "file": "pages/index.svelte-685b9917.js",
+    "file": "pages/index.svelte-49388a2f.js",
     "src": "src/routes/index.svelte",
     "isEntry": true,
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-5e8b3037.js"
+      "_vendor-87f020b6.js",
+      "_db-f3cf9e2e.js"
     ],
     "css": [
-      "assets/pages/index.svelte-b275861a.css"
+      "assets/pages/index.svelte-90f91423.css"
     ]
   },
-  "_vendor-5e8b3037.js": {
-    "file": "chunks/vendor-5e8b3037.js"
+  "src/routes/[uid].svelte": {
+    "file": "pages/_uid_.svelte-49cd50a9.js",
+    "src": "src/routes/[uid].svelte",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-87f020b6.js",
+      "_db-f3cf9e2e.js"
+    ]
+  },
+  "_vendor-87f020b6.js": {
+    "file": "chunks/vendor-87f020b6.js"
+  },
+  "_db-f3cf9e2e.js": {
+    "file": "chunks/db-f3cf9e2e.js",
+    "imports": [
+      "_vendor-87f020b6.js"
+    ]
   }
 }

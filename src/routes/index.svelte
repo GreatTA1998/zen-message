@@ -53,9 +53,10 @@
             on:click={() => currentFriendUID = friend.uid} 
             style="border: solid orange; height: 40px; display: flex; align-items: center;"
             class:highlighted-box={friend.uid === currentFriendUID}
+            class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
           >
             <span style="margin-left: 5px">
-              {friend.name}{friendUIDsWithNewMessages.includes(friend.uid) ? 'New messages' : ''}
+              {friend.name}
             </span>
           </div>
         {/each}

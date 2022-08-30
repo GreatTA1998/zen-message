@@ -53,8 +53,8 @@
 
 <script>
   export let friendUID
-  export let currentUser
   export let chatRoomID
+  export let currentUser
 
   import { where, getDoc, getDocs, query, collection, doc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from 'firebase/firestore'
   import db from './db';
@@ -149,13 +149,14 @@
     // somehow visibly show there's a new message in that chat room 
     // const [otherPersonUID] = chatDoc.participantUIDs.filter(uid => uid !== currentUser.uid)
     // const otherPersonUID = currentUser.uid
-    const personRef = doc(db, 'users', friendUID)
-    updateDoc(personRef, {
-      friendUIDsWithNewMessages: arrayUnion(chatRoomID)
+    
+    const otherRef = doc(db, 'users', friendUID)
+    updateDoc(otherRef, {
+      friendUIDsWithNewMessages: arrayUnion(currentUser.uid)
     })  
 
     // get the other person's phone number
-    const otherPersonSnap = await getDoc(personRef)
+    const otherPersonSnap = await getDoc(otherRef)
 
     // HANDLE SMS NOTIFICATION
     switch (replyWithin) {

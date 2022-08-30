@@ -945,7 +945,7 @@ var init_install_fetch = __esm({
         factory(exports2);
       })(commonjsGlobal, function(exports3) {
         const SymbolPolyfill = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? Symbol : (description) => `Symbol(${description})`;
-        function noop4() {
+        function noop5() {
           return void 0;
         }
         function getGlobals() {
@@ -962,7 +962,7 @@ var init_install_fetch = __esm({
         function typeIsObject(x2) {
           return typeof x2 === "object" && x2 !== null || typeof x2 === "function";
         }
-        const rethrowAssertionErrorRejection = noop4;
+        const rethrowAssertionErrorRejection = noop5;
         const originalPromise = Promise;
         const originalPromiseThen = Promise.prototype.then;
         const originalPromiseResolve = Promise.resolve.bind(originalPromise);
@@ -1636,10 +1636,10 @@ var init_install_fetch = __esm({
           [PullSteps](readRequest) {
             const stream = this._controlledReadableByteStream;
             if (this._queueTotalSize > 0) {
-              const entry4 = this._queue.shift();
-              this._queueTotalSize -= entry4.byteLength;
+              const entry5 = this._queue.shift();
+              this._queueTotalSize -= entry5.byteLength;
               ReadableByteStreamControllerHandleQueueDrain(this);
-              const view = new Uint8Array(entry4.buffer, entry4.byteOffset, entry4.byteLength);
+              const view = new Uint8Array(entry5.buffer, entry5.byteOffset, entry5.byteLength);
               readRequest._chunkSteps(view);
               return;
             }
@@ -3171,7 +3171,7 @@ var init_install_fetch = __esm({
                 return newPromise((resolveRead, rejectRead) => {
                   ReadableStreamDefaultReaderRead(reader, {
                     _chunkSteps: (chunk) => {
-                      currentWrite = PerformPromiseThen(WritableStreamDefaultWriterWrite(writer, chunk), void 0, noop4);
+                      currentWrite = PerformPromiseThen(WritableStreamDefaultWriterWrite(writer, chunk), void 0, noop5);
                       resolveRead(false);
                     },
                     _closeSteps: () => resolveRead(true),
@@ -3884,10 +3884,10 @@ var init_install_fetch = __esm({
           const readable2 = pair === null || pair === void 0 ? void 0 : pair.readable;
           assertRequiredField(readable2, "readable", "ReadableWritablePair");
           assertReadableStream(readable2, `${context} has member 'readable' that`);
-          const writable2 = pair === null || pair === void 0 ? void 0 : pair.writable;
-          assertRequiredField(writable2, "writable", "ReadableWritablePair");
-          assertWritableStream(writable2, `${context} has member 'writable' that`);
-          return { readable: readable2, writable: writable2 };
+          const writable3 = pair === null || pair === void 0 ? void 0 : pair.writable;
+          assertRequiredField(writable3, "writable", "ReadableWritablePair");
+          assertWritableStream(writable3, `${context} has member 'writable' that`);
+          return { readable: readable2, writable: writable3 };
         }
         class ReadableStream2 {
           constructor(rawUnderlyingSource = {}, rawStrategy = {}) {
@@ -4066,7 +4066,7 @@ var init_install_fetch = __esm({
             reader._readIntoRequests = new SimpleQueue();
           }
           const sourceCancelPromise = stream._readableStreamController[CancelSteps](reason);
-          return transformPromiseWith(sourceCancelPromise, noop4);
+          return transformPromiseWith(sourceCancelPromise, noop5);
         }
         function ReadableStreamClose(stream) {
           stream._state = "closed";
@@ -4465,10 +4465,10 @@ var init_install_fetch = __esm({
           if (stream._backpressure) {
             const backpressureChangePromise = stream._backpressureChangePromise;
             return transformPromiseWith(backpressureChangePromise, () => {
-              const writable2 = stream._writable;
-              const state = writable2._state;
+              const writable3 = stream._writable;
+              const state = writable3._state;
               if (state === "erroring") {
-                throw writable2._storedError;
+                throw writable3._storedError;
               }
               return TransformStreamDefaultControllerPerformTransform(controller, chunk);
             });
@@ -5417,7 +5417,9 @@ var init_install_fetch = __esm({
   }
 });
 
-// .svelte-kit/output/server/chunks/index-13c0de55.js
+// .svelte-kit/output/server/chunks/index-b3dad0a6.js
+function noop2() {
+}
 function run(fn) {
   return fn();
 }
@@ -5426,6 +5428,16 @@ function blank_object() {
 }
 function run_all(fns) {
   fns.forEach(run);
+}
+function safe_not_equal(a, b) {
+  return a != a ? b == b : a !== b || (a && typeof a === "object" || typeof a === "function");
+}
+function subscribe(store, ...callbacks) {
+  if (store == null) {
+    return noop2;
+  }
+  const unsub = store.subscribe(...callbacks);
+  return unsub.unsubscribe ? () => unsub.unsubscribe() : unsub;
 }
 function set_current_component(component) {
   current_component = component;
@@ -5481,7 +5493,7 @@ function create_ssr_component(fn) {
       return {
         html,
         css: {
-          code: Array.from(result.css).map((css5) => css5.code).join("\n"),
+          code: Array.from(result.css).map((css6) => css6.code).join("\n"),
           map: null
         },
         head: result.title + result.head
@@ -5496,8 +5508,8 @@ function add_attribute(name6, value, boolean) {
   return ` ${name6}${value === true && boolean_attributes.has(name6) ? "" : `=${typeof value === "string" ? JSON.stringify(escape(value)) : `"${value}"`}`}`;
 }
 var current_component, boolean_attributes, escaped, missing_component, on_destroy;
-var init_index_13c0de55 = __esm({
-  ".svelte-kit/output/server/chunks/index-13c0de55.js"() {
+var init_index_b3dad0a6 = __esm({
+  ".svelte-kit/output/server/chunks/index-b3dad0a6.js"() {
     Promise.resolve();
     boolean_attributes = /* @__PURE__ */ new Set([
       "allowfullscreen",
@@ -5546,7 +5558,7 @@ __export(layout_svelte_exports, {
 var Layout;
 var init_layout_svelte = __esm({
   ".svelte-kit/output/server/entries/fallbacks/layout.svelte.js"() {
-    init_index_13c0de55();
+    init_index_b3dad0a6();
     Layout = create_ssr_component(($$result, $$props, $$bindings, slots) => {
       return `${slots.default ? slots.default({}) : ``}`;
     });
@@ -5565,8 +5577,8 @@ var entry, js, css;
 var init__ = __esm({
   ".svelte-kit/output/server/nodes/0.js"() {
     init_layout_svelte();
-    entry = "layout.svelte-bceffa4c.js";
-    js = ["layout.svelte-bceffa4c.js", "chunks/vendor-5e8b3037.js"];
+    entry = "layout.svelte-35ac87e8.js";
+    js = ["layout.svelte-35ac87e8.js", "chunks/vendor-87f020b6.js"];
     css = [];
   }
 });
@@ -5583,7 +5595,7 @@ function load({ error: error2, status }) {
 var Error2;
 var init_error_svelte = __esm({
   ".svelte-kit/output/server/entries/fallbacks/error.svelte.js"() {
-    init_index_13c0de55();
+    init_index_b3dad0a6();
     Error2 = create_ssr_component(($$result, $$props, $$bindings, slots) => {
       let { status } = $$props;
       let { error: error2 } = $$props;
@@ -5615,8 +5627,8 @@ var entry2, js2, css2;
 var init__2 = __esm({
   ".svelte-kit/output/server/nodes/1.js"() {
     init_error_svelte();
-    entry2 = "error.svelte-688ad5f6.js";
-    js2 = ["error.svelte-688ad5f6.js", "chunks/vendor-5e8b3037.js"];
+    entry2 = "error.svelte-ad85eac2.js";
+    js2 = ["error.svelte-ad85eac2.js", "chunks/vendor-87f020b6.js"];
     css2 = [];
   }
 });
@@ -5750,7 +5762,7 @@ function implementsAnyMethods(obj, methods) {
   }
   return false;
 }
-function noop3() {
+function noop4() {
 }
 function getModularInstance(service) {
   if (service && service._delegate) {
@@ -6040,13 +6052,13 @@ var init_index_node_esm = __esm({
           };
         }
         if (observer.next === void 0) {
-          observer.next = noop3;
+          observer.next = noop4;
         }
         if (observer.error === void 0) {
-          observer.error = noop3;
+          observer.error = noop4;
         }
         if (observer.complete === void 0) {
-          observer.complete = noop3;
+          observer.complete = noop4;
         }
         const unsub = this.unsubscribeOne.bind(this, this.observers.length);
         if (this.finalized) {
@@ -11668,7 +11680,7 @@ var require_writer = __commonJS({
       this.next = void 0;
       this.val = val;
     }
-    function noop4() {
+    function noop5() {
     }
     function State(writer) {
       this.head = writer.head;
@@ -11678,7 +11690,7 @@ var require_writer = __commonJS({
     }
     function Writer() {
       this.len = 0;
-      this.head = new Op(noop4, 0, 0);
+      this.head = new Op(noop5, 0, 0);
       this.tail = this.head;
       this.states = null;
     }
@@ -11797,7 +11809,7 @@ var require_writer = __commonJS({
     };
     Writer.prototype.fork = function fork() {
       this.states = new State(this);
-      this.head = this.tail = new Op(noop4, 0, 0);
+      this.head = this.tail = new Op(noop5, 0, 0);
       this.len = 0;
       return this;
     };
@@ -11808,7 +11820,7 @@ var require_writer = __commonJS({
         this.len = this.states.len;
         this.states = this.states.next;
       } else {
-        this.head = this.tail = new Op(noop4, 0, 0);
+        this.head = this.tail = new Op(noop5, 0, 0);
         this.len = 0;
       }
       return this;
@@ -13920,14 +13932,14 @@ var require_root = __commonJS({
     Root2.prototype.fetch = util.fetch;
     function SYNC() {
     }
-    Root2.prototype.load = function load2(filename, options, callback) {
+    Root2.prototype.load = function load3(filename, options, callback) {
       if (typeof options === "function") {
         callback = options;
         options = void 0;
       }
       var self2 = this;
       if (!callback)
-        return util.asPromise(load2, self2, filename, options);
+        return util.asPromise(load3, self2, filename, options);
       var sync = callback === SYNC;
       function finish(err, root) {
         if (!callback)
@@ -14473,7 +14485,7 @@ var require_index_light = __commonJS({
     "use strict";
     var protobuf = module2.exports = require_index_minimal();
     protobuf.build = "light";
-    function load2(filename, root, callback) {
+    function load3(filename, root, callback) {
       if (typeof root === "function") {
         callback = root;
         root = new protobuf.Root();
@@ -14481,7 +14493,7 @@ var require_index_light = __commonJS({
         root = new protobuf.Root();
       return root.load(filename, callback);
     }
-    protobuf.load = load2;
+    protobuf.load = load3;
     function loadSync(filename, root) {
       if (!root)
         root = new protobuf.Root();
@@ -17333,12 +17345,12 @@ var require_src2 = __commonJS({
       root.resolveAll();
       return createPackageDefinition(root, options);
     }
-    function load2(filename, options) {
+    function load3(filename, options) {
       return util_1.loadProtosWithOptions(filename, options).then((loadedRoot) => {
         return createPackageDefinition(loadedRoot, options);
       });
     }
-    exports2.load = load2;
+    exports2.load = load3;
     function loadSync(filename, options) {
       const loadedRoot = util_1.loadProtosWithOptionsSync(filename, options);
       return createPackageDefinition(loadedRoot, options);
@@ -20212,7 +20224,7 @@ var require_server = __commonJS({
     var uri_parser_1 = require_uri_parser();
     var channelz_1 = require_channelz();
     var TRACER_NAME = "server";
-    function noop4() {
+    function noop5() {
     }
     function getUnimplementedStatusResponse(methodName) {
       return {
@@ -20428,7 +20440,7 @@ var require_server = __commonJS({
           } else {
             http2Server = http2.createServer(serverOptions);
           }
-          http2Server.setTimeout(0, noop4);
+          http2Server.setTimeout(0, noop5);
           this._setupHandlers(http2Server);
           return http2Server;
         };
@@ -23717,13 +23729,13 @@ async function ignoreIfPrimaryLeaseLoss(err) {
 function newLocalStore(persistence, queryEngine, initialUser, serializer) {
   return new LocalStoreImpl(persistence, queryEngine, initialUser, serializer);
 }
-async function localStoreHandleUserChange(localStore, user) {
+async function localStoreHandleUserChange(localStore, user2) {
   const localStoreImpl = debugCast(localStore);
   const result = await localStoreImpl.persistence.runTransaction("Handle user change", "readonly", (txn) => {
     let oldBatches;
     return localStoreImpl.mutationQueue.getAllMutationBatches(txn).next((promisedOldBatches) => {
       oldBatches = promisedOldBatches;
-      localStoreImpl.initializeUserComponents(user);
+      localStoreImpl.initializeUserComponents(user2);
       return localStoreImpl.mutationQueue.getAllMutationBatches(txn);
     }).next((newBatches) => {
       const removedBatchIds = [];
@@ -24315,7 +24327,7 @@ async function restartNetwork(remoteStore) {
   remoteStoreImpl.offlineCauses.delete(4);
   await enableNetworkInternal(remoteStoreImpl);
 }
-async function remoteStoreHandleCredentialChange(remoteStore, user) {
+async function remoteStoreHandleCredentialChange(remoteStore, user2) {
   const remoteStoreImpl = debugCast(remoteStore);
   remoteStoreImpl.asyncQueue.verifyOperationInProgress();
   logDebug(LOG_TAG$5, "RemoteStore received new credentials");
@@ -24325,7 +24337,7 @@ async function remoteStoreHandleCredentialChange(remoteStore, user) {
   if (usesNetwork) {
     remoteStoreImpl.onlineStateTracker.set("Unknown");
   }
-  await remoteStoreImpl.remoteSyncer.handleCredentialChange(user);
+  await remoteStoreImpl.remoteSyncer.handleCredentialChange(user2);
   remoteStoreImpl.offlineCauses.delete(3);
   await enableNetworkInternal(remoteStoreImpl);
 }
@@ -24817,15 +24829,15 @@ async function applyDocChanges(syncEngineImpl, queryView, changes, remoteEvent) 
   updateTrackedLimbos(syncEngineImpl, queryView.targetId, viewChange.limboChanges);
   return viewChange.snapshot;
 }
-async function syncEngineHandleCredentialChange(syncEngine, user) {
+async function syncEngineHandleCredentialChange(syncEngine, user2) {
   const syncEngineImpl = debugCast(syncEngine);
-  const userChanged = !syncEngineImpl.currentUser.isEqual(user);
+  const userChanged = !syncEngineImpl.currentUser.isEqual(user2);
   if (userChanged) {
-    logDebug(LOG_TAG$3, "User change. New user:", user.toKey());
-    const result = await localStoreHandleUserChange(syncEngineImpl.localStore, user);
-    syncEngineImpl.currentUser = user;
+    logDebug(LOG_TAG$3, "User change. New user:", user2.toKey());
+    const result = await localStoreHandleUserChange(syncEngineImpl.localStore, user2);
+    syncEngineImpl.currentUser = user2;
     rejectOutstandingPendingWritesCallbacks(syncEngineImpl, "'waitForPendingWrites' promise is rejected due to a user change.");
-    syncEngineImpl.sharedClientState.handleUserChange(user, result.removedBatchIds, result.addedBatchIds);
+    syncEngineImpl.sharedClientState.handleUserChange(user2, result.removedBatchIds, result.addedBatchIds);
     await syncEngineEmitNewSnapsAndNotifyLocalStore(syncEngineImpl, result.affectedDocuments);
   }
 }
@@ -24940,10 +24952,10 @@ async function setOfflineComponentProvider(client, offlineComponentProvider) {
   const configuration = await client.getConfiguration();
   await offlineComponentProvider.initialize(configuration);
   let currentUser = configuration.initialUser;
-  client.setCredentialChangeListener(async (user) => {
-    if (!currentUser.isEqual(user)) {
-      await localStoreHandleUserChange(offlineComponentProvider.localStore, user);
-      currentUser = user;
+  client.setCredentialChangeListener(async (user2) => {
+    if (!currentUser.isEqual(user2)) {
+      await localStoreHandleUserChange(offlineComponentProvider.localStore, user2);
+      currentUser = user2;
     }
   });
   offlineComponentProvider.persistence.setDatabaseDeletedListener(() => client.terminate());
@@ -24955,8 +24967,8 @@ async function setOnlineComponentProvider(client, onlineComponentProvider) {
   logDebug(LOG_TAG$2, "Initializing OnlineComponentProvider");
   const configuration = await client.getConfiguration();
   await onlineComponentProvider.initialize(offlineComponentProvider, configuration);
-  client.setCredentialChangeListener((user) => remoteStoreHandleCredentialChange(onlineComponentProvider.remoteStore, user));
-  client.setAppCheckTokenChangeListener((_, user) => remoteStoreHandleCredentialChange(onlineComponentProvider.remoteStore, user));
+  client.setCredentialChangeListener((user2) => remoteStoreHandleCredentialChange(onlineComponentProvider.remoteStore, user2));
+  client.setAppCheckTokenChangeListener((_, user2) => remoteStoreHandleCredentialChange(onlineComponentProvider.remoteStore, user2));
   client.onlineComponents = onlineComponentProvider;
 }
 async function ensureOfflineComponents(client) {
@@ -25244,8 +25256,8 @@ function parseObject(obj, context) {
 function parseArray(array, context) {
   const values = [];
   let entryIndex = 0;
-  for (const entry4 of array) {
-    let parsedEntry = parseData(entry4, context.childContextForArray(entryIndex));
+  for (const entry5 of array) {
+    let parsedEntry = parseData(entry5, context.childContextForArray(entryIndex));
     if (parsedEntry == null) {
       parsedEntry = { nullValue: "NULL_VALUE" };
     }
@@ -25617,8 +25629,8 @@ var init_index_node = __esm({
       }
     };
     OAuthToken = class {
-      constructor(value, user) {
-        this.user = user;
+      constructor(value, user2) {
+        this.user = user2;
         this.type = "OAuth";
         this.headers = /* @__PURE__ */ new Map();
         this.headers.set("Authorization", `Bearer ${value}`);
@@ -25646,10 +25658,10 @@ var init_index_node = __esm({
       }
       start(asyncQueue, changeListener) {
         let lastTokenId = this.tokenCounter;
-        const guardedChangeListener = (user) => {
+        const guardedChangeListener = (user2) => {
           if (this.tokenCounter !== lastTokenId) {
             lastTokenId = this.tokenCounter;
-            return changeListener(user);
+            return changeListener(user2);
           } else {
             return Promise.resolve();
           }
@@ -28509,9 +28521,9 @@ var init_index_node = __esm({
         this.bundleCache = persistence.getBundleCache();
         this.initializeUserComponents(initialUser);
       }
-      initializeUserComponents(user) {
-        this.indexManager = this.persistence.getIndexManager(user);
-        this.mutationQueue = this.persistence.getMutationQueue(user, this.indexManager);
+      initializeUserComponents(user2) {
+        this.indexManager = this.persistence.getIndexManager(user2);
+        this.mutationQueue = this.persistence.getMutationQueue(user2, this.indexManager);
         this.localDocuments = new LocalDocumentsView(this.remoteDocuments, this.mutationQueue, this.indexManager);
         this.remoteDocuments.setIndexManager(this.indexManager);
         this.queryEngine.setLocalDocumentsView(this.localDocuments);
@@ -28569,8 +28581,8 @@ var init_index_node = __esm({
         const prefix = new DocumentKey(collection2.child(""));
         const iter = this.overlays.getIteratorFrom(prefix);
         while (iter.hasNext()) {
-          const entry4 = iter.getNext();
-          const overlay = entry4.value;
+          const entry5 = iter.getNext();
+          const overlay = entry5.value;
           const key2 = overlay.getKey();
           if (!collection2.isPrefixOf(key2.path)) {
             break;
@@ -28588,8 +28600,8 @@ var init_index_node = __esm({
         let batchIdToOverlays = new SortedMap((key1, key2) => key1 - key2);
         const iter = this.overlays.getIterator();
         while (iter.hasNext()) {
-          const entry4 = iter.getNext();
-          const overlay = entry4.value;
+          const entry5 = iter.getNext();
+          const overlay = entry5.value;
           const key2 = overlay.getKey();
           if (key2.getCollectionGroup() !== collectionGroup) {
             continue;
@@ -28606,8 +28618,8 @@ var init_index_node = __esm({
         const result = /* @__PURE__ */ new Map();
         const batchIter = batchIdToOverlays.getIterator();
         while (batchIter.hasNext()) {
-          const entry4 = batchIter.getNext();
-          const overlays = entry4.value;
+          const entry5 = batchIter.getNext();
+          const overlays = entry5.value;
           overlays.forEach((overlay, key2) => result.set(key2, overlay));
           if (result.size >= count) {
             break;
@@ -28849,8 +28861,8 @@ var init_index_node = __esm({
       }
       addEntry(transaction, doc2) {
         const key2 = doc2.key;
-        const entry4 = this.docs.get(key2);
-        const previousSize = entry4 ? entry4.size : 0;
+        const entry5 = this.docs.get(key2);
+        const previousSize = entry5 ? entry5.size : 0;
         const currentSize = this.sizer(doc2);
         this.docs = this.docs.insert(key2, {
           document: doc2.mutableCopy(),
@@ -28860,21 +28872,21 @@ var init_index_node = __esm({
         return this.indexManager.addToCollectionParentIndex(transaction, key2.path.popLast());
       }
       removeEntry(documentKey) {
-        const entry4 = this.docs.get(documentKey);
-        if (entry4) {
+        const entry5 = this.docs.get(documentKey);
+        if (entry5) {
           this.docs = this.docs.remove(documentKey);
-          this.size -= entry4.size;
+          this.size -= entry5.size;
         }
       }
       getEntry(transaction, documentKey) {
-        const entry4 = this.docs.get(documentKey);
-        return PersistencePromise.resolve(entry4 ? entry4.document.mutableCopy() : MutableDocument.newInvalidDocument(documentKey));
+        const entry5 = this.docs.get(documentKey);
+        return PersistencePromise.resolve(entry5 ? entry5.document.mutableCopy() : MutableDocument.newInvalidDocument(documentKey));
       }
       getEntries(transaction, documentKeys) {
         let results = mutableDocumentMap();
         documentKeys.forEach((documentKey) => {
-          const entry4 = this.docs.get(documentKey);
-          results = results.insert(documentKey, entry4 ? entry4.document.mutableCopy() : MutableDocument.newInvalidDocument(documentKey));
+          const entry5 = this.docs.get(documentKey);
+          results = results.insert(documentKey, entry5 ? entry5.document.mutableCopy() : MutableDocument.newInvalidDocument(documentKey));
         });
         return PersistencePromise.resolve(results);
       }
@@ -29066,22 +29078,22 @@ var init_index_node = __esm({
       }
       setNetworkEnabled() {
       }
-      getIndexManager(user) {
+      getIndexManager(user2) {
         return this.indexManager;
       }
-      getDocumentOverlayCache(user) {
-        let overlay = this.overlays[user.toKey()];
+      getDocumentOverlayCache(user2) {
+        let overlay = this.overlays[user2.toKey()];
         if (!overlay) {
           overlay = new MemoryDocumentOverlayCache();
-          this.overlays[user.toKey()] = overlay;
+          this.overlays[user2.toKey()] = overlay;
         }
         return overlay;
       }
-      getMutationQueue(user, indexManager) {
-        let queue = this.mutationQueues[user.toKey()];
+      getMutationQueue(user2, indexManager) {
+        let queue = this.mutationQueues[user2.toKey()];
         if (!queue) {
           queue = new MemoryMutationQueue(indexManager, this.referenceDelegate);
-          this.mutationQueues[user.toKey()] = queue;
+          this.mutationQueues[user2.toKey()] = queue;
         }
         return queue;
       }
@@ -29299,7 +29311,7 @@ var init_index_node = __esm({
         this.localState = new LocalClientState();
         return Promise.resolve();
       }
-      handleUserChange(user, removedBatchIds, addedBatchIds) {
+      handleUserChange(user2, removedBatchIds, addedBatchIds) {
       }
       setOnlineState(onlineState) {
       }
@@ -32971,9 +32983,9 @@ This typically indicates that your device does not have a healthy Internet conne
         let needsRefill = false;
         const lastDocInLimit = hasLimitToFirst(this.query) && oldDocumentSet.size === this.query.limit ? oldDocumentSet.last() : null;
         const firstDocInLimit = hasLimitToLast(this.query) && oldDocumentSet.size === this.query.limit ? oldDocumentSet.first() : null;
-        docChanges.inorderTraversal((key2, entry4) => {
+        docChanges.inorderTraversal((key2, entry5) => {
           const oldDoc = oldDocumentSet.get(key2);
-          const newDoc = queryMatches(this.query, entry4) ? entry4 : null;
+          const newDoc = queryMatches(this.query, entry5) ? entry5 : null;
           const oldDocHadPendingMutations = oldDoc ? this.mutatedKeys.has(oldDoc.key) : false;
           const newDocHasPendingMutations = newDoc ? newDoc.hasLocalMutations || this.mutatedKeys.has(newDoc.key) && newDoc.hasCommittedMutations : false;
           let changeApplied = false;
@@ -33274,10 +33286,10 @@ This typically indicates that your device does not have a healthy Internet conne
         this.clientId = AutoId.newId();
         this.authCredentialListener = () => Promise.resolve();
         this.appCheckCredentialListener = () => Promise.resolve();
-        this.authCredentials.start(asyncQueue, async (user) => {
-          logDebug(LOG_TAG$2, "Received user=", user.uid);
-          await this.authCredentialListener(user);
-          this.user = user;
+        this.authCredentials.start(asyncQueue, async (user2) => {
+          logDebug(LOG_TAG$2, "Received user=", user2.uid);
+          await this.authCredentialListener(user2);
+          this.user = user2;
         });
         this.appCheckCredentials.start(asyncQueue, (newAppCheckToken) => {
           logDebug(LOG_TAG$2, "Received new app check token=", newAppCheckToken);
@@ -34018,6 +34030,26 @@ This typically indicates that your device does not have a healthy Internet conne
 var init_dist2 = __esm({
   "node_modules/firebase/firestore/dist/index.mjs"() {
     init_index_node();
+  }
+});
+
+// .svelte-kit/output/server/chunks/db-55d4571e.js
+var firebaseConfig, db;
+var init_db_55d4571e = __esm({
+  ".svelte-kit/output/server/chunks/db-55d4571e.js"() {
+    init_dist();
+    init_dist2();
+    firebaseConfig = {
+      apiKey: "AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc",
+      authDomain: "project-z-e00fd.firebaseapp.com",
+      projectId: "project-z-e00fd",
+      storageBucket: "project-z-e00fd.appspot.com",
+      messagingSenderId: "37588438028",
+      appId: "1:37588438028:web:82c870a2fe6af985d67229",
+      measurementId: "G-W20KMPGM93"
+    };
+    initializeApp(firebaseConfig);
+    db = getFirestore();
   }
 });
 
@@ -37559,8 +37591,8 @@ function utcTimestampToDateString(utcTimestamp) {
   }
   return void 0;
 }
-async function getIdTokenResult(user, forceRefresh = false) {
-  const userInternal = getModularInstance(user);
+async function getIdTokenResult(user2, forceRefresh = false) {
+  const userInternal = getModularInstance(user2);
   const token = await userInternal.getIdToken(forceRefresh);
   const claims = _parseToken(token);
   _assert(claims && claims.exp && claims.auth_time && claims.iat, userInternal.auth, "internal-error");
@@ -37604,7 +37636,7 @@ function _tokenExpiresIn(token) {
   _assert(typeof parsedToken.iat !== "undefined", "internal-error");
   return Number(parsedToken.exp) - Number(parsedToken.iat);
 }
-async function _logoutIfInvalidated(user, promise, bypassAuthState = false) {
+async function _logoutIfInvalidated(user2, promise, bypassAuthState = false) {
   if (bypassAuthState) {
     return promise;
   }
@@ -37612,8 +37644,8 @@ async function _logoutIfInvalidated(user, promise, bypassAuthState = false) {
     return await promise;
   } catch (e2) {
     if (e2 instanceof FirebaseError && isUserInvalidated(e2)) {
-      if (user.auth.currentUser === user) {
-        await user.auth.signOut();
+      if (user2.auth.currentUser === user2) {
+        await user2.auth.signOut();
       }
     }
     throw e2;
@@ -37622,18 +37654,18 @@ async function _logoutIfInvalidated(user, promise, bypassAuthState = false) {
 function isUserInvalidated({ code }) {
   return code === `auth/${"user-disabled"}` || code === `auth/${"user-token-expired"}`;
 }
-async function _reloadWithoutSaving(user) {
+async function _reloadWithoutSaving(user2) {
   var _a4;
-  const auth = user.auth;
-  const idToken = await user.getIdToken();
-  const response = await _logoutIfInvalidated(user, getAccountInfo(auth, { idToken }));
+  const auth = user2.auth;
+  const idToken = await user2.getIdToken();
+  const response = await _logoutIfInvalidated(user2, getAccountInfo(auth, { idToken }));
   _assert(response === null || response === void 0 ? void 0 : response.users.length, auth, "internal-error");
   const coreAccount = response.users[0];
-  user._notifyReloadListener(coreAccount);
+  user2._notifyReloadListener(coreAccount);
   const newProviderData = ((_a4 = coreAccount.providerUserInfo) === null || _a4 === void 0 ? void 0 : _a4.length) ? extractProviderData(coreAccount.providerUserInfo) : [];
-  const providerData = mergeProviderData(user.providerData, newProviderData);
-  const oldIsAnonymous = user.isAnonymous;
-  const newIsAnonymous = !(user.email && coreAccount.passwordHash) && !(providerData === null || providerData === void 0 ? void 0 : providerData.length);
+  const providerData = mergeProviderData(user2.providerData, newProviderData);
+  const oldIsAnonymous = user2.isAnonymous;
+  const newIsAnonymous = !(user2.email && coreAccount.passwordHash) && !(providerData === null || providerData === void 0 ? void 0 : providerData.length);
   const isAnonymous = !oldIsAnonymous ? false : newIsAnonymous;
   const updates = {
     uid: coreAccount.localId,
@@ -37647,10 +37679,10 @@ async function _reloadWithoutSaving(user) {
     metadata: new UserMetadata(coreAccount.createdAt, coreAccount.lastLoginAt),
     isAnonymous
   };
-  Object.assign(user, updates);
+  Object.assign(user2, updates);
 }
-async function reload(user) {
-  const userInternal = getModularInstance(user);
+async function reload(user2) {
+  const userInternal = getModularInstance(user2);
   await _reloadWithoutSaving(userInternal);
   await userInternal.auth._persistUserIfCurrent(userInternal);
   userInternal.auth._notifyListenersIfCurrent(userInternal);
@@ -37994,8 +38026,8 @@ var init_index_89c9d3da = __esm({
       }
     };
     ProactiveRefresh = class {
-      constructor(user) {
-        this.user = user;
+      constructor(user2) {
+        this.user = user2;
         this.isRunning = false;
         this.timerId = null;
         this.errorBackoff = 3e4;
@@ -38190,21 +38222,21 @@ var init_index_89c9d3da = __esm({
       reload() {
         return reload(this);
       }
-      _assign(user) {
-        if (this === user) {
+      _assign(user2) {
+        if (this === user2) {
           return;
         }
-        _assert(this.uid === user.uid, this.auth, "internal-error");
-        this.displayName = user.displayName;
-        this.photoURL = user.photoURL;
-        this.email = user.email;
-        this.emailVerified = user.emailVerified;
-        this.phoneNumber = user.phoneNumber;
-        this.isAnonymous = user.isAnonymous;
-        this.tenantId = user.tenantId;
-        this.providerData = user.providerData.map((userInfo) => Object.assign({}, userInfo));
-        this.metadata._copy(user.metadata);
-        this.stsTokenManager._assign(user.stsTokenManager);
+        _assert(this.uid === user2.uid, this.auth, "internal-error");
+        this.displayName = user2.displayName;
+        this.photoURL = user2.photoURL;
+        this.email = user2.email;
+        this.emailVerified = user2.emailVerified;
+        this.phoneNumber = user2.phoneNumber;
+        this.isAnonymous = user2.isAnonymous;
+        this.tenantId = user2.tenantId;
+        this.providerData = user2.providerData.map((userInfo) => Object.assign({}, userInfo));
+        this.metadata._copy(user2.metadata);
+        this.stsTokenManager._assign(user2.stsTokenManager);
       }
       _clone(auth) {
         return new UserImpl(Object.assign(Object.assign({}, this), { auth, stsTokenManager: this.stsTokenManager._clone() }));
@@ -38295,7 +38327,7 @@ var init_index_89c9d3da = __esm({
         assertStringOrUndefined(_redirectEventId, auth.name);
         assertStringOrUndefined(createdAt, auth.name);
         assertStringOrUndefined(lastLoginAt, auth.name);
-        const user = new UserImpl({
+        const user2 = new UserImpl({
           uid,
           auth,
           email,
@@ -38310,24 +38342,24 @@ var init_index_89c9d3da = __esm({
           lastLoginAt
         });
         if (providerData && Array.isArray(providerData)) {
-          user.providerData = providerData.map((userInfo) => Object.assign({}, userInfo));
+          user2.providerData = providerData.map((userInfo) => Object.assign({}, userInfo));
         }
         if (_redirectEventId) {
-          user._redirectEventId = _redirectEventId;
+          user2._redirectEventId = _redirectEventId;
         }
-        return user;
+        return user2;
       }
       static async _fromIdTokenResponse(auth, idTokenResponse, isAnonymous = false) {
         const stsTokenManager = new StsTokenManager();
         stsTokenManager.updateFromServerResponse(idTokenResponse);
-        const user = new UserImpl({
+        const user2 = new UserImpl({
           uid: idTokenResponse.localId,
           auth,
           stsTokenManager,
           isAnonymous
         });
-        await _reloadWithoutSaving(user);
-        return user;
+        await _reloadWithoutSaving(user2);
+        return user2;
       }
     };
     InMemoryPersistence = class {
@@ -38368,8 +38400,8 @@ var init_index_89c9d3da = __esm({
         this.boundEventHandler = auth._onStorageEvent.bind(auth);
         this.persistence._addListener(this.fullUserKey, this.boundEventHandler);
       }
-      setCurrentUser(user) {
-        return this.persistence._set(this.fullUserKey, user.toJSON());
+      setCurrentUser(user2) {
+        return this.persistence._set(this.fullUserKey, user2.toJSON());
       }
       async getCurrentUser() {
         const blob = await this.persistence._get(this.fullUserKey);
@@ -38412,9 +38444,9 @@ var init_index_89c9d3da = __esm({
           try {
             const blob = await persistence._get(key2);
             if (blob) {
-              const user = UserImpl._fromJSON(auth, blob);
+              const user2 = UserImpl._fromJSON(auth, blob);
               if (persistence !== selectedPersistence) {
-                userToMigrate = user;
+                userToMigrate = user2;
               }
               selectedPersistence = persistence;
               break;
@@ -38498,16 +38530,16 @@ var init_index_89c9d3da = __esm({
         if (this._deleted) {
           return;
         }
-        const user = await this.assertedPersistence.getCurrentUser();
-        if (!this.currentUser && !user) {
+        const user2 = await this.assertedPersistence.getCurrentUser();
+        if (!this.currentUser && !user2) {
           return;
         }
-        if (this.currentUser && user && this.currentUser.uid === user.uid) {
-          this._currentUser._assign(user);
+        if (this.currentUser && user2 && this.currentUser.uid === user2.uid) {
+          this._currentUser._assign(user2);
           await this.currentUser.getIdToken();
           return;
         }
-        await this._updateCurrentUser(user);
+        await this._updateCurrentUser(user2);
       }
       async initializeCurrentUser(popupRedirectResolver) {
         var _a4;
@@ -38543,15 +38575,15 @@ var init_index_89c9d3da = __esm({
         }
         return result;
       }
-      async reloadAndSetCurrentUserOrClear(user) {
+      async reloadAndSetCurrentUserOrClear(user2) {
         try {
-          await _reloadWithoutSaving(user);
+          await _reloadWithoutSaving(user2);
         } catch (e2) {
           if (e2.code !== `auth/${"network-request-failed"}`) {
             return this.directlySetCurrentUser(null);
           }
         }
-        return this.directlySetCurrentUser(user);
+        return this.directlySetCurrentUser(user2);
       }
       useDeviceLanguage() {
         this.languageCode = _getUserLanguage();
@@ -38560,21 +38592,21 @@ var init_index_89c9d3da = __esm({
         this._deleted = true;
       }
       async updateCurrentUser(userExtern) {
-        const user = userExtern ? getModularInstance(userExtern) : null;
-        if (user) {
-          _assert(user.auth.config.apiKey === this.config.apiKey, this, "invalid-user-token");
+        const user2 = userExtern ? getModularInstance(userExtern) : null;
+        if (user2) {
+          _assert(user2.auth.config.apiKey === this.config.apiKey, this, "invalid-user-token");
         }
-        return this._updateCurrentUser(user && user._clone(this));
+        return this._updateCurrentUser(user2 && user2._clone(this));
       }
-      async _updateCurrentUser(user) {
+      async _updateCurrentUser(user2) {
         if (this._deleted) {
           return;
         }
-        if (user) {
-          _assert(this.tenantId === user.tenantId, this, "tenant-id-mismatch");
+        if (user2) {
+          _assert(this.tenantId === user2.tenantId, this, "tenant-id-mismatch");
         }
         return this.queue(async () => {
-          await this.directlySetCurrentUser(user);
+          await this.directlySetCurrentUser(user2);
           this.notifyAuthListeners();
         });
       }
@@ -38610,9 +38642,9 @@ var init_index_89c9d3da = __esm({
           currentUser: (_a4 = this._currentUser) === null || _a4 === void 0 ? void 0 : _a4.toJSON()
         };
       }
-      async _setRedirectUser(user, popupRedirectResolver) {
+      async _setRedirectUser(user2, popupRedirectResolver) {
         const redirectManager = await this.getOrInitRedirectPersistenceManager(popupRedirectResolver);
-        return user === null ? redirectManager.removeCurrentUser() : redirectManager.setCurrentUser(user);
+        return user2 === null ? redirectManager.removeCurrentUser() : redirectManager.setCurrentUser(user2);
       }
       async getOrInitRedirectPersistenceManager(popupRedirectResolver) {
         if (!this.redirectPersistenceManager) {
@@ -38637,13 +38669,13 @@ var init_index_89c9d3da = __esm({
         }
         return null;
       }
-      async _persistUserIfCurrent(user) {
-        if (user === this.currentUser) {
-          return this.queue(async () => this.directlySetCurrentUser(user));
+      async _persistUserIfCurrent(user2) {
+        if (user2 === this.currentUser) {
+          return this.queue(async () => this.directlySetCurrentUser(user2));
         }
       }
-      _notifyListenersIfCurrent(user) {
-        if (user === this.currentUser) {
+      _notifyListenersIfCurrent(user2) {
+        if (user2 === this.currentUser) {
           this.notifyAuthListeners();
         }
       }
@@ -38692,16 +38724,16 @@ var init_index_89c9d3da = __esm({
           return subscription.addObserver(nextOrObserver);
         }
       }
-      async directlySetCurrentUser(user) {
-        if (this.currentUser && this.currentUser !== user) {
+      async directlySetCurrentUser(user2) {
+        if (this.currentUser && this.currentUser !== user2) {
           this._currentUser._stopProactiveRefresh();
-          if (user && this.isProactiveRefreshEnabled) {
-            user._startProactiveRefresh();
+          if (user2 && this.isProactiveRefreshEnabled) {
+            user2._startProactiveRefresh();
           }
         }
-        this.currentUser = user;
-        if (user) {
-          await this.assertedPersistence.setCurrentUser(user);
+        this.currentUser = user2;
+        if (user2) {
+          await this.assertedPersistence.setCurrentUser(user2);
         } else {
           await this.assertedPersistence.removeCurrentUser();
         }
@@ -39169,9 +39201,9 @@ var init_index_89c9d3da = __esm({
         if (this.internalListeners.has(listener)) {
           return;
         }
-        const unsubscribe = this.auth.onIdTokenChanged((user) => {
+        const unsubscribe = this.auth.onIdTokenChanged((user2) => {
           var _a4;
-          listener(((_a4 = user) === null || _a4 === void 0 ? void 0 : _a4.stsTokenManager.accessToken) || null);
+          listener(((_a4 = user2) === null || _a4 === void 0 ? void 0 : _a4.stsTokenManager.accessToken) || null);
         });
         this.internalListeners.set(listener, unsubscribe);
         this.updateProactiveRefresh();
@@ -39371,30 +39403,65 @@ var index_svelte_exports = {};
 __export(index_svelte_exports, {
   default: () => Routes
 });
-var firebaseConfig, db, css3, Routes;
+function writable2(value, start = noop2) {
+  let stop;
+  const subscribers = /* @__PURE__ */ new Set();
+  function set(new_value) {
+    if (safe_not_equal(value, new_value)) {
+      value = new_value;
+      if (stop) {
+        const run_queue = !subscriber_queue2.length;
+        for (const subscriber of subscribers) {
+          subscriber[1]();
+          subscriber_queue2.push(subscriber, value);
+        }
+        if (run_queue) {
+          for (let i2 = 0; i2 < subscriber_queue2.length; i2 += 2) {
+            subscriber_queue2[i2][0](subscriber_queue2[i2 + 1]);
+          }
+          subscriber_queue2.length = 0;
+        }
+      }
+    }
+  }
+  function update(fn) {
+    set(fn(value));
+  }
+  function subscribe2(run2, invalidate = noop2) {
+    const subscriber = [run2, invalidate];
+    subscribers.add(subscriber);
+    if (subscribers.size === 1) {
+      stop = start(set) || noop2;
+    }
+    run2(value);
+    return () => {
+      subscribers.delete(subscriber);
+      if (subscribers.size === 0) {
+        stop();
+        stop = null;
+      }
+    };
+  }
+  return { set, update, subscribe: subscribe2 };
+}
+var subscriber_queue2, user, css3, Routes;
 var init_index_svelte = __esm({
   ".svelte-kit/output/server/entries/pages/index.svelte.js"() {
-    init_index_13c0de55();
-    init_dist();
-    init_dist2();
+    init_index_b3dad0a6();
+    init_db_55d4571e();
     init_dist3();
+    init_dist2();
     init_dist4();
-    firebaseConfig = {
-      apiKey: "AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc",
-      authDomain: "project-z-e00fd.firebaseapp.com",
-      projectId: "project-z-e00fd",
-      storageBucket: "project-z-e00fd.appspot.com",
-      messagingSenderId: "37588438028",
-      appId: "1:37588438028:web:82c870a2fe6af985d67229",
-      measurementId: "G-W20KMPGM93"
-    };
-    initializeApp(firebaseConfig);
-    db = getFirestore();
+    init_dist();
+    subscriber_queue2 = [];
+    user = writable2(null);
     css3 = {
-      code: ".highlighted-box.svelte-odgpo{background-color:orange}span.svelte-odgpo:hover{background-color:cyan}.message-group-title.svelte-odgpo{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
+      code: ".highlighted-box.svelte-1637l9v{background-color:orange}span.svelte-1637l9v:hover{background-color:cyan}.message-group-title.svelte-1637l9v{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
       map: null
     };
     Routes = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+      let $user, $$unsubscribe_user;
+      $$unsubscribe_user = subscribe(user, (value) => $user = value);
       let newUserName = "";
       let appVerifier;
       let countryCode = "+1";
@@ -39433,7 +39500,6 @@ var init_index_svelte = __esm({
         }
       }
       const auth = getAuth();
-      let currentUser = null;
       let currentFriendUID = "";
       let accounts = [];
       const docsRef = collection(db, "users");
@@ -39442,29 +39508,29 @@ var init_index_svelte = __esm({
           accounts.push(__spreadValues({ uid: doc2.id }, doc2.data()));
         });
       });
-      onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          const docRef = doc(db, "users", user.uid);
+      onAuthStateChanged(auth, async (resultUser) => {
+        if (resultUser) {
+          const docRef = doc(db, "users", resultUser.uid);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
-            currentUser = docSnap.data();
+            user.set(docSnap.data());
           } else {
             const initialUserDoc = {
-              uid: user.uid,
-              name: user.displayName || "John Apple",
-              phoneNumber: user.phoneNumber,
+              uid: resultUser.uid,
+              name: resultUser.displayName || "John Apple",
+              phoneNumber: resultUser.phoneNumber,
               friends: [],
               family: [],
               VIPs: [],
               everyoneElse: []
             };
-            await setDoc(doc(db, "users", user.uid), initialUserDoc);
-            currentUser = initialUserDoc;
+            await setDoc(doc(db, "users", resultUser.uid), initialUserDoc);
+            user.set(initialUserDoc);
           }
-          onSnapshot(doc(db, "users", user.uid), (snap) => {
-            currentUser = snap.data();
-            if (currentUser.friendUIDsWithNewMessages) {
-              friendUIDsWithNewMessages = currentUser.friendUIDsWithNewMessages;
+          onSnapshot(doc(db, "users", resultUser.uid), (snap) => {
+            user.set(snap.data());
+            if ($user.friendUIDsWithNewMessages) {
+              friendUIDsWithNewMessages = $user.friendUIDsWithNewMessages;
             }
           });
         }
@@ -39485,11 +39551,12 @@ var init_index_svelte = __esm({
           signInWithPhone();
         }
       }
-      return `<div style="${"display: flex; padding-left: 0px; padding-right: 0px;"}"><div>${!currentUser ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
+      $$unsubscribe_user();
+      return `<div style="${"display: flex; padding-left: 0px; padding-right: 0px;"}"><div>${!$user ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
           Even if you try to ignore it, visually they go to the top of our chat list; 
           if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
-          Multiply that by all the people you message across time, and it&#39;s a disaster . 
+          Multiply that by all the people you message across time, and it&#39;s a disaster.
 
           <br><br>
           <b>How this app differs</b>
@@ -39508,10 +39575,11 @@ var init_index_svelte = __esm({
           
           <div id="${"sign-in-button"}" style="${"border: solid; padding: 6px;"}">Sign Up
           </div></div>` : `<div style="${"display: flex"}"><input label="${"6-digit code"}" placeholder="${"123456"}"${add_attribute("value", phoneConfirmCode, 0)}>
-          <button>Confirm code</button></div>`}` : `<div style="${"width: 100px;"}"><h2 class="${"message-group-title svelte-odgpo"}">People
+          <button>Confirm code
+          </button></div>`}` : `<div style="${"width: 100px;"}"><h2 class="${"message-group-title svelte-1637l9v"}">People
         </h2>
-        ${each(currentUser.friends, (friend) => {
-        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-odgpo", friend.uid === currentFriendUID ? "highlighted-box" : ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-odgpo"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
+        ${each($user.friends, (friend) => {
+        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-1637l9v", friend.uid === currentFriendUID ? "highlighted-box" : ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-1637l9v"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
           </div>`;
       })}
 
@@ -39520,20 +39588,30 @@ var init_index_svelte = __esm({
 
         ${``}
 
-        
-
-        <h2 class="${"message-group-title svelte-odgpo"}" style="${"margin-top: 50px;"}">Editable category</h2>
+        <h2 class="${"message-group-title svelte-1637l9v"}" style="${"margin-top: 50px;"}">Editable category
+        </h2>
         Coming soon...
 
-        <h2 class="${"message-group-title svelte-odgpo"}" style="${"margin-top: 50px;"}">Everyone else</h2>
-        No new message requests yet...
-      </div>`}</div>
+        <h2 class="${"message-group-title svelte-1637l9v"}" style="${"margin-top: 50px;"}">Outside Messages
+        </h2>
+        
+        ${$user.messageRequestNames instanceof Array ? `${each($user.messageRequestNames, (newName) => {
+        return `<div style="${"border: solid blue; height: 40px; display: flex; align-items: center;"}">${escape(newName)}
+            </div>`;
+      })}` : ``}</div>`}</div>
 
-  <div style="${"width: 320px; margin-left: 5px; margin-top: 5px;"}">${`${currentUser ? `<div style="${"margin-top: 5px; margin-bottom: 12px;"}">Click any chat on the left-side
+  <div style="${"width: 320px; margin-left: 5px; margin-top: 5px;"}">${`${`${$user ? `<div style="${"margin-top: 5px; margin-bottom: 12px;"}">Click any chat on the left-side
       </div> 
-      
+
       <input placeholder="${"John Apple"}"${add_attribute("value", newUserName, 0)}>
-      <button>Update name</button>` : ``}`}</div>
+
+      <button>Update name
+      </button>
+
+      <div style="${"margin-top: 10px;"}">Give this link to your friends &amp; family so they can message you without a zen-message account:
+      </div>
+
+      <div style="${"font-size: 0.8rem; color: blue"}">zen-message.com/${escape($user.uid)}</div>` : ``}`}`}</div>
 </div>`;
     });
   }
@@ -39551,9 +39629,61 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-685b9917.js";
-    js3 = ["pages/index.svelte-685b9917.js", "chunks/vendor-5e8b3037.js"];
-    css4 = ["assets/pages/index.svelte-b275861a.css"];
+    entry3 = "pages/index.svelte-49388a2f.js";
+    js3 = ["pages/index.svelte-49388a2f.js", "chunks/vendor-87f020b6.js", "chunks/db-f3cf9e2e.js"];
+    css4 = ["assets/pages/index.svelte-90f91423.css"];
+  }
+});
+
+// .svelte-kit/output/server/entries/pages/_uid_.svelte.js
+var uid_svelte_exports = {};
+__export(uid_svelte_exports, {
+  default: () => U5Buidu5D,
+  load: () => load2
+});
+function load2({ params }) {
+  return { props: { uid: params.uid } };
+}
+var U5Buidu5D;
+var init_uid_svelte = __esm({
+  ".svelte-kit/output/server/entries/pages/_uid_.svelte.js"() {
+    init_index_b3dad0a6();
+    init_dist2();
+    init_db_55d4571e();
+    init_dist();
+    U5Buidu5D = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+      let { uid } = $$props;
+      let newMessage = "";
+      let senderName = "";
+      let MessageField;
+      console.log("uid =", uid);
+      if ($$props.uid === void 0 && $$bindings.uid && uid !== void 0)
+        $$bindings.uid(uid);
+      return `<input style="${"width: 300px; box-sizing: border-box"}" placeholder="${"Type message here..."}"${add_attribute("value", newMessage, 0)}${add_attribute("this", MessageField, 0)}>
+
+<div><input placeholder="${"Your name e.g. John"}"${add_attribute("value", senderName, 0)}></div>
+
+<button style="${"margin-top: 12px; height: 30px; width: 300px;"}">Send message
+</button>`;
+    });
+  }
+});
+
+// .svelte-kit/output/server/nodes/3.js
+var __exports4 = {};
+__export(__exports4, {
+  css: () => css5,
+  entry: () => entry4,
+  js: () => js4,
+  module: () => uid_svelte_exports
+});
+var entry4, js4, css5;
+var init__4 = __esm({
+  ".svelte-kit/output/server/nodes/3.js"() {
+    init_uid_svelte();
+    entry4 = "pages/_uid_.svelte-49cd50a9.js";
+    js4 = ["pages/_uid_.svelte-49cd50a9.js", "chunks/vendor-87f020b6.js", "chunks/db-f3cf9e2e.js"];
+    css5 = [];
   }
 });
 
@@ -39639,7 +39769,7 @@ async function setResponse(res, response) {
 }
 
 // .svelte-kit/output/server/index.js
-init_index_13c0de55();
+init_index_b3dad0a6();
 var __accessCheck2 = (obj, member, msg) => {
   if (!member.has(obj))
     throw TypeError("Cannot " + msg);
@@ -39888,12 +40018,12 @@ function devalue(value) {
   }
   walk(value);
   var names = /* @__PURE__ */ new Map();
-  Array.from(counts).filter(function(entry4) {
-    return entry4[1] > 1;
+  Array.from(counts).filter(function(entry5) {
+    return entry5[1] > 1;
   }).sort(function(a, b) {
     return b[1] - a[1];
-  }).forEach(function(entry4, i2) {
-    names.set(entry4[0], getName(i2));
+  }).forEach(function(entry5, i2) {
+    names.set(entry5[0], getName(i2));
   });
   function stringify(thing) {
     if (names.has(thing)) {
@@ -40049,9 +40179,9 @@ function stringifyString(str) {
   result += '"';
   return result;
 }
-function noop2() {
+function noop3() {
 }
-function safe_not_equal(a, b) {
+function safe_not_equal2(a, b) {
   return a != a ? b == b : a !== b || (a && typeof a === "object" || typeof a === "function");
 }
 Promise.resolve();
@@ -40061,11 +40191,11 @@ function readable(value, start) {
     subscribe: writable(value, start).subscribe
   };
 }
-function writable(value, start = noop2) {
+function writable(value, start = noop3) {
   let stop;
   const subscribers = /* @__PURE__ */ new Set();
   function set(new_value) {
-    if (safe_not_equal(value, new_value)) {
+    if (safe_not_equal2(value, new_value)) {
       value = new_value;
       if (stop) {
         const run_queue = !subscriber_queue.length;
@@ -40085,11 +40215,11 @@ function writable(value, start = noop2) {
   function update(fn) {
     set(fn(value));
   }
-  function subscribe(run2, invalidate = noop2) {
+  function subscribe2(run2, invalidate = noop3) {
     const subscriber = [run2, invalidate];
     subscribers.add(subscriber);
     if (subscribers.size === 1) {
-      stop = start(set) || noop2;
+      stop = start(set) || noop3;
     }
     run2(value);
     return () => {
@@ -40100,7 +40230,7 @@ function writable(value, start = noop2) {
       }
     };
   }
-  return { set, update, subscribe };
+  return { set, update, subscribe: subscribe2 };
 }
 function coalesce_to_error(err) {
   return err instanceof Error || err && err.name && err.message ? err : new Error(JSON.stringify(err));
@@ -41622,11 +41752,12 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-655f8a0b.js", "js": ["start-655f8a0b.js", "chunks/vendor-5e8b3037.js"], "css": [] },
+    entry: { "file": "start-82afb7a7.js", "js": ["start-82afb7a7.js", "chunks/vendor-87f020b6.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
-      () => Promise.resolve().then(() => (init__3(), __exports3))
+      () => Promise.resolve().then(() => (init__3(), __exports3)),
+      () => Promise.resolve().then(() => (init__4(), __exports4))
     ],
     routes: [
       {
@@ -41637,6 +41768,16 @@ var manifest = {
         path: "/",
         shadow: null,
         a: [0, 2],
+        b: [1]
+      },
+      {
+        type: "page",
+        key: "[uid]",
+        pattern: /^\/([^/]+?)\/?$/,
+        params: (m2) => ({ uid: m2[1] }),
+        path: null,
+        shadow: null,
+        a: [0, 3],
         b: [1]
       }
     ]

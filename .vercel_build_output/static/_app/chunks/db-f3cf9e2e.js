@@ -1,0 +1,1 @@
+import{a6 as e,a7 as a}from"./vendor-87f020b6.js";const p={apiKey:"AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc",authDomain:"project-z-e00fd.firebaseapp.com",projectId:"project-z-e00fd",storageBucket:"project-z-e00fd.appspot.com",messagingSenderId:"37588438028",appId:"1:37588438028:web:82c870a2fe6af985d67229",measurementId:"G-W20KMPGM93"};e(p);var r=a();export{r as d};
