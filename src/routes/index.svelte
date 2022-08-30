@@ -1,14 +1,11 @@
 <div style="display: flex; padding-left: 0px; padding-right: 0px;">
   <div>
     {#if !$user}
-      <!-- {#if !phoneConfirmationResult} -->
         <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
           <b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
           Even if you try to ignore it, visually they go to the top of our chat list; 
           if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
-          Multiply that by all the people you message across time, and it's a disaster.
-
           <br><br>
           <b>How this app differs</b>
           <ol>

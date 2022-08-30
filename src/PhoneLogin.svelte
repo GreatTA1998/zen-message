@@ -22,9 +22,9 @@
       </div>
 
       <!-- autocomplete allows iPhone users to just use text suggestion https://stackoverflow.com/a/56770419/7812829 -->
-      <input autocomplete="one-time-code">
+      <!-- <input autocomplete="one-time-code"> -->
       
-      <input minlength="1" maxlength="1" bind:value={confirm1} bind:this={c1} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="1">
+      <input minlength="1" maxlength="1" bind:value={confirm1} bind:this={c1} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="1" autocomplete="one-time-code">
       <input minlength="1" maxlength="1" bind:value={confirm2} bind:this={c2} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="2">  
       <input minlength="1" maxlength="1" bind:value={confirm3} bind:this={c3} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="3">
       <input minlength="1" maxlength="1" bind:value={confirm4} bind:this={c4} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="4">
