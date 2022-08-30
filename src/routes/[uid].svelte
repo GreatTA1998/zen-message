@@ -26,12 +26,17 @@
   Send message
 </button>
 
+<div>Or create an account</div>
+{#if !$user}
+  <PhoneLogin canTakeInternationalNumbers/>
+{/if}
+
 <script>
   import { user } from '../store.js'
-
+  import PhoneLogin from '../PhoneLogin.svelte'
   import { doc, updateDoc } from "firebase/firestore";
   import { arrayUnion } from 'firebase/firestore'
-  import db from "../db.js";
+  import db from "../db.js"
 
   export let uid
 

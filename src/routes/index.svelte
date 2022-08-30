@@ -1,7 +1,7 @@
 <div style="display: flex; padding-left: 0px; padding-right: 0px;">
   <div>
     {#if !$user}
-      {#if !phoneConfirmationResult}
+      <!-- {#if !phoneConfirmationResult} -->
         <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
           <b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
@@ -20,46 +20,31 @@
             </li>
           </ol>
         </div>
-
-        <div style="display: flex; justify-content: center; align-items: center; width: 400px; margin-top: 25px;">
-          <input type="tel" id="phone-input-1" minlength="2" maxlength="4" placeholder="+1" bind:value={countryCode} style="width: 36px; height: 40px; font-size: 2rem; margin-right: 10px">
-
-          <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="339" bind:value={phoneNumSegment1} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
-
-          <input type="tel" id="phone-input-2" minlength="3" maxlength="3" placeholder="676" bind:value={phoneNumSegment2} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
-
-          <input type="tel" id="phone-input-3" minlength="4" maxlength="4" placeholder="1234" bind:value={phoneNumSegment3} style="width: 76px; height: 40px; font-size: 2rem; margin-right: 10px">
-          
-          <div id="sign-in-button" on:click={signInWithPhone} style="border: solid; padding: 6px;">
-            Sign Up
-          </div>
-        </div>  
-      {:else}
-        <div style="display: flex">
-          <input label="6-digit code" placeholder="123456" bind:value={phoneConfirmCode}>
-          <button on:click={verifyConfirmationCode}>
-            Confirm code
-          </button>
-        </div>
-      {/if}  
-
+        
+        <PhoneLogin 
+          canTakeInternationalNumbers
+        />
     {:else}
       <div style="width: 100px;">
-        <h2 class="message-group-title">
-          People
-        </h2>
-        {#each $user.friends as friend}
-          <div 
-            on:click={() => currentFriendUID = friend.uid} 
-            style="border: solid orange; height: 40px; display: flex; align-items: center;"
-            class:highlighted-box={friend.uid === currentFriendUID}
-            class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
-          >
-            <span style="margin-left: 5px">
-              {friend.name}
-            </span>
-          </div>
-        {/each}
+        <div on:drop={(e) => drop_handler(e)} on:dragover={dragover_handler}>
+          <h2 class="message-group-title">
+            People
+          </h2>
+          {#each $user.friends as friend}
+            <div 
+              on:click={() => currentFriendUID = friend.uid} 
+              draggable="true" 
+              on:dragstart={(e) => dragstart_handler(e)}
+              style="border: solid orange; height: 40px; display: flex; align-items: center;"
+              class:highlighted-box={friend.uid === currentFriendUID}
+              class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
+            >
+              <span style="margin-left: 5px">
+                {friend.name}
+              </span>
+            </div>
+          {/each}
+        </div>
 
         <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
           Add person
@@ -78,10 +63,19 @@
           {/each}
         {/if}
 
+        <!-- LIST CATEGORIES -->
+        {#if $user.peopleCategories instanceof Array}
+          {#each $user.peopleCategories as category}
+            <h2 class="message-group-title">{category}</h2>
+          {/each}
+        {/if}
+
         <h2 class="message-group-title" style="margin-top: 50px;">
           Editable category
         </h2>
-        Coming soon...
+        <button on:click={createNewCategory}>New category</button>
+        <input bind:value={newlyTypedCategory} style="width: 90px">
+
 
         <h2 class="message-group-title" style="margin-top: 50px;">
           Outside Messages
@@ -135,9 +129,9 @@
         Give this link to your friends & family so they can message you without a zen-message account:
       </div>
 
-      <div style="font-size: 0.8rem; color: blue">
+      <a style="font-size: 0.8rem; color: blue" href="https://zen-message.com/{$user.uid}" target="_blank">
         zen-message.com/{$user.uid}
-      </div>
+      </a>
     {/if}
   </div>
 </div>
@@ -156,100 +150,29 @@
   import ChatWindow from '../chatWindow.svelte'
   import { user } from '../store.js'
   import { getRandomID } from '../helpers.js'
+  import PhoneLogin from '../PhoneLogin.svelte'
 
   let unsub
 
-  let appVerifier
-  let countryCode = '+1'
-  let phoneNumSegment1 = ''
-  let phoneNumSegment2 = ''
-  let phoneNumSegment3 = ''
-  let phoneConfirmationResult
-	let phoneConfirmCode = ''
-
   let chatRoomID = ''
+  let userRef = null
 
   let currentMessageRequestContent = '' 
   let currentMessageRequestName = ''
+
+  let newlyTypedCategory = ''
 
   $: if (currentFriendUID) {
     chatRoomID = $user.uid < currentFriendUID ? ($user.uid + currentFriendUID) : (currentFriendUID + $user.uid)
     console.log('chatRoomID =', chatRoomID)
   }
 
-
-  let friendUIDsWithNewMessages = [] 
-
-  $: if (phoneNumSegment1.length === 3) {
-		document.getElementById('phone-input-2').focus()
-	}
-	$: if (phoneNumSegment2.length === 3) {
-		document.getElementById('phone-input-3').focus()
-	}
-	$: if (phoneNumSegment3.length === 4) {
-		signInWithPhone()
-	}
-  
-  function signInWithPhone () {
-    console.log('signInWithPhone()')
-    if (!window.recaptchaVerifier) {
-			window.recaptchaVerifier = new RecaptchaVerifier('sign-in-button', {
-				'size': 'invisible',
-				'callback': (response) => {
-					// reCAPTCHA solved, allow signInWithPhoneNumber.
-					console.log('reCAPTCHA solved =', response)
-					// onSignInSubmit()
-				}
-			}, getAuth())
-			appVerifier = window.recaptchaVerifier;
-		}
-		onSignInSubmit();
-		function onSignInSubmit () {
-			const phoneNumber = `${countryCode} ${phoneNumSegment1}-${phoneNumSegment2}-${phoneNumSegment3}`
-			print(getAuth(), phoneNumber, appVerifier)
-			signInWithPhoneNumber(getAuth(), phoneNumber, appVerifier)
-				.then((confirmationResult) => {
-					console.log('confirmation result =', confirmationResult)
-					phoneConfirmationResult = confirmationResult
-					// SMS sent. Prompt user to type the code from the message, then sign the
-					// user in with confirmationResult.confirm(code).
-					window.confirmationResult = confirmationResult
-					// ...
-				}).catch((error) => {
-					alert(error)
-					console.log('error =', error)
-					// Error; SMS not sent
-					// ...
-			
-					// if it fails, reset 
-					// grecaptcha.reset(window.recaptchaWidgetId);
-			
-					// Or, if you haven't stored the widget ID:
-					window.recaptchaVerifier.render().then(function(widgetId) {
-						grecaptcha.reset(widgetId);
-					})
-				});
-			}
-		}
-		// SIGN IN WITH CONFIRMATION CODE
-		function verifyConfirmationCode () {
-			console.log('phoneConfirmCode =', phoneConfirmCode)
-			window.confirmationResult.confirm(phoneConfirmCode).then((result) => {
-				// User signed in successfully
-        // `authStateChange` will handle the rest
-
-				// const user = result.user;
-				// console.log('redirecting, user =', user)
-				// goto('AsUl1VWQ7zzxZsD5epL7/AsUl1VWQ7zzxZsD5epL7', { replaceState: true })
-				// ...
-			}).catch((error) => {
-				alert(error)
-				// User couldn't sign in (bad verification code?)
-				// ...
-			});
-
+  $: if ($user) {
+    userRef = doc(db, 'users', $user.uid)
   }
 
+  let friendUIDsWithNewMessages = [] 
+  
   const auth = getAuth();
 
   let currentFriendUID = ''
@@ -334,7 +257,7 @@
   }
 
   function resolveMessageRequest (name) {
-    const userRef = doc(db, 'users', $user.uid)
+    // const userRef = doc(db, 'users', $user.uid)
     // const target = $user.messageRequestObjects.filter(obj => obj.senderName === name)[0]
     updateDoc(userRef, {
       messageRequestObjects: arrayRemove({
@@ -346,6 +269,32 @@
 
     currentMessageRequestName = '' 
     currentMessageRequestContent = ''
+  }
+
+  function createNewCategory () {
+    if (!newlyTypedCategory) {
+      alert("New category can't be blank")
+    }
+    updateDoc(userRef, { 
+      peopleCategories: arrayUnion(newlyTypedCategory) 
+    })
+    console.log("created new category")
+    newlyTypedCategory = ''
+  }
+
+  function drop_handler (e) {
+    console.log('detected drop =', e)
+    // check with person it is
+    // have the friend somehow point to the category i.e. friend.category = ''
+    // consider using IDs
+  }
+
+  function dragover_handler (e) {
+    console.log("detected dragover =", e)
+  }
+
+  function dragstart_handler (e) {
+    console.log('dragstart =', e)
   }
 </script>
 
