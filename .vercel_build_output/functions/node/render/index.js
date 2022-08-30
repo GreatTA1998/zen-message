@@ -39456,7 +39456,7 @@ var init_index_svelte = __esm({
     subscriber_queue2 = [];
     user = writable2(null);
     css3 = {
-      code: ".highlighted-box.svelte-1637l9v{background-color:orange}span.svelte-1637l9v:hover{background-color:cyan}.message-group-title.svelte-1637l9v{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
+      code: ".highlighted-box.svelte-1637l9v{background-color:orange}.highlighted-blue.svelte-1637l9v{background-color:lightseagreen}span.svelte-1637l9v:hover{background-color:cyan}.message-group-title.svelte-1637l9v{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
       map: null
     };
     Routes = create_ssr_component(($$result, $$props, $$bindings, slots) => {
@@ -39579,7 +39579,10 @@ var init_index_svelte = __esm({
           </button></div>`}` : `<div style="${"width: 100px;"}"><h2 class="${"message-group-title svelte-1637l9v"}">People
         </h2>
         ${each($user.friends, (friend) => {
-        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${["svelte-1637l9v", friend.uid === currentFriendUID ? "highlighted-box" : ""].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-1637l9v"}">${escape(friend.name)}${escape(friendUIDsWithNewMessages.includes(friend.uid) ? "New messages" : "")}</span>
+        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${[
+          "svelte-1637l9v",
+          (friend.uid === currentFriendUID ? "highlighted-box" : "") + " " + (friendUIDsWithNewMessages.includes(friend.uid) ? "highlighted-blue" : "")
+        ].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-1637l9v"}">${escape(friend.name)}</span>
           </div>`;
       })}
 
@@ -39629,9 +39632,9 @@ var entry3, js3, css4;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-49388a2f.js";
-    js3 = ["pages/index.svelte-49388a2f.js", "chunks/vendor-87f020b6.js", "chunks/db-f3cf9e2e.js"];
-    css4 = ["assets/pages/index.svelte-90f91423.css"];
+    entry3 = "pages/index.svelte-beef07f2.js";
+    js3 = ["pages/index.svelte-beef07f2.js", "chunks/vendor-87f020b6.js", "chunks/db-f3cf9e2e.js"];
+    css4 = ["assets/pages/index.svelte-73157806.css"];
   }
 });
 
@@ -41752,7 +41755,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-82afb7a7.js", "js": ["start-82afb7a7.js", "chunks/vendor-87f020b6.js"], "css": [] },
+    entry: { "file": "start-5df30b5c.js", "js": ["start-5df30b5c.js", "chunks/vendor-87f020b6.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
