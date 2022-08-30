@@ -5417,7 +5417,7 @@ var init_install_fetch = __esm({
   }
 });
 
-// .svelte-kit/output/server/chunks/index-b3dad0a6.js
+// .svelte-kit/output/server/chunks/index-1788aa30.js
 function noop2() {
 }
 function run(fn) {
@@ -5493,7 +5493,7 @@ function create_ssr_component(fn) {
       return {
         html,
         css: {
-          code: Array.from(result.css).map((css6) => css6.code).join("\n"),
+          code: Array.from(result.css).map((css7) => css7.code).join("\n"),
           map: null
         },
         head: result.title + result.head
@@ -5508,8 +5508,8 @@ function add_attribute(name6, value, boolean) {
   return ` ${name6}${value === true && boolean_attributes.has(name6) ? "" : `=${typeof value === "string" ? JSON.stringify(escape(value)) : `"${value}"`}`}`;
 }
 var current_component, boolean_attributes, escaped, missing_component, on_destroy;
-var init_index_b3dad0a6 = __esm({
-  ".svelte-kit/output/server/chunks/index-b3dad0a6.js"() {
+var init_index_1788aa30 = __esm({
+  ".svelte-kit/output/server/chunks/index-1788aa30.js"() {
     Promise.resolve();
     boolean_attributes = /* @__PURE__ */ new Set([
       "allowfullscreen",
@@ -5558,7 +5558,7 @@ __export(layout_svelte_exports, {
 var Layout;
 var init_layout_svelte = __esm({
   ".svelte-kit/output/server/entries/fallbacks/layout.svelte.js"() {
-    init_index_b3dad0a6();
+    init_index_1788aa30();
     Layout = create_ssr_component(($$result, $$props, $$bindings, slots) => {
       return `${slots.default ? slots.default({}) : ``}`;
     });
@@ -5577,8 +5577,8 @@ var entry, js, css;
 var init__ = __esm({
   ".svelte-kit/output/server/nodes/0.js"() {
     init_layout_svelte();
-    entry = "layout.svelte-35ac87e8.js";
-    js = ["layout.svelte-35ac87e8.js", "chunks/vendor-87f020b6.js"];
+    entry = "layout.svelte-db19fb9d.js";
+    js = ["layout.svelte-db19fb9d.js", "chunks/vendor-f53b4472.js"];
     css = [];
   }
 });
@@ -5595,7 +5595,7 @@ function load({ error: error2, status }) {
 var Error2;
 var init_error_svelte = __esm({
   ".svelte-kit/output/server/entries/fallbacks/error.svelte.js"() {
-    init_index_b3dad0a6();
+    init_index_1788aa30();
     Error2 = create_ssr_component(($$result, $$props, $$bindings, slots) => {
       let { status } = $$props;
       let { error: error2 } = $$props;
@@ -5627,8 +5627,8 @@ var entry2, js2, css2;
 var init__2 = __esm({
   ".svelte-kit/output/server/nodes/1.js"() {
     init_error_svelte();
-    entry2 = "error.svelte-ad85eac2.js";
-    js2 = ["error.svelte-ad85eac2.js", "chunks/vendor-87f020b6.js"];
+    entry2 = "error.svelte-50a1528d.js";
+    js2 = ["error.svelte-50a1528d.js", "chunks/vendor-f53b4472.js"];
     css2 = [];
   }
 });
@@ -34033,26 +34033,6 @@ var init_dist2 = __esm({
   }
 });
 
-// .svelte-kit/output/server/chunks/db-55d4571e.js
-var firebaseConfig, db;
-var init_db_55d4571e = __esm({
-  ".svelte-kit/output/server/chunks/db-55d4571e.js"() {
-    init_dist();
-    init_dist2();
-    firebaseConfig = {
-      apiKey: "AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc",
-      authDomain: "project-z-e00fd.firebaseapp.com",
-      projectId: "project-z-e00fd",
-      storageBucket: "project-z-e00fd.appspot.com",
-      messagingSenderId: "37588438028",
-      appId: "1:37588438028:web:82c870a2fe6af985d67229",
-      measurementId: "G-W20KMPGM93"
-    };
-    initializeApp(firebaseConfig);
-    db = getFirestore();
-  }
-});
-
 // node_modules/tslib/tslib.js
 var require_tslib = __commonJS({
   "node_modules/tslib/tslib.js"(exports2, module2) {
@@ -39265,6 +39245,209 @@ var init_dist3 = __esm({
   }
 });
 
+// .svelte-kit/output/server/chunks/PhoneLogin-c8b81e70.js
+function writable2(value, start = noop2) {
+  let stop;
+  const subscribers = /* @__PURE__ */ new Set();
+  function set(new_value) {
+    if (safe_not_equal(value, new_value)) {
+      value = new_value;
+      if (stop) {
+        const run_queue = !subscriber_queue2.length;
+        for (const subscriber of subscribers) {
+          subscriber[1]();
+          subscriber_queue2.push(subscriber, value);
+        }
+        if (run_queue) {
+          for (let i2 = 0; i2 < subscriber_queue2.length; i2 += 2) {
+            subscriber_queue2[i2][0](subscriber_queue2[i2 + 1]);
+          }
+          subscriber_queue2.length = 0;
+        }
+      }
+    }
+  }
+  function update(fn) {
+    set(fn(value));
+  }
+  function subscribe2(run2, invalidate = noop2) {
+    const subscriber = [run2, invalidate];
+    subscribers.add(subscriber);
+    if (subscribers.size === 1) {
+      stop = start(set) || noop2;
+    }
+    run2(value);
+    return () => {
+      subscribers.delete(subscriber);
+      if (subscribers.size === 0) {
+        stop();
+        stop = null;
+      }
+    };
+  }
+  return { set, update, subscribe: subscribe2 };
+}
+var firebaseConfig, db, subscriber_queue2, user, css3, PhoneLogin;
+var init_PhoneLogin_c8b81e70 = __esm({
+  ".svelte-kit/output/server/chunks/PhoneLogin-c8b81e70.js"() {
+    init_dist();
+    init_dist2();
+    init_index_1788aa30();
+    init_dist3();
+    firebaseConfig = {
+      apiKey: "AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc",
+      authDomain: "project-z-e00fd.firebaseapp.com",
+      projectId: "project-z-e00fd",
+      storageBucket: "project-z-e00fd.appspot.com",
+      messagingSenderId: "37588438028",
+      appId: "1:37588438028:web:82c870a2fe6af985d67229",
+      measurementId: "G-W20KMPGM93"
+    };
+    initializeApp(firebaseConfig);
+    db = getFirestore();
+    subscriber_queue2 = [];
+    user = writable2(null);
+    css3 = {
+      code: '.svelte-1iojg2p::placeholder{opacity:0.2\r\n  }.copied-from-koa.svelte-1iojg2p{font:20px/1.7 "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif\r\n  }',
+      map: null
+    };
+    PhoneLogin = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+      let phoneConfirmCode;
+      let hasEnteredPhoneNumber;
+      let hasEnteredConfirmCode;
+      let { canTakeInternationalNumbers } = $$props;
+      let appVerifier;
+      let phoneConfirmationResult;
+      let countryCode = "+1";
+      let phoneNumSegment1 = "";
+      let phoneNumSegment2 = "";
+      let phoneNumSegment3 = "";
+      let confirm1 = "";
+      let confirm2 = "";
+      let confirm3 = "";
+      let confirm4 = "";
+      let confirm5 = "";
+      let confirm6 = "";
+      let c1, c2, c3, c4, c5, c6;
+      function signInWithPhone() {
+        if (!window.recaptchaVerifier) {
+          window.recaptchaVerifier = new RecaptchaVerifier("sign-in-button", {
+            "size": "invisible",
+            "callback": (response) => {
+              console.log("reCAPTCHA solved =", response);
+            }
+          }, getAuth());
+          appVerifier = window.recaptchaVerifier;
+        }
+        onSignInSubmit();
+        function onSignInSubmit() {
+          const phoneNumber = `${countryCode} ${phoneNumSegment1}-${phoneNumSegment2}-${phoneNumSegment3}`;
+          print(getAuth(), phoneNumber, appVerifier);
+          signInWithPhoneNumber(getAuth(), phoneNumber, appVerifier).then((confirmationResult) => {
+            console.log("confirmation result =", confirmationResult);
+            phoneConfirmationResult = confirmationResult;
+            window.confirmationResult = confirmationResult;
+          }).catch((error2) => {
+            alert(error2);
+            console.log("error =", error2);
+            window.recaptchaVerifier.render().then(function(widgetId) {
+              grecaptcha.reset(widgetId);
+            });
+          });
+        }
+      }
+      function verifyConfirmationCode() {
+        console.log("phoneConfirmCode =", phoneConfirmCode);
+        window.confirmationResult.confirm(phoneConfirmCode).then((result) => {
+          const user2 = result.user;
+          console.log("redirecting, user =", user2);
+        }).catch((error2) => {
+          alert(error2);
+        });
+      }
+      if ($$props.canTakeInternationalNumbers === void 0 && $$bindings.canTakeInternationalNumbers && canTakeInternationalNumbers !== void 0)
+        $$bindings.canTakeInternationalNumbers(canTakeInternationalNumbers);
+      $$result.css.add(css3);
+      phoneConfirmCode = confirm1 + confirm2 + confirm3 + confirm4 + confirm5 + confirm6;
+      hasEnteredPhoneNumber = phoneNumSegment1.length === 3 && phoneNumSegment2.length === 3 && phoneNumSegment3.length === 4;
+      {
+        if (phoneNumSegment1.length === 3) {
+          document.getElementById("phone-input-2").focus();
+        }
+      }
+      {
+        if (phoneNumSegment2.length === 3) {
+          document.getElementById("phone-input-3").focus();
+        }
+      }
+      {
+        if (hasEnteredPhoneNumber) {
+          signInWithPhone();
+        }
+      }
+      {
+        if (phoneConfirmationResult && c1) {
+          c1.focus();
+        }
+      }
+      {
+        if (confirm1.length === 1) {
+          c2.focus();
+        }
+      }
+      {
+        if (confirm2.length === 1) {
+          c3.focus();
+        }
+      }
+      {
+        if (confirm3.length === 1) {
+          c4.focus();
+        }
+      }
+      {
+        if (confirm4.length === 1) {
+          c5.focus();
+        }
+      }
+      {
+        if (confirm5.length === 1) {
+          c6.focus();
+        }
+      }
+      hasEnteredConfirmCode = phoneConfirmCode.length === 6;
+      {
+        if (hasEnteredConfirmCode) {
+          verifyConfirmationCode();
+        }
+      }
+      return `<div style="${"height: 100px"}" class="${"svelte-1iojg2p"}">${!phoneConfirmationResult ? `<div style="${"display: flex; justify-content: center; align-items: center; margin-top: 24px;"}" class="${"svelte-1iojg2p"}">
+
+      ${canTakeInternationalNumbers ? `<input type="${"tel"}" id="${"phone-country-code"}" minlength="${"2"}" maxlength="${"4"}" placeholder="${"+1"}" style="${"margin-left: 15px; width: 72px; height: 40px; font-size: 2rem; margin-right: 10px"}" class="${"svelte-1iojg2p"}"${add_attribute("value", countryCode, 0)}>` : ``}
+      <input type="${"tel"}" id="${"phone-input-1"}" minlength="${"3"}" maxlength="${"3"}" placeholder="${"503"}" style="${"margin-left: 15px; width: 54px; height: 40px; font-size: 2rem; margin-right: 10px"}" class="${"svelte-1iojg2p"}"${add_attribute("value", phoneNumSegment1, 0)}>
+
+      <input type="${"tel"}" id="${"phone-input-2"}" minlength="${"3"}" maxlength="${"3"}" placeholder="${"250"}" style="${"width: 54px; height: 40px; font-size: 2rem; margin-right: 10px"}" class="${"svelte-1iojg2p"}"${add_attribute("value", phoneNumSegment2, 0)}>
+
+      <input type="${"tel"}" id="${"phone-input-3"}" minlength="${"4"}" maxlength="${"4"}" placeholder="${"3868"}" style="${"width: 76px; height: 40px; font-size: 2rem; margin-right: 10px"}" class="${"svelte-1iojg2p"}"${add_attribute("value", phoneNumSegment3, 0)}>
+      <button id="${"sign-in-button"}" style="${"display: none; color: " + escape(hasEnteredPhoneNumber ? "rgb(116 28 183)" : "grey") + "; margin-bottom: 2px"}" ${!hasEnteredPhoneNumber ? "disabled" : ""} class="${"svelte-1iojg2p"}">Sign Up
+      </button></div>` : `<div style="${"display: flex; justify-content: center; align-items: center; margin-top: 24px"}" class="${"svelte-1iojg2p"}"><div class="${"copied-from-koa svelte-1iojg2p"}" style="${"color: purple"}">You should receive a text message with a 6-digit code:
+      </div>
+
+      
+      <input autocomplete="${"one-time-code"}" class="${"svelte-1iojg2p"}">
+      
+      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"1"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm1, 0)}${add_attribute("this", c1, 0)}>
+      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"2"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm2, 0)}${add_attribute("this", c2, 0)}>  
+      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"3"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm3, 0)}${add_attribute("this", c3, 0)}>
+      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"4"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm4, 0)}${add_attribute("this", c4, 0)}>
+      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"5"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm5, 0)}${add_attribute("this", c5, 0)}>
+      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px; margin-right: 10px"}" placeholder="${"6"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm6, 0)}${add_attribute("this", c6, 0)}>
+      <button style="${"display: none; color: " + escape(hasEnteredConfirmCode ? "rgb(116 28 183)" : "grey") + "; margin-bottom: 2px;"}" ${!hasEnteredConfirmCode ? "disabled" : ""} class="${"svelte-1iojg2p"}">Confirm code</button></div>`}
+</div>`;
+    });
+  }
+});
+
 // node_modules/@firebase/functions/dist/esm-node/index.node.esm.js
 function registerFunctions(fetchImpl2, variant) {
   const factory = (container, { instanceIdentifier: regionOrCustomDomain }) => {
@@ -39403,59 +39586,16 @@ var index_svelte_exports = {};
 __export(index_svelte_exports, {
   default: () => Routes
 });
-function writable2(value, start = noop2) {
-  let stop;
-  const subscribers = /* @__PURE__ */ new Set();
-  function set(new_value) {
-    if (safe_not_equal(value, new_value)) {
-      value = new_value;
-      if (stop) {
-        const run_queue = !subscriber_queue2.length;
-        for (const subscriber of subscribers) {
-          subscriber[1]();
-          subscriber_queue2.push(subscriber, value);
-        }
-        if (run_queue) {
-          for (let i2 = 0; i2 < subscriber_queue2.length; i2 += 2) {
-            subscriber_queue2[i2][0](subscriber_queue2[i2 + 1]);
-          }
-          subscriber_queue2.length = 0;
-        }
-      }
-    }
-  }
-  function update(fn) {
-    set(fn(value));
-  }
-  function subscribe2(run2, invalidate = noop2) {
-    const subscriber = [run2, invalidate];
-    subscribers.add(subscriber);
-    if (subscribers.size === 1) {
-      stop = start(set) || noop2;
-    }
-    run2(value);
-    return () => {
-      subscribers.delete(subscriber);
-      if (subscribers.size === 0) {
-        stop();
-        stop = null;
-      }
-    };
-  }
-  return { set, update, subscribe: subscribe2 };
-}
-var subscriber_queue2, user, css3, Routes;
+var css4, Routes;
 var init_index_svelte = __esm({
   ".svelte-kit/output/server/entries/pages/index.svelte.js"() {
-    init_index_b3dad0a6();
-    init_db_55d4571e();
+    init_index_1788aa30();
+    init_PhoneLogin_c8b81e70();
     init_dist3();
     init_dist2();
     init_dist4();
     init_dist();
-    subscriber_queue2 = [];
-    user = writable2(null);
-    css3 = {
+    css4 = {
       code: ".highlighted-box.svelte-1637l9v{background-color:orange}.highlighted-blue.svelte-1637l9v{background-color:lightseagreen}span.svelte-1637l9v:hover{background-color:cyan}.message-group-title.svelte-1637l9v{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
       map: null
     };
@@ -39463,42 +39603,8 @@ var init_index_svelte = __esm({
       let $user, $$unsubscribe_user;
       $$unsubscribe_user = subscribe(user, (value) => $user = value);
       let newUserName = "";
-      let appVerifier;
-      let countryCode = "+1";
-      let phoneNumSegment1 = "";
-      let phoneNumSegment2 = "";
-      let phoneNumSegment3 = "";
-      let phoneConfirmationResult;
-      let phoneConfirmCode = "";
+      let newlyTypedCategory = "";
       let friendUIDsWithNewMessages = [];
-      function signInWithPhone() {
-        console.log("signInWithPhone()");
-        if (!window.recaptchaVerifier) {
-          window.recaptchaVerifier = new RecaptchaVerifier("sign-in-button", {
-            "size": "invisible",
-            "callback": (response) => {
-              console.log("reCAPTCHA solved =", response);
-            }
-          }, getAuth());
-          appVerifier = window.recaptchaVerifier;
-        }
-        onSignInSubmit();
-        function onSignInSubmit() {
-          const phoneNumber = `${countryCode} ${phoneNumSegment1}-${phoneNumSegment2}-${phoneNumSegment3}`;
-          print(getAuth(), phoneNumber, appVerifier);
-          signInWithPhoneNumber(getAuth(), phoneNumber, appVerifier).then((confirmationResult) => {
-            console.log("confirmation result =", confirmationResult);
-            phoneConfirmationResult = confirmationResult;
-            window.confirmationResult = confirmationResult;
-          }).catch((error2) => {
-            alert(error2);
-            console.log("error =", error2);
-            window.recaptchaVerifier.render().then(function(widgetId) {
-              grecaptcha.reset(widgetId);
-            });
-          });
-        }
-      }
       const auth = getAuth();
       let currentFriendUID = "";
       let accounts = [];
@@ -39535,24 +39641,15 @@ var init_index_svelte = __esm({
           });
         }
       });
-      $$result.css.add(css3);
+      $$result.css.add(css4);
       {
-        if (phoneNumSegment1.length === 3) {
-          document.getElementById("phone-input-2").focus();
-        }
-      }
-      {
-        if (phoneNumSegment2.length === 3) {
-          document.getElementById("phone-input-3").focus();
-        }
-      }
-      {
-        if (phoneNumSegment3.length === 4) {
-          signInWithPhone();
+        if ($user) {
+          doc(db, "users", $user.uid);
         }
       }
       $$unsubscribe_user();
-      return `<div style="${"display: flex; padding-left: 0px; padding-right: 0px;"}"><div>${!$user ? `${!phoneConfirmationResult ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
+      return `<div style="${"display: flex; padding-left: 0px; padding-right: 0px;"}"><div>${!$user ? `
+        <div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
           Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
           Even if you try to ignore it, visually they go to the top of our chat list; 
           if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
@@ -39564,36 +39661,32 @@ var init_index_svelte = __esm({
             </li>
             <li>Left-side is organized intentionally - NOT by whoever messaged you most recently
             </li></ol></div>
-
-        <div style="${"display: flex; justify-content: center; align-items: center; width: 400px; margin-top: 25px;"}"><input type="${"tel"}" id="${"phone-input-1"}" minlength="${"2"}" maxlength="${"4"}" placeholder="${"+1"}" style="${"width: 36px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", countryCode, 0)}>
-
-          <input type="${"tel"}" id="${"phone-input-1"}" minlength="${"3"}" maxlength="${"3"}" placeholder="${"339"}" style="${"width: 54px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", phoneNumSegment1, 0)}>
-
-          <input type="${"tel"}" id="${"phone-input-2"}" minlength="${"3"}" maxlength="${"3"}" placeholder="${"676"}" style="${"width: 54px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", phoneNumSegment2, 0)}>
-
-          <input type="${"tel"}" id="${"phone-input-3"}" minlength="${"4"}" maxlength="${"4"}" placeholder="${"1234"}" style="${"width: 76px; height: 40px; font-size: 2rem; margin-right: 10px"}"${add_attribute("value", phoneNumSegment3, 0)}>
-          
-          <div id="${"sign-in-button"}" style="${"border: solid; padding: 6px;"}">Sign Up
-          </div></div>` : `<div style="${"display: flex"}"><input label="${"6-digit code"}" placeholder="${"123456"}"${add_attribute("value", phoneConfirmCode, 0)}>
-          <button>Confirm code
-          </button></div>`}` : `<div style="${"width: 100px;"}"><h2 class="${"message-group-title svelte-1637l9v"}">People
-        </h2>
-        ${each($user.friends, (friend) => {
-        return `<div style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${[
+        
+        ${validate_component(PhoneLogin, "PhoneLogin").$$render($$result, { canTakeInternationalNumbers: true }, {}, {})}` : `<div style="${"width: 100px;"}"><div><h2 class="${"message-group-title svelte-1637l9v"}">People
+          </h2>
+          ${each($user.friends, (friend) => {
+        return `<div draggable="${"true"}" style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${[
           "svelte-1637l9v",
           (friend.uid === currentFriendUID ? "highlighted-box" : "") + " " + (friendUIDsWithNewMessages.includes(friend.uid) ? "highlighted-blue" : "")
         ].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-1637l9v"}">${escape(friend.name)}</span>
-          </div>`;
-      })}
+            </div>`;
+      })}</div>
 
         <button style="${"margin-top: 20px;"}">Add person
         </button>
 
         ${``}
 
+        
+        ${$user.peopleCategories instanceof Array ? `${each($user.peopleCategories, (category) => {
+        return `<h2 class="${"message-group-title svelte-1637l9v"}">${escape(category)}</h2>`;
+      })}` : ``}
+
         <h2 class="${"message-group-title svelte-1637l9v"}" style="${"margin-top: 50px;"}">Editable category
         </h2>
-        Coming soon...
+        <button>New category</button>
+        <input style="${"width: 90px"}"${add_attribute("value", newlyTypedCategory, 0)}>
+
 
         <h2 class="${"message-group-title svelte-1637l9v"}" style="${"margin-top: 50px;"}">Outside Messages
         </h2>
@@ -39614,7 +39707,7 @@ var init_index_svelte = __esm({
       <div style="${"margin-top: 10px;"}">Give this link to your friends &amp; family so they can message you without a zen-message account:
       </div>
 
-      <div style="${"font-size: 0.8rem; color: blue"}">zen-message.com/${escape($user.uid)}</div>` : ``}`}`}</div>
+      <a style="${"font-size: 0.8rem; color: blue"}" href="${"https://zen-message.com/" + escape($user.uid)}" target="${"_blank"}">zen-message.com/${escape($user.uid)}</a>` : ``}`}`}</div>
 </div>`;
     });
   }
@@ -39623,18 +39716,18 @@ var init_index_svelte = __esm({
 // .svelte-kit/output/server/nodes/2.js
 var __exports3 = {};
 __export(__exports3, {
-  css: () => css4,
+  css: () => css5,
   entry: () => entry3,
   js: () => js3,
   module: () => index_svelte_exports
 });
-var entry3, js3, css4;
+var entry3, js3, css5;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-beef07f2.js";
-    js3 = ["pages/index.svelte-beef07f2.js", "chunks/vendor-87f020b6.js", "chunks/db-f3cf9e2e.js"];
-    css4 = ["assets/pages/index.svelte-73157806.css"];
+    entry3 = "pages/index.svelte-9eb4c82f.js";
+    js3 = ["pages/index.svelte-9eb4c82f.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-5d69dbd4.js", "chunks/singletons-d1fb5791.js"];
+    css5 = ["assets/pages/index.svelte-73157806.css", "assets/PhoneLogin-f3f594b5.css"];
   }
 });
 
@@ -39650,11 +39743,14 @@ function load2({ params }) {
 var U5Buidu5D;
 var init_uid_svelte = __esm({
   ".svelte-kit/output/server/entries/pages/_uid_.svelte.js"() {
-    init_index_b3dad0a6();
+    init_index_1788aa30();
+    init_PhoneLogin_c8b81e70();
     init_dist2();
-    init_db_55d4571e();
     init_dist();
+    init_dist3();
     U5Buidu5D = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+      let $user, $$unsubscribe_user;
+      $$unsubscribe_user = subscribe(user, (value) => $user = value);
       let { uid } = $$props;
       let newMessage = "";
       let senderName = "";
@@ -39662,12 +39758,16 @@ var init_uid_svelte = __esm({
       console.log("uid =", uid);
       if ($$props.uid === void 0 && $$bindings.uid && uid !== void 0)
         $$bindings.uid(uid);
+      $$unsubscribe_user();
       return `<input style="${"width: 300px; box-sizing: border-box"}" placeholder="${"Type message here..."}"${add_attribute("value", newMessage, 0)}${add_attribute("this", MessageField, 0)}>
 
 <div><input placeholder="${"Your name e.g. John"}"${add_attribute("value", senderName, 0)}></div>
 
 <button style="${"margin-top: 12px; height: 30px; width: 300px;"}">Send message
-</button>`;
+</button>
+
+<div>Or create an account</div>
+${!$user ? `${validate_component(PhoneLogin, "PhoneLogin").$$render($$result, { canTakeInternationalNumbers: true }, {}, {})}` : ``}`;
     });
   }
 });
@@ -39675,18 +39775,18 @@ var init_uid_svelte = __esm({
 // .svelte-kit/output/server/nodes/3.js
 var __exports4 = {};
 __export(__exports4, {
-  css: () => css5,
+  css: () => css6,
   entry: () => entry4,
   js: () => js4,
   module: () => uid_svelte_exports
 });
-var entry4, js4, css5;
+var entry4, js4, css6;
 var init__4 = __esm({
   ".svelte-kit/output/server/nodes/3.js"() {
     init_uid_svelte();
-    entry4 = "pages/_uid_.svelte-49cd50a9.js";
-    js4 = ["pages/_uid_.svelte-49cd50a9.js", "chunks/vendor-87f020b6.js", "chunks/db-f3cf9e2e.js"];
-    css5 = [];
+    entry4 = "pages/_uid_.svelte-b946df1b.js";
+    js4 = ["pages/_uid_.svelte-b946df1b.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-5d69dbd4.js", "chunks/singletons-d1fb5791.js"];
+    css6 = ["assets/PhoneLogin-f3f594b5.css"];
   }
 });
 
@@ -39772,7 +39872,7 @@ async function setResponse(res, response) {
 }
 
 // .svelte-kit/output/server/index.js
-init_index_b3dad0a6();
+init_index_1788aa30();
 var __accessCheck2 = (obj, member, msg) => {
   if (!member.has(obj))
     throw TypeError("Cannot " + msg);
@@ -41755,7 +41855,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-5df30b5c.js", "js": ["start-5df30b5c.js", "chunks/vendor-87f020b6.js"], "css": [] },
+    entry: { "file": "start-27b4bda4.js", "js": ["start-27b4bda4.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
