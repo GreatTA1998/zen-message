@@ -1,26 +1,22 @@
 <div style="display: flex; padding-left: 0px; padding-right: 0px;">
   <div>
-    {#if !$user}
+    {#if !$hasFetchedUser}
+      <div style="margin-left: 4px">Fetching your data...</div>
+    {:else if $hasFetchedUser && !$user}
         <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
-          <b>What problem does this solve:</b>
-          Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
-          Even if you try to ignore it, visually they go to the top of our chat list; 
-          if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
-          <br><br>
-          <b>How this app differs</b>
-          <ol>
-            <li>
-            Messages have no notifications by default unless the other person specifies it's time-sensitive e.g. "Before today" / "This week"
-            </li>
-            <li>
-            Left-side is organized intentionally - NOT by whoever messaged you most recently
-            </li>
-          </ol>
+          <h4 style="margin-left: 12px">Zen Messenger</h4>
+          <ul style="padding-left: 12px; font-size: 0.8rem; list-style: none;">
+            <li><b>Fewer notifications:</b> messages won't ping you unless it requires immediate attention</li>
+            <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
+            <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li>
+          </ul>
         </div>
         
-        <PhoneLogin 
-          canTakeInternationalNumbers
-        />
+        <div style="width: 350px">
+          <PhoneLogin 
+            canTakeInternationalNumbers
+          />
+        </div>
     {:else}
       <div style="width: 100px;">
         <!-- LIST CATEGORIES -->
@@ -144,7 +140,7 @@
   import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
   import ChatWindow from '../chatWindow.svelte'
-  import { user } from '../store.js'
+  import { hasFetchedUser, user } from '../store.js'
   import { getRandomID } from '../helpers.js'
   import PhoneLogin from '../PhoneLogin.svelte'
 
@@ -219,7 +215,8 @@
           name: resultUser.displayName || 'John Apple',
           phoneNumber: resultUser.phoneNumber,
           friends: [],
-          peopleCategories: ['Friends', 'Family']
+          peopleCategories: ['Friends', 'Family'],
+          friendUIDsWithNewMessages: []
         }
         await setDoc(doc(db, 'users', resultUser.uid), initialUserDoc)
         // $user = initialUserDoc
@@ -231,8 +228,9 @@
         if ($user.friendUIDsWithNewMessages) {
           friendUIDsWithNewMessages = $user.friendUIDsWithNewMessages
         }
-      });
-    } 
+      })
+    }
+    hasFetchedUser.set(true) 
   })
   
   async function updateUserName () {
@@ -305,6 +303,10 @@
 </script>
 
 <style>
+  .ul .li {
+    margin-left: 4px;
+  }
+
   .highlighted-box {
     background-color: orange;
   }
