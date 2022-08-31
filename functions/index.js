@@ -52,17 +52,19 @@ exports.scheduledFunction = functions.pubsub.schedule('every 24 hours').onRun(as
           for (const friendUID of user.friendUIDsWithNewMessages) {
             console.log('friendUID =', friendUID)
             const chatID = user.uid < friendUID ? (user.uid + friendUID) : (friendUID + user.uid)
-            const chatRef = db.doc(`chats/${chatID}`)
-            const chatResult = await chatRef.get() 
+            const chatResult = await db.doc(`chats/${chatID}`).get()
             const chatObj = chatResult.data()
+
+            // find out friend's name
+            const friendName = user.friends.filter(f => f.uid === friendUID)[0].name
             const mostRecentMessage = chatObj.messages[chatObj.messages.length - 1].content
-            summaryOfMessages.push(mostRecentMessage)
+            summaryOfMessages.push(`${friendName}: ${mostRecentMessage}`)
           }
           // send a text
           // to use the function we already have https://stackoverflow.com/a/60470745/7812829
             client.messages 
               .create({        
-                  body: summaryOfMessages.join(''),
+                  body: summaryOfMessages.join(','),
                   messagingServiceSid: 'MGe595615f66055b9ee88ac19a9d0ddce5',
                   to: user.phoneNumber
                 }) 
