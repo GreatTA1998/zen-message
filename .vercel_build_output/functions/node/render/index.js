@@ -39245,7 +39245,7 @@ var init_dist3 = __esm({
   }
 });
 
-// .svelte-kit/output/server/chunks/PhoneLogin-c8b81e70.js
+// .svelte-kit/output/server/chunks/PhoneLogin-3cce1c8c.js
 function writable2(value, start = noop2) {
   let stop;
   const subscribers = /* @__PURE__ */ new Set();
@@ -39287,9 +39287,9 @@ function writable2(value, start = noop2) {
   }
   return { set, update, subscribe: subscribe2 };
 }
-var firebaseConfig, db, subscriber_queue2, user, css3, PhoneLogin;
-var init_PhoneLogin_c8b81e70 = __esm({
-  ".svelte-kit/output/server/chunks/PhoneLogin-c8b81e70.js"() {
+var firebaseConfig, db, subscriber_queue2, user, hasFetchedUser, css3, PhoneLogin;
+var init_PhoneLogin_3cce1c8c = __esm({
+  ".svelte-kit/output/server/chunks/PhoneLogin-3cce1c8c.js"() {
     init_dist();
     init_dist2();
     init_index_1788aa30();
@@ -39307,6 +39307,7 @@ var init_PhoneLogin_c8b81e70 = __esm({
     db = getFirestore();
     subscriber_queue2 = [];
     user = writable2(null);
+    hasFetchedUser = writable2(false);
     css3 = {
       code: '.svelte-1iojg2p::placeholder{opacity:0.2\r\n  }.copied-from-koa.svelte-1iojg2p{font:20px/1.7 "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif\r\n  }',
       map: null
@@ -39434,9 +39435,9 @@ var init_PhoneLogin_c8b81e70 = __esm({
       </div>
 
       
-      <input autocomplete="${"one-time-code"}" class="${"svelte-1iojg2p"}">
       
-      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"1"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm1, 0)}${add_attribute("this", c1, 0)}>
+      
+      <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"1"}" autocomplete="${"one-time-code"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm1, 0)}${add_attribute("this", c1, 0)}>
       <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"2"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm2, 0)}${add_attribute("this", c2, 0)}>  
       <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"3"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm3, 0)}${add_attribute("this", c3, 0)}>
       <input minlength="${"1"}" maxlength="${"1"}" style="${"width: 20px; font-size: 2rem; margin-left: 15px;"}" placeholder="${"4"}" class="${"svelte-1iojg2p"}"${add_attribute("value", confirm4, 0)}${add_attribute("this", c4, 0)}>
@@ -39590,18 +39591,20 @@ var css4, Routes;
 var init_index_svelte = __esm({
   ".svelte-kit/output/server/entries/pages/index.svelte.js"() {
     init_index_1788aa30();
-    init_PhoneLogin_c8b81e70();
+    init_PhoneLogin_3cce1c8c();
     init_dist3();
     init_dist2();
     init_dist4();
     init_dist();
     css4 = {
-      code: ".highlighted-box.svelte-1637l9v{background-color:orange}.highlighted-blue.svelte-1637l9v{background-color:lightseagreen}span.svelte-1637l9v:hover{background-color:cyan}.message-group-title.svelte-1637l9v{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
+      code: ".highlighted-box.svelte-aliv1u{background-color:orange}.highlighted-blue.svelte-aliv1u{background-color:lightseagreen}span.svelte-aliv1u:hover{background-color:cyan}.message-group-title.svelte-aliv1u{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
       map: null
     };
     Routes = create_ssr_component(($$result, $$props, $$bindings, slots) => {
       let $user, $$unsubscribe_user;
+      let $hasFetchedUser, $$unsubscribe_hasFetchedUser;
       $$unsubscribe_user = subscribe(user, (value) => $user = value);
+      $$unsubscribe_hasFetchedUser = subscribe(hasFetchedUser, (value) => $hasFetchedUser = value);
       let newUserName = "";
       let newlyTypedCategory = "";
       let friendUIDsWithNewMessages = [];
@@ -39626,9 +39629,8 @@ var init_index_svelte = __esm({
               name: resultUser.displayName || "John Apple",
               phoneNumber: resultUser.phoneNumber,
               friends: [],
-              family: [],
-              VIPs: [],
-              everyoneElse: []
+              peopleCategories: ["Friends", "Family"],
+              friendUIDsWithNewMessages: []
             };
             await setDoc(doc(db, "users", resultUser.uid), initialUserDoc);
             user.set(initialUserDoc);
@@ -39640,6 +39642,7 @@ var init_index_svelte = __esm({
             }
           });
         }
+        hasFetchedUser.set(true);
       });
       $$result.css.add(css4);
       {
@@ -39648,53 +39651,44 @@ var init_index_svelte = __esm({
         }
       }
       $$unsubscribe_user();
-      return `<div style="${"display: flex; padding-left: 0px; padding-right: 0px;"}"><div>${!$user ? `
-        <div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><b>What problem does this solve:</b>
-          Everytime someone messages us, we get a notification IMMEDIATELY, regardless of whether the message is time-sensitive, or even important. 
-          Even if you try to ignore it, visually they go to the top of our chat list; 
-          if you visited Messenger for a specific purpose, the top message distractions will help you forget what you were doing.
-          Multiply that by all the people you message across time, and it&#39;s a disaster.
-
-          <br><br>
-          <b>How this app differs</b>
-          <ol><li>Messages have no notifications by default unless the other person specifies it&#39;s time-sensitive e.g. &quot;Before today&quot; / &quot;This week&quot;
-            </li>
-            <li>Left-side is organized intentionally - NOT by whoever messaged you most recently
-            </li></ol></div>
+      $$unsubscribe_hasFetchedUser();
+      return `<div style="${"display: flex; padding-left: 0px; padding-right: 0px;"}"><div>${!$hasFetchedUser ? `<div style="${"margin-left: 4px"}">Fetching your data...</div>` : `${$hasFetchedUser && !$user ? `<div style="${"font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;"}"><h4 style="${"margin-left: 12px"}">Zen Messenger</h4>
+          <ul style="${"padding-left: 12px; font-size: 0.8rem; list-style: none;"}"><li><b>Fewer notifications:</b> messages won&#39;t ping you unless it requires immediate attention</li>
+            <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
+            <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li></ul></div>
         
-        ${validate_component(PhoneLogin, "PhoneLogin").$$render($$result, { canTakeInternationalNumbers: true }, {}, {})}` : `<div style="${"width: 100px;"}"><div><h2 class="${"message-group-title svelte-1637l9v"}">People
-          </h2>
-          ${each($user.friends, (friend) => {
-        return `<div draggable="${"true"}" style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${[
-          "svelte-1637l9v",
-          (friend.uid === currentFriendUID ? "highlighted-box" : "") + " " + (friendUIDsWithNewMessages.includes(friend.uid) ? "highlighted-blue" : "")
-        ].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-1637l9v"}">${escape(friend.name)}</span>
+        <div style="${"width: 350px"}">${validate_component(PhoneLogin, "PhoneLogin").$$render($$result, { canTakeInternationalNumbers: true }, {}, {})}</div>` : `<div style="${"width: 100px;"}">
+        ${$user.peopleCategories instanceof Array ? `${each($user.peopleCategories, (category) => {
+        return `<div><h2 class="${"message-group-title svelte-aliv1u"}">${escape(category)}</h2>
+              ${each($user.friends.filter((f3) => f3.category === category), (friend) => {
+          return `<div draggable="${"true"}" style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${[
+            "svelte-aliv1u",
+            (friend.uid === currentFriendUID ? "highlighted-box" : "") + " " + (friendUIDsWithNewMessages.includes(friend.uid) ? "highlighted-blue" : "")
+          ].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-aliv1u"}">${escape(friend.name)}</span>
+                </div>`;
+        })}
             </div>`;
-      })}</div>
+      })}` : ``}
 
+        <h2 class="${"message-group-title svelte-aliv1u"}" style="${"margin-top: 50px;"}">Editable category
+        </h2>
+        <button>New category</button>
+        <input style="${"width: 90px"}"${add_attribute("value", newlyTypedCategory, 0)}>
+
+        
         <button style="${"margin-top: 20px;"}">Add person
         </button>
 
         ${``}
 
-        
-        ${$user.peopleCategories instanceof Array ? `${each($user.peopleCategories, (category) => {
-        return `<h2 class="${"message-group-title svelte-1637l9v"}">${escape(category)}</h2>`;
-      })}` : ``}
 
-        <h2 class="${"message-group-title svelte-1637l9v"}" style="${"margin-top: 50px;"}">Editable category
-        </h2>
-        <button>New category</button>
-        <input style="${"width: 90px"}"${add_attribute("value", newlyTypedCategory, 0)}>
-
-
-        <h2 class="${"message-group-title svelte-1637l9v"}" style="${"margin-top: 50px;"}">Outside Messages
+        <h2 class="${"message-group-title svelte-aliv1u"}" style="${"margin-top: 50px;"}">Outside Messages
         </h2>
         
         ${$user.messageRequestNames instanceof Array ? `${each($user.messageRequestNames, (newName) => {
         return `<div style="${"border: solid blue; height: 40px; display: flex; align-items: center;"}">${escape(newName)}
             </div>`;
-      })}` : ``}</div>`}</div>
+      })}` : ``}</div>`}`}</div>
 
   <div style="${"width: 320px; margin-left: 5px; margin-top: 5px;"}">${`${`${$user ? `<div style="${"margin-top: 5px; margin-bottom: 12px;"}">Click any chat on the left-side
       </div> 
@@ -39704,7 +39698,7 @@ var init_index_svelte = __esm({
       <button>Update name
       </button>
 
-      <div style="${"margin-top: 10px;"}">Give this link to your friends &amp; family so they can message you without a zen-message account:
+      <div style="${"margin-top: 10px;"}">Give this link to close friends &amp; family so they can message you without a zen-message account:
       </div>
 
       <a style="${"font-size: 0.8rem; color: blue"}" href="${"https://zen-message.com/" + escape($user.uid)}" target="${"_blank"}">zen-message.com/${escape($user.uid)}</a>` : ``}`}`}</div>
@@ -39725,9 +39719,9 @@ var entry3, js3, css5;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-9eb4c82f.js";
-    js3 = ["pages/index.svelte-9eb4c82f.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-5d69dbd4.js", "chunks/singletons-d1fb5791.js"];
-    css5 = ["assets/pages/index.svelte-73157806.css", "assets/PhoneLogin-f3f594b5.css"];
+    entry3 = "pages/index.svelte-e80d032a.js";
+    js3 = ["pages/index.svelte-e80d032a.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-9d4641d4.js", "chunks/singletons-d1fb5791.js"];
+    css5 = ["assets/pages/index.svelte-6861f960.css", "assets/PhoneLogin-f3f594b5.css"];
   }
 });
 
@@ -39744,7 +39738,7 @@ var U5Buidu5D;
 var init_uid_svelte = __esm({
   ".svelte-kit/output/server/entries/pages/_uid_.svelte.js"() {
     init_index_1788aa30();
-    init_PhoneLogin_c8b81e70();
+    init_PhoneLogin_3cce1c8c();
     init_dist2();
     init_dist();
     init_dist3();
@@ -39784,8 +39778,8 @@ var entry4, js4, css6;
 var init__4 = __esm({
   ".svelte-kit/output/server/nodes/3.js"() {
     init_uid_svelte();
-    entry4 = "pages/_uid_.svelte-b946df1b.js";
-    js4 = ["pages/_uid_.svelte-b946df1b.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-5d69dbd4.js", "chunks/singletons-d1fb5791.js"];
+    entry4 = "pages/_uid_.svelte-752eb8e5.js";
+    js4 = ["pages/_uid_.svelte-752eb8e5.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-9d4641d4.js", "chunks/singletons-d1fb5791.js"];
     css6 = ["assets/PhoneLogin-f3f594b5.css"];
   }
 });
@@ -41855,7 +41849,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-27b4bda4.js", "js": ["start-27b4bda4.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
+    entry: { "file": "start-836ec25e.js", "js": ["start-836ec25e.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
