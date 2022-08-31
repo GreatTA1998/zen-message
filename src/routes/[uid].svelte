@@ -2,7 +2,7 @@
   export function load ({ params }) {
     return {
       props: {
-        uid: params.uid,
+        uid: params.uid
       }
     }
   }  

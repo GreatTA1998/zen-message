@@ -23,26 +23,38 @@
         />
     {:else}
       <div style="width: 100px;">
-        <div on:drop={(e) => drop_handler(e)} on:dragover={dragover_handler}>
-          <h2 class="message-group-title">
-            People
-          </h2>
-          {#each $user.friends as friend}
-            <div 
-              on:click={() => currentFriendUID = friend.uid} 
-              draggable="true" 
-              on:dragstart={(e) => dragstart_handler(e)}
-              style="border: solid orange; height: 40px; display: flex; align-items: center;"
-              class:highlighted-box={friend.uid === currentFriendUID}
-              class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
-            >
-              <span style="margin-left: 5px">
-                {friend.name}
-              </span>
+        <!-- LIST CATEGORIES -->
+        {#if $user.peopleCategories instanceof Array}
+          {#each $user.peopleCategories as category}
+            <div on:drop={(e) => drop_handler(e, category)} on:dragover={dragover_handler}>
+              <h2 class="message-group-title">
+                {category}
+              </h2>
+              {#each $user.friends.filter(f => f.category === category) as friend}
+                <div 
+                  on:click={() => currentFriendUID = friend.uid} 
+                  draggable="true" 
+                  on:dragstart={(e) => dragstart_handler(e, friend.uid)}
+                  style="border: solid orange; height: 40px; display: flex; align-items: center;"
+                  class:highlighted-box={friend.uid === currentFriendUID}
+                  class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
+                >
+                  <span style="margin-left: 5px">
+                    {friend.name}
+                  </span>
+                </div>
+              {/each}
             </div>
           {/each}
-        </div>
+        {/if}
 
+        <h2 class="message-group-title" style="margin-top: 50px;">
+          Editable category
+        </h2>
+        <button on:click={createNewCategory}>New category</button>
+        <input bind:value={newlyTypedCategory} style="width: 90px">
+
+        <!-- ADD NEW PERSON -->
         <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
           Add person
         </button>
@@ -59,19 +71,6 @@
             {/if}
           {/each}
         {/if}
-
-        <!-- LIST CATEGORIES -->
-        {#if $user.peopleCategories instanceof Array}
-          {#each $user.peopleCategories as category}
-            <h2 class="message-group-title">{category}</h2>
-          {/each}
-        {/if}
-
-        <h2 class="message-group-title" style="margin-top: 50px;">
-          Editable category
-        </h2>
-        <button on:click={createNewCategory}>New category</button>
-        <input bind:value={newlyTypedCategory} style="width: 90px">
 
 
         <h2 class="message-group-title" style="margin-top: 50px;">
@@ -123,7 +122,7 @@
       </button>
 
       <div style="margin-top: 10px;">
-        Give this link to your friends & family so they can message you without a zen-message account:
+        Give this link to close friends & family so they can message you without a zen-message account:
       </div>
 
       <a style="font-size: 0.8rem; color: blue" href="https://zen-message.com/{$user.uid}" target="_blank">
@@ -194,7 +193,7 @@
 
     const ref = doc(db, 'users', $user.uid)
     await updateDoc(ref, {
-      friends: arrayUnion({ name, uid })
+      friends: arrayUnion({ name, uid, category: $user.peopleCategories[0] })
     })
 
     const chatRoomID = $user.uid < uid ? ($user.uid + uid) : (uid + $user.uid)
@@ -220,9 +219,7 @@
           name: resultUser.displayName || 'John Apple',
           phoneNumber: resultUser.phoneNumber,
           friends: [],
-          family: [],
-          VIPs: [],
-          everyoneElse: []
+          peopleCategories: ['Friends', 'Family']
         }
         await setDoc(doc(db, 'users', resultUser.uid), initialUserDoc)
         // $user = initialUserDoc
@@ -279,19 +276,31 @@
     newlyTypedCategory = ''
   }
 
-  function drop_handler (e) {
-    console.log('detected drop =', e)
-    // check with person it is
-    // have the friend somehow point to the category i.e. friend.category = ''
-    // consider using IDs
+  async function drop_handler (e, categoryName) {
+    e.preventDefault()
+    const friendUID = e.dataTransfer.getData('text/plain')
+    
+    // update the user object
+    const copy = [...$user.friends]
+    for (const friend of copy) {
+      if (friend.uid === friendUID) {
+        friend.category = categoryName
+        break
+      }
+    }
+
+    await updateDoc(userRef, {
+      friends: copy
+    })
   }
 
   function dragover_handler (e) {
-    console.log("detected dragover =", e)
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move"
   }
 
-  function dragstart_handler (e) {
-    console.log('dragstart =', e)
+  function dragstart_handler (e, friendUID) {
+    e.dataTransfer.setData("text/plain", friendUID)
   }
 </script>
 
