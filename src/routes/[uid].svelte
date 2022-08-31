@@ -28,8 +28,17 @@
 
 <div>Or create an account</div>
 {#if !$user}
-  <PhoneLogin canTakeInternationalNumbers/>
+  <div style="width: 250px;">
+    <PhoneLogin canTakeInternationalNumbers/> 
+  </div>
 {/if}
+
+<h4 style="margin-left: 12px">Zen Messenger</h4>
+<ul style="padding-left: 12px; font-size: 0.8rem; list-style: none;">
+  <li><b>Fewer notifications:</b> messages won't ping you unless it requires immediate attention</li>
+  <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
+  <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li>
+</ul>
 
 <script>
   import { user } from '../store.js'

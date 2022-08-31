@@ -39597,7 +39597,7 @@ var init_index_svelte = __esm({
     init_dist4();
     init_dist();
     css4 = {
-      code: ".highlighted-box.svelte-aliv1u{background-color:orange}.highlighted-blue.svelte-aliv1u{background-color:lightseagreen}span.svelte-aliv1u:hover{background-color:cyan}.message-group-title.svelte-aliv1u{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
+      code: ".highlighted-box.svelte-zpsj5u{background-color:orange}.highlighted-blue.svelte-zpsj5u{background-color:lightseagreen}.message-group-title.svelte-zpsj5u{font-family:Roboto, sans-serif;font-weight:600;color:rgb(119, 110, 110);margin-top:5px;margin-bottom:5px}",
       map: null
     };
     Routes = create_ssr_component(($$result, $$props, $$bindings, slots) => {
@@ -39659,18 +39659,18 @@ var init_index_svelte = __esm({
         
         <div style="${"width: 350px"}">${validate_component(PhoneLogin, "PhoneLogin").$$render($$result, { canTakeInternationalNumbers: true }, {}, {})}</div>` : `<div style="${"width: 100px;"}">
         ${$user.peopleCategories instanceof Array ? `${each($user.peopleCategories, (category) => {
-        return `<div><h2 class="${"message-group-title svelte-aliv1u"}">${escape(category)}</h2>
+        return `<div><h2 class="${"message-group-title svelte-zpsj5u"}">${escape(category)}</h2>
               ${each($user.friends.filter((f3) => f3.category === category), (friend) => {
           return `<div draggable="${"true"}" style="${"border: solid orange; height: 40px; display: flex; align-items: center;"}" class="${[
-            "svelte-aliv1u",
+            "svelte-zpsj5u",
             (friend.uid === currentFriendUID ? "highlighted-box" : "") + " " + (friendUIDsWithNewMessages.includes(friend.uid) ? "highlighted-blue" : "")
-          ].join(" ").trim()}"><span style="${"margin-left: 5px"}" class="${"svelte-aliv1u"}">${escape(friend.name)}</span>
+          ].join(" ").trim()}"><span style="${"margin-left: 5px"}">${escape(friend.name)}</span>
                 </div>`;
         })}
             </div>`;
       })}` : ``}
 
-        <h2 class="${"message-group-title svelte-aliv1u"}" style="${"margin-top: 50px;"}">Editable category
+        <h2 class="${"message-group-title svelte-zpsj5u"}" style="${"margin-top: 50px;"}">Editable category
         </h2>
         <button>New category</button>
         <input style="${"width: 90px"}"${add_attribute("value", newlyTypedCategory, 0)}>
@@ -39682,7 +39682,7 @@ var init_index_svelte = __esm({
         ${``}
 
 
-        <h2 class="${"message-group-title svelte-aliv1u"}" style="${"margin-top: 50px;"}">Outside Messages
+        <h2 class="${"message-group-title svelte-zpsj5u"}" style="${"margin-top: 50px;"}">Outside Messages
         </h2>
         
         ${$user.messageRequestNames instanceof Array ? `${each($user.messageRequestNames, (newName) => {
@@ -39719,9 +39719,9 @@ var entry3, js3, css5;
 var init__3 = __esm({
   ".svelte-kit/output/server/nodes/2.js"() {
     init_index_svelte();
-    entry3 = "pages/index.svelte-e80d032a.js";
-    js3 = ["pages/index.svelte-e80d032a.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-9d4641d4.js", "chunks/singletons-d1fb5791.js"];
-    css5 = ["assets/pages/index.svelte-6861f960.css", "assets/PhoneLogin-f3f594b5.css"];
+    entry3 = "pages/index.svelte-0fa4fa8f.js";
+    js3 = ["pages/index.svelte-0fa4fa8f.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-9d4641d4.js", "chunks/singletons-d1fb5791.js"];
+    css5 = ["assets/pages/index.svelte-d7faf56f.css", "assets/PhoneLogin-f3f594b5.css"];
   }
 });
 
@@ -41849,7 +41849,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-836ec25e.js", "js": ["start-836ec25e.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
+    entry: { "file": "start-31fcc95a.js", "js": ["start-31fcc95a.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
