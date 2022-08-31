@@ -1,5 +1,5 @@
 <div style="width: 300px;">
-  <div style="height: 200px; overflow-y: auto; overflow-x: hidden;">
+  <div id="chat-window" style="height: 200px; overflow-y: auto; overflow-x: hidden;">
     {#if chatDoc.messages}
       {#each chatDoc.messages as message, i}
         <div style="display: flex; width: 280px; margin-right: 20px;">
@@ -18,8 +18,9 @@
               {' ' + displayDate(message.timestamp)}
             </p>
           {/if}
+
           {#if i === chatDoc.messages.length - 1}
-          <div bind:this={AutoscrollTargetElem}></div>
+            <div bind:this={AutoscrollTargetElem}></div>
           {/if}
         </div>
       {/each}
@@ -88,7 +89,7 @@
         // mark chat as read
         const myRef = doc(db, 'users', currentUser.uid)
         updateDoc(myRef, {
-          friendUIDsWithNewMessages: arrayRemove(chatRoomID)
+          friendUIDsWithNewMessages: arrayRemove(friendUID)
         })
 
         await tick() // let message divs render
@@ -99,11 +100,15 @@
         //   block: 'center',
         //   behavior: 'smooth'
         // })
+        
+        // scroll to the bottom
+        const ChatWindow = document.getElementById('chat-window')
+        ChatWindow.scrollTop = ChatWindow.scrollHeight
 
-        AutoscrollTargetElem.scrollIntoView({
-          block: 'center',
-          behavior: 'smooth'
-        })
+        // AutoscrollTargetElem.scrollIntoView({
+        //   block: 'center',
+        //   behavior: 'smooth'
+        // })
       }
     })
   })

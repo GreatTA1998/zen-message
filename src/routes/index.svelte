@@ -314,10 +314,10 @@
   .highlighted-blue {
     background-color: lightseagreen;
   }
-
+/* 
   span:hover {
     background-color: cyan;
-  }
+  } */
 
   .message-group-title {
     font-family: Roboto, sans-serif; 
