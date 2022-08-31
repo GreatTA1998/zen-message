@@ -39761,7 +39761,13 @@ var init_uid_svelte = __esm({
 </button>
 
 <div>Or create an account</div>
-${!$user ? `${validate_component(PhoneLogin, "PhoneLogin").$$render($$result, { canTakeInternationalNumbers: true }, {}, {})}` : ``}`;
+${!$user ? `<div style="${"width: 250px;"}">${validate_component(PhoneLogin, "PhoneLogin").$$render($$result, { canTakeInternationalNumbers: true }, {}, {})}</div>` : ``}
+
+<h4 style="${"margin-left: 12px"}">Zen Messenger</h4>
+<ul style="${"padding-left: 12px; font-size: 0.8rem; list-style: none;"}"><li><b>Fewer notifications:</b> messages won&#39;t ping you unless it requires immediate attention</li>
+  <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
+  <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li>
+</ul>`;
     });
   }
 });
@@ -39778,8 +39784,8 @@ var entry4, js4, css6;
 var init__4 = __esm({
   ".svelte-kit/output/server/nodes/3.js"() {
     init_uid_svelte();
-    entry4 = "pages/_uid_.svelte-752eb8e5.js";
-    js4 = ["pages/_uid_.svelte-752eb8e5.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-9d4641d4.js", "chunks/singletons-d1fb5791.js"];
+    entry4 = "pages/_uid_.svelte-9563a993.js";
+    js4 = ["pages/_uid_.svelte-9563a993.js", "chunks/vendor-f53b4472.js", "chunks/PhoneLogin-9d4641d4.js", "chunks/singletons-d1fb5791.js"];
     css6 = ["assets/PhoneLogin-f3f594b5.css"];
   }
 });
@@ -41849,7 +41855,7 @@ var manifest = {
   assets: /* @__PURE__ */ new Set(["favicon.png"]),
   _: {
     mime: { ".png": "image/png" },
-    entry: { "file": "start-31fcc95a.js", "js": ["start-31fcc95a.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
+    entry: { "file": "start-397e5bf7.js", "js": ["start-397e5bf7.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
