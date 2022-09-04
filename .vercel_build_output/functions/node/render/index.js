@@ -41797,7 +41797,7 @@ function set_paths(paths) {
 var user_hooks = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null
 }, Symbol.toStringTag, { value: "Module" }));
-var template = ({ head, body, assets: assets2, nonce }) => '<!DOCTYPE html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<meta name="description" content="" />\n		<link rel="icon" href="' + assets2 + '/favicon.png" />\n		<meta name="viewport" content="width=device-width, initial-scale=1" />\n		' + head + "\n	</head>\n	<body>\n		<div>" + body + "</div>\n	</body>\n</html>\n";
+var template = ({ head, body, assets: assets2, nonce }) => '<!DOCTYPE html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<meta name="description" content="" />\n		<!-- https://stackoverflow.com/a/43469640/7812829 -->\n		<!-- <link rel="icon" href="' + assets2 + '/favicon.png" /> -->\n		<link rel="icon" href="' + assets2 + '/logo.jpg">\n		<link rel="apple-touch-icon" href="' + assets2 + '/logo.jpg">\n\n		<meta name="viewport" content="width=device-width, initial-scale=1" />\n		' + head + "\n	</head>\n	<body>\n		<div>" + body + "</div>\n	</body>\n</html>\n";
 var read = null;
 set_paths({ "base": "", "assets": "" });
 var get_hooks = (hooks) => ({
@@ -41852,10 +41852,10 @@ var Server = class {
 // .svelte-kit/vercel-tmp/manifest.js
 var manifest = {
   appDir: "_app",
-  assets: /* @__PURE__ */ new Set(["favicon.png"]),
+  assets: /* @__PURE__ */ new Set(["favicon.png", "logo.jpg"]),
   _: {
-    mime: { ".png": "image/png" },
-    entry: { "file": "start-397e5bf7.js", "js": ["start-397e5bf7.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
+    mime: { ".png": "image/png", ".jpg": "image/jpeg" },
+    entry: { "file": "start-880ff30f.js", "js": ["start-880ff30f.js", "chunks/vendor-f53b4472.js", "chunks/singletons-d1fb5791.js"], "css": [] },
     nodes: [
       () => Promise.resolve().then(() => (init__(), __exports)),
       () => Promise.resolve().then(() => (init__2(), __exports2)),
