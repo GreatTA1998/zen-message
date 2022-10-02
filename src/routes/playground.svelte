@@ -1,194 +1,66 @@
-<div style="display: flex; padding-left: 0px; padding-right: 0px;">
-  <div>
-    {#if !hasLogoExited}
-      {#if !hasAnimationEnded}
-        <div 
-          id="loading-screen-logo-start"
-          style="opacity: 0; border-radius: 12px;"
-          class="fade-in center"
-        >
-          <!-- <p id="test">Hello Test animation</p> -->
-          <!-- fade in and fade out -->
-          <img 
-            src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
-            width="300"
-            height="300"
-            style="border-radius: 40px;"
-          />
-        </div>
-      {:else if hasAnimationEnded} 
-        <div 
-          id="loading-screen-logo-exit"
-          use:action
-          style="opacity: 0; border-radius: 12px;"
-          class="fade-out"
-
-        >
-          <!-- <p id="test">Hello Test animation</p> -->
-          <!-- fade in and fade out -->
-          <img 
-            src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
-            width="300"
-            height="300"
-            style="border-radius: 40px;"
-          />
-        </div>
-      {/if}
+<!-- <div> -->
+  {#if !hasLogoExited}
+    {#if !hasAnimationEnded}
+      <div 
+        id="loading-screen-logo-start"
+        style="opacity: 0; width: 30vw; height: 30vh"
+        class="fade-in center"
+      >
+        <!-- <p id="test">Hello Test animation</p> -->
+        <!-- fade in and fade out -->
+        <img 
+          src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
+          width="250"
+          height="250"
+          style="border-radius: 40px;"
+          class="center"
+        />
+      </div>
+    {:else if hasAnimationEnded} 
+      <div 
+        id="loading-screen-logo-exit"
+        use:action
+        style="opacity: 0; width: 30vw; height: 30vh"
+        class="fade-out"
+      >
+        <!-- <p id="test">Hello Test animation</p> -->
+        <!-- fade in and fade out -->
+        <img 
+          src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
+          width="250"
+          height="250"
+          style="border-radius: 40px;"
+          class="center"
+        />
+      </div>
     {/if}
-      <!-- hasLogoExited && $hasFetchedUser && !$user -->
-    {#if hasLogoExited && $hasFetchedUser && !$user}
-      <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
-        <h4 style="margin-left: 12px">Zen Messenger</h4>
-        <ul style="padding-left: 12px; font-size: 0.8rem; list-style: none;">
+  {/if}
+    <!-- hasLogoExited && $hasFetchedUser && !$user -->
+  {#if hasLogoExited && $hasFetchedUser && !$user}
+    <div class="quick-fade-in" style="font-family: Roboto, sans-serif; color: grey; margin-top: 20px;">
+      <h4 style="text-align: center; font-size: 5rem; margin-top: 30vh; margin-bottom: 48px">
+          Zen Messenger
+      </h4>
+      <div style="margin: auto; width: 60%;">
+        <ul style="font-size: 1.2rem; list-style: none;">
           <li><b>Fewer notifications:</b> messages won't ping you unless it requires immediate attention</li>
           <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
           <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li>
         </ul>
       </div>
-      
-      <div style="width: 350px">
-        <PhoneLogin 
-          canTakeInternationalNumbers
-        />
-      </div>
-    {/if}
-      <!-- fade the logo out -->
-    {#if $hasFetchedUser === false}
-    <!--  $hasFetchedUser && !$user  -->
-    {:else if hasLogoExited && $hasFetchedUser && !$user}
-      <!-- <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
-        <h4 style="margin-left: 12px">Zen Messenger</h4>
-        <ul style="padding-left: 12px; font-size: 0.8rem; list-style: none;">
-          <li><b>Fewer notifications:</b> messages won't ping you unless it requires immediate attention</li>
-          <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
-          <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li>
-        </ul>
-      </div>
-      
-      <div style="width: 350px">
-        <PhoneLogin 
-          canTakeInternationalNumbers
-        />
-      </div> -->
-    {:else if $user}
-      <div style="width: 100px;">
-        <!-- LIST CATEGORIES -->
-        {#if $user.peopleCategories instanceof Array}
-          {#each $user.peopleCategories as category}
-            <div on:drop={(e) => drop_handler(e, category)} on:dragover={dragover_handler}>
-              <h2 class="message-group-title">
-                {category}
-              </h2>
-              {#each $user.friends.filter(f => f.category === category) as friend}
-                <div 
-                  on:click={() => currentFriendUID = friend.uid} 
-                  draggable="true" 
-                  on:dragstart={(e) => dragstart_handler(e, friend.uid)}
-                  style="border: solid orange; height: 40px; display: flex; align-items: center;"
-                  class:highlighted-box={friend.uid === currentFriendUID}
-                  class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
-                >
-                  <span style="margin-left: 5px">
-                    {friend.name}
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/each}
-        {/if}
+    </div>
 
-        <h2 class="message-group-title" style="margin-top: 50px;">
-          Editable category
-        </h2>
-        <button on:click={createNewCategory}>New category</button>
-        <input bind:value={newlyTypedCategory} style="width: 90px">
+    <div style="margin-bottom: 60px;"></div>
 
-        <!-- ADD NEW PERSON -->
-        <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
-          Add person
-        </button>
-
-        {#if isAddingFriend}
-          <div>Here are all accounts:</div>
-          {#each accounts as account} 
-            {#if account.uid !== $user.uid}
-              <div style="margin-top: 10px;">
-                <button on:click={() => addFriend(account)} style="margin-left: 20px;">
-                  {account.name}
-                </button>
-              </div>
-            {/if}
-          {/each}
-        {/if}
-
-
-        <h2 class="message-group-title" style="margin-top: 50px;">
-          Outside Messages
-        </h2>
-        
-        {#if $user.messageRequestNames instanceof Array}
-          {#each $user.messageRequestNames as newName}
-            <div 
-              on:click={() => showMessageRequest(newName)}
-              style="border: solid blue; height: 40px; display: flex; align-items: center;"
-            >
-              {newName}
-            </div>
-          {/each}
-        {/if}
-      </div>
-    {/if}
-  </div>
-
-  <div style="width: 320px; margin-left: 5px; margin-top: 5px;">
-    {#if currentFriendUID && $user && chatRoomID}
-      {#key currentFriendUID}
-        <ChatWindow 
-          {chatRoomID}
-          friendUID={currentFriendUID} 
-          otherPersonUID={currentFriendUID}
-          currentUser={$user}
-        />
-      {/key}
-    {:else if currentMessageRequestName}
-      <div>
-        {currentMessageRequestContent}
-      </div>
-
-      <button on:click={() => resolveMessageRequest(currentMessageRequestName)}>
-        Resolve and delete
-      </button>
-
-    {:else if $user}
-      <div style="margin-top: 5px; margin-bottom: 12px;">
-        Click any chat on the left-side
-      </div> 
-
-      <input placeholder="John Apple" bind:value={newUserName}>
-
-      <button on:click={updateUserName}>
-        Update name
-      </button>
-
-      <div style="margin-top: 10px;">
-        Give this link to close friends & family so they can message you without a zen-message account:
-      </div>
-
-      <a style="font-size: 0.8rem; color: blue" href="https://zen-message.com/{$user.uid}" target="_blank">
-        zen-message.com/{$user.uid}
-      </a>
-    {/if}
-  </div>
-</div>
+    <div style="width: 350px; margin: auto;">
+      <PhoneLogin 
+        canTakeInternationalNumbers
+      />
+    </div>
+  {/if}
+<!-- </div> -->
 
 <script>
-  let newUserName = ''
-
-  const chatID = ''
-  const allFriends = [] 
-  const allFamily = [] 
-  const everyoneElse = [] 
-
   import db from '../db.js'
   import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
@@ -213,24 +85,13 @@
 
   onMount(() => {
     const Elem = document.getElementById('loading-screen-logo-start')
-    Elem.addEventListener('animationend', (event) => {
-      console.log("animation ended!")
+    Elem.addEventListener('animationend', (e) => {
       hasAnimationEnded = true
-      // if ($hasFetchedUser) {
-      //   Elem.classList.remove('fade-in')
-      //   Elem.classList.add('fade-out')
-      // }
     })
-
-    // document.getElementById('loading-screen-logo-end').addEventListener('animationend', e => {
-    //   console.log("logo disappeared")
-    //    hasLogoExited = true
-    // })
   })
 
   function action (node) {
     node.addEventListener('animationend', e => {
-      console.log("logo disappeared")
        hasLogoExited = true
     })
   } 
@@ -411,7 +272,7 @@
 
   /* ease-in means slow start (so visible image stays longer) */
   .fade-out {
-    animation: fadeout 0.5s ease-in 1 forwards;
+    animation: fadeout 0.8s ease-in 1 forwards;
   } 
   /* forwards: retains the last keyframe (so the image doesn't just appear again) 
     `1` is the number of repeats
@@ -432,6 +293,12 @@
   .fade-in {
     animation: fadein 0.8s ease-out 1 forwards;
   }
+
+  .quick-fade-in {
+    animation: fadein 0.2s ease-out 1 forwards; 
+  }
+
+
 
   
   @keyframes fadein {
