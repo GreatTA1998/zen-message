@@ -1,194 +1,60 @@
-<div style="display: flex; padding-left: 0px; padding-right: 0px;">
+{#if !hasLogoExited}
+  <div 
+    id="loading-screen-logo-start"
+    style="opacity: 0; width: 30vw; height: 30vh"
+    class="elementToFadeInAndOut center"
+  >
+    <img 
+      src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
+      width="250"
+      height="250"
+      style="border-radius: 40px;"
+      class="center"
+    />
+  </div>
+{/if}
+  <!-- hasLogoExited && $hasFetchedUser && !$user -->
+{#if hasLogoExited && $hasFetchedUser && !$user}
+  <div 
+    class="quick-fade-in" 
+    style="font-family: Roboto, sans-serif; color: grey; margin-top: 20px;"
+  >
+    <h4 id="app-title">
+      zen messenger
+    </h4>
+
+    <div style="margin: auto; width: 60%;">
+      <ul style="font-size: 1.2rem; list-style: none;">
+        <li>Minimize unnecessary notifications</li>
+        <button>Normal</button>
+      </ul>
+    </div>
+  </div>
+
+
+  <div id="foo" class="ball" use:setupMovement></div>
+
+  {#each Array(4) as _, i}
+    <div class="message-bubble" style="width: {getRandomIntInclusive(40, 200)}px" use:autoMove>
+    </div>
+  {/each}
+
   <div>
-    {#if !hasLogoExited}
-      {#if !hasAnimationEnded}
-        <div 
-          id="loading-screen-logo-start"
-          style="opacity: 0; border-radius: 12px;"
-          class="fade-in center"
-        >
-          <!-- <p id="test">Hello Test animation</p> -->
-          <!-- fade in and fade out -->
-          <img 
-            src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
-            width="300"
-            height="300"
-            style="border-radius: 40px;"
-          />
-        </div>
-      {:else if hasAnimationEnded} 
-        <div 
-          id="loading-screen-logo-exit"
-          use:action
-          style="opacity: 0; border-radius: 12px;"
-          class="fade-out"
-
-        >
-          <!-- <p id="test">Hello Test animation</p> -->
-          <!-- fade in and fade out -->
-          <img 
-            src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
-            width="300"
-            height="300"
-            style="border-radius: 40px;"
-          />
-        </div>
-      {/if}
-    {/if}
-      <!-- hasLogoExited && $hasFetchedUser && !$user -->
-    {#if hasLogoExited && $hasFetchedUser && !$user}
-      <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
-        <h4 style="margin-left: 12px">Zen Messenger</h4>
-        <ul style="padding-left: 12px; font-size: 0.8rem; list-style: none;">
-          <li><b>Fewer notifications:</b> messages won't ping you unless it requires immediate attention</li>
-          <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
-          <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li>
-        </ul>
-      </div>
-      
-      <div style="width: 350px">
-        <PhoneLogin 
-          canTakeInternationalNumbers
-        />
-      </div>
-    {/if}
-      <!-- fade the logo out -->
-    {#if $hasFetchedUser === false}
-    <!--  $hasFetchedUser && !$user  -->
-    {:else if hasLogoExited && $hasFetchedUser && !$user}
-      <!-- <div style="font-family: Roboto, sans-serif; font-size: 1.5rem; color: grey; margin-top: 20px;">
-        <h4 style="margin-left: 12px">Zen Messenger</h4>
-        <ul style="padding-left: 12px; font-size: 0.8rem; list-style: none;">
-          <li><b>Fewer notifications:</b> messages won't ping you unless it requires immediate attention</li>
-          <li><b>Message summaries:</b> notifications are batched at regular times <i>and</i> before message deadlines</li>
-          <li><b>Fixed contact:</b> left-side panes are arranged by you, not by who messaged you most recently</li>
-        </ul>
-      </div>
-      
-      <div style="width: 350px">
-        <PhoneLogin 
-          canTakeInternationalNumbers
-        />
-      </div> -->
-    {:else if $user}
-      <div style="width: 100px;">
-        <!-- LIST CATEGORIES -->
-        {#if $user.peopleCategories instanceof Array}
-          {#each $user.peopleCategories as category}
-            <div on:drop={(e) => drop_handler(e, category)} on:dragover={dragover_handler}>
-              <h2 class="message-group-title">
-                {category}
-              </h2>
-              {#each $user.friends.filter(f => f.category === category) as friend}
-                <div 
-                  on:click={() => currentFriendUID = friend.uid} 
-                  draggable="true" 
-                  on:dragstart={(e) => dragstart_handler(e, friend.uid)}
-                  style="border: solid orange; height: 40px; display: flex; align-items: center;"
-                  class:highlighted-box={friend.uid === currentFriendUID}
-                  class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
-                >
-                  <span style="margin-left: 5px">
-                    {friend.name}
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/each}
-        {/if}
-
-        <h2 class="message-group-title" style="margin-top: 50px;">
-          Editable category
-        </h2>
-        <button on:click={createNewCategory}>New category</button>
-        <input bind:value={newlyTypedCategory} style="width: 90px">
-
-        <!-- ADD NEW PERSON -->
-        <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
-          Add person
-        </button>
-
-        {#if isAddingFriend}
-          <div>Here are all accounts:</div>
-          {#each accounts as account} 
-            {#if account.uid !== $user.uid}
-              <div style="margin-top: 10px;">
-                <button on:click={() => addFriend(account)} style="margin-left: 20px;">
-                  {account.name}
-                </button>
-              </div>
-            {/if}
-          {/each}
-        {/if}
-
-
-        <h2 class="message-group-title" style="margin-top: 50px;">
-          Outside Messages
-        </h2>
-        
-        {#if $user.messageRequestNames instanceof Array}
-          {#each $user.messageRequestNames as newName}
-            <div 
-              on:click={() => showMessageRequest(newName)}
-              style="border: solid blue; height: 40px; display: flex; align-items: center;"
-            >
-              {newName}
-            </div>
-          {/each}
-        {/if}
-      </div>
-    {/if}
+    <div style="font-family: Roboto, sans-serif; color: grey; font-size: 1.2rem;">
+      <div class="quick-fade-in" style="text-align: center">Re-arrange your contacts</div>
+    </div>
   </div>
 
-  <div style="width: 320px; margin-left: 5px; margin-top: 5px;">
-    {#if currentFriendUID && $user && chatRoomID}
-      {#key currentFriendUID}
-        <ChatWindow 
-          {chatRoomID}
-          friendUID={currentFriendUID} 
-          otherPersonUID={currentFriendUID}
-          currentUser={$user}
-        />
-      {/key}
-    {:else if currentMessageRequestName}
-      <div>
-        {currentMessageRequestContent}
-      </div>
+  <div style="margin-bottom: 500px;"></div>
 
-      <button on:click={() => resolveMessageRequest(currentMessageRequestName)}>
-        Resolve and delete
-      </button>
-
-    {:else if $user}
-      <div style="margin-top: 5px; margin-bottom: 12px;">
-        Click any chat on the left-side
-      </div> 
-
-      <input placeholder="John Apple" bind:value={newUserName}>
-
-      <button on:click={updateUserName}>
-        Update name
-      </button>
-
-      <div style="margin-top: 10px;">
-        Give this link to close friends & family so they can message you without a zen-message account:
-      </div>
-
-      <a style="font-size: 0.8rem; color: blue" href="https://zen-message.com/{$user.uid}" target="_blank">
-        zen-message.com/{$user.uid}
-      </a>
-    {/if}
+  <div style="width: 350px; margin: auto;">
+    <PhoneLogin 
+      canTakeInternationalNumbers
+    />
   </div>
-</div>
+{/if}
 
 <script>
-  let newUserName = ''
-
-  const chatID = ''
-  const allFriends = [] 
-  const allFamily = [] 
-  const everyoneElse = [] 
-
   import db from '../db.js'
   import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
@@ -197,6 +63,7 @@
   import { getRandomID } from '../helpers.js'
   import PhoneLogin from '../PhoneLogin.svelte'
   import { onMount } from 'svelte'
+  import { goto } from '$app/navigation'
 
   let unsub
 
@@ -213,24 +80,39 @@
 
   onMount(() => {
     const Elem = document.getElementById('loading-screen-logo-start')
-    Elem.addEventListener('animationend', (event) => {
-      console.log("animation ended!")
-      hasAnimationEnded = true
-      // if ($hasFetchedUser) {
-      //   Elem.classList.remove('fade-in')
-      //   Elem.classList.add('fade-out')
-      // }
+    Elem.addEventListener('animationend', (e) => {
+      hasLogoExited = true
     })
-
-    // document.getElementById('loading-screen-logo-end').addEventListener('animationend', e => {
-    //   console.log("logo disappeared")
-    //    hasLogoExited = true
-    // })
   })
+
+  function setupMovement (node) {
+    document.addEventListener('click', (ev) => {
+      node.style.transform = `translateY(${ev.clientY - 25}px)`;
+      node.style.transform += `translateX(${ev.clientX - 25}px)`;
+    }, false);
+  }
+
+  function autoMove (node) {
+    node.style.width = `${getRandomIntInclusive(30, 300)}px;`
+    console.log("node.style =", node.style)
+    console.log("node.style.width =", node.style.width)
+    node.style.transform = `translateX(${-400}px)`
+
+    setTimeout(() => {
+      node.style.transform = `translateX(${600}px)`
+    }, getRandomIntInclusive(0, 9000))
+  }
+
+  function getRandomIntInclusive(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1) + min); // The maximum is inclusive and the minimum is inclusive
+  }
+
+
 
   function action (node) {
     node.addEventListener('animationend', e => {
-      console.log("logo disappeared")
        hasLogoExited = true
     })
   } 
@@ -303,103 +185,45 @@
         // $user = initialUserDoc
         user.set(initialUserDoc)
       }
-
       unsub = onSnapshot(doc(db, 'users', resultUser.uid), (snap) => {
         user.set(snap.data())
         if ($user.friendUIDsWithNewMessages) {
           friendUIDsWithNewMessages = $user.friendUIDsWithNewMessages
         }
       })
+      
+      goto(`/${$user.uid}`)
     }
     console.log('fetched user')
     hasFetchedUser.set(true) 
   })
-  
-  async function updateUserName () {
-    const ref = 
-    await updateDoc(doc(db, 'users', $user.uid), {
-      name: newUserName
-    })
-    newUserName = ''
-    alert('successfully updated')
-  }
-
-  function showMessageRequest (name) {
-    currentFriendUID = '' 
-    currentMessageRequestName = name
-    currentMessageRequestContent = $user.messageRequestObjects.filter(obj => obj.senderName === name)[0].content
-  }
-
-  function resolveMessageRequest (name) {
-    // const userRef = doc(db, 'users', $user.uid)
-    // const target = $user.messageRequestObjects.filter(obj => obj.senderName === name)[0]
-    updateDoc(userRef, {
-      messageRequestObjects: arrayRemove({
-        content: currentMessageRequestContent,
-        senderName: currentMessageRequestName
-      }),
-      messageRequestNames: arrayRemove(currentMessageRequestName)
-    })
-
-    currentMessageRequestName = '' 
-    currentMessageRequestContent = ''
-  }
-
-  function createNewCategory () {
-    if (!newlyTypedCategory) {
-      alert("New category can't be blank")
-    }
-    updateDoc(userRef, { 
-      peopleCategories: arrayUnion(newlyTypedCategory) 
-    })
-    console.log("created new category")
-    newlyTypedCategory = ''
-  }
-
-  async function drop_handler (e, categoryName) {
-    e.preventDefault()
-    const friendUID = e.dataTransfer.getData('text/plain')
-    
-    // update the user object
-    const copy = [...$user.friends]
-    for (const friend of copy) {
-      if (friend.uid === friendUID) {
-        friend.category = categoryName
-        break
-      }
-    }
-
-    await updateDoc(userRef, {
-      friends: copy
-    })
-  }
-
-  function dragover_handler (e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move"
-  }
-
-  function dragstart_handler (e, friendUID) {
-    e.dataTransfer.setData("text/plain", friendUID)
-  }
 </script>
 
 <style>
-  .ul .li {
-    margin-left: 4px;
+  li {
+    margin-top: 10px;
   }
 
-  .highlighted-box {
-    background-color: orange;
+  .message-bubble {
+    /* border: 2px solid red; */
+    padding-top: 10px;
+    padding-left: 18px;
+    /* width: 200px; */
+    height: 30px;
+    border-radius: 30px;
+    background-color: green;
+    color: white;
   }
 
-  .highlighted-blue {
-    background-color: lightseagreen;
+  #app-title {
+    text-align: center; 
+    font-size: 7rem; 
+    font-weight: 500;
+    margin-top: 30vh; 
+    margin-bottom: 48px;
+    letter-spacing: 0.01em;
+    color: grey;
   }
-/* 
-  span:hover {
-    background-color: cyan;
-  } */
 
   .message-group-title {
     font-family: Roboto, sans-serif; 
@@ -411,7 +235,7 @@
 
   /* ease-in means slow start (so visible image stays longer) */
   .fade-out {
-    animation: fadeout 0.5s ease-in 1 forwards;
+    animation: fadeout 0.8s ease-in 1 forwards;
   } 
   /* forwards: retains the last keyframe (so the image doesn't just appear again) 
     `1` is the number of repeats
@@ -433,32 +257,11 @@
     animation: fadein 0.8s ease-out 1 forwards;
   }
 
+  .quick-fade-in {
+    animation: fadein 0.4s ease-out 1 forwards; 
+  }
   
   @keyframes fadein {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-  }
-
-  /* Firefox < 16 */
-  @-moz-keyframes fadein {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-  }
-
-  /* Safari, Chrome and Opera > 12.1 */
-  @-webkit-keyframes fadein {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-  }
-
-  /* Internet Explorer */
-  @-ms-keyframes fadein {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-  }
-
-  /* Opera < 12.1 */
-  @-o-keyframes fadein {
       from { opacity: 0; }
       to   { opacity: 1; }
   }
@@ -472,4 +275,37 @@
     
     margin: auto;
   }
+
+.elementToFadeInAndOut {
+  animation: fadeInOut 1s ease-out 1 forwards;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.ball {
+  border-radius: 25px;
+  width: 50px;
+  height: 50px;
+  background: #c00;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: transform 1s;
+}
+
+.message-bubble {
+  margin-bottom: 20px;
+  transition: transform 5s;
+}
 </style>
+
