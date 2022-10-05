@@ -5,11 +5,9 @@
     class="elementToFadeInAndOut center"
   >
     <img 
-      src="/full-size-zen-bird.jpg" alt="loading-logo-icon"
-      width="250"
-      height="250"
-      style="border-radius: 40px;"
-      class="center"
+      src="/full-size-zen-bird.jpg" 
+      class="app-loading-logo center"
+      alt="logo"
     />
   </div>
 {/if}
@@ -17,10 +15,10 @@
 {#if hasLogoExited && $hasFetchedUser && !$user}
   <div 
     class="quick-fade-in" 
-    style="font-family: Roboto, sans-serif; color: grey; margin-top: 20px;"
+    style="font-family: Roboto, sans-serif; margin-top: 20px;"
   >
     <h4 id="app-title">
-      zen messenger
+      zen message
     </h4>
 
     <div style="margin: auto; width: 60%;">
@@ -30,7 +28,6 @@
       </ul>
     </div>
   </div>
-
 
   <div id="foo" class="ball" use:setupMovement></div>
 
@@ -47,7 +44,7 @@
 
   <div style="margin-bottom: 500px;"></div>
 
-  <div style="width: 350px; margin: auto;">
+  <div style="margin: auto;">
     <PhoneLogin 
       canTakeInternationalNumbers
     />
@@ -69,13 +66,6 @@
 
   let chatRoomID = ''
   let userRef = null
-
-  let currentMessageRequestContent = '' 
-  let currentMessageRequestName = ''
-
-  let newlyTypedCategory = ''
-
-  let hasAnimationEnded = false
   let hasLogoExited = false
 
   onMount(() => {
@@ -215,22 +205,37 @@
     color: white;
   }
 
+  /* phones */
+  @media screen and (min-width: 320px) {
+    #app-title {
+      font-size: 3rem;
+    }
+    .app-loading-logo {
+      width: 150px; 
+      height: 150px;
+      border-radius: 20px;
+    }
+  }
+
+  @media screen and (min-width: 768px) {
+    #app-title {
+      font-size: 6rem;
+    }
+    .app-loading-logo {
+      width: 250px;
+      height: 250px;
+      border-radius: 40px;
+    }
+  }
+
+
   #app-title {
     text-align: center; 
-    font-size: 7rem; 
     font-weight: 500;
     margin-top: 30vh; 
     margin-bottom: 48px;
     letter-spacing: 0.01em;
-    color: grey;
-  }
-
-  .message-group-title {
-    font-family: Roboto, sans-serif; 
-    font-weight: 600; 
-    color: rgb(119, 110, 110);
-    margin-top: 5px;
-    margin-bottom: 5px;
+    color: rgb(105,105,105);
   }
 
   /* ease-in means slow start (so visible image stays longer) */
@@ -274,6 +279,9 @@
     right: 0;
     
     margin: auto;
+
+    /* safari iOS doesn't work without this */
+    -webkit-transform: translate(-50%,-50%); 
   }
 
 .elementToFadeInAndOut {
