@@ -75,10 +75,11 @@
   })
 
   function setupEndListener (node) {
-    const epsilon = 800
+    const epsilon = 100
+    const fadeOutDuration = 3000
     setTimeout(() => {
       isShowingPhoneLogin = true
-    }, 2000 + 3001 + epsilon) 
+    }, fadeOutDuration + epsilon) 
   }
 
   function setupMovement (node) {
@@ -97,17 +98,17 @@
       await tick()
       await tick()
       setTimeout(() => {
-        node.style.transform = `translateX(${150}px)`
-        node.style.transition = 'transform 2s ease-out'
-      }, getRandomIntInclusive(0, 3001))
+        node.style.transform = `translateX(${200}px)`
+        node.style.transition = 'transform 2s'
+      }, getRandomIntInclusive(0, 1001))
     } else {
       node.style.width = '300px'
       node.style.transform = `translateX(${-400}px)`
 
       setTimeout(() => {
         node.style.transform = `translateX(${600}px)`
-        node.style.transition = 'transform 2s ease-out'
-      }, getRandomIntInclusive(0, 3001))
+        node.style.transition = 'transform 2s'
+      }, getRandomIntInclusive(0, 1001))
     }
 
 
@@ -216,14 +217,14 @@
     text-align: center; 
     font-weight: 500;
     margin-top: 30vh; 
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     letter-spacing: 0.01em;
     color: rgb(105,105,105);
   }
 
   /* ease-in means slow start (so visible image stays longer) */
   .fade-out {
-    animation: fadeout 7s ease-in 1 forwards;
+    animation: fadeout 3s ease-in 1 forwards;
   } 
   /* forwards: retains the last keyframe (so the image doesn't just appear again) 
     `1` is the number of repeats

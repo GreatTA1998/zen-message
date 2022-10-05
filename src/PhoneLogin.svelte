@@ -196,4 +196,9 @@
       margin-left: 15px;
     }
   }
+
+  .phone-number-input {
+    border: 2px solid rgb(220, 220, 220);
+    border-radius: 6px;
+  }
 </style>
