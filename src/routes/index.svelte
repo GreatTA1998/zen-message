@@ -5,13 +5,13 @@
     class="elementToFadeInAndOut center"
   >
     <img 
-      src="/full-size-zen-bird.jpg" 
+      src="/largest-zen-bird.jpg" 
       class="app-loading-logo center"
       alt="logo"
     />
   </div>
 {/if}
-  <!-- hasLogoExited && $hasFetchedUser && !$user -->
+
 {#if hasLogoExited && $hasFetchedUser && !$user}
   <div 
     class="quick-fade-in" 
@@ -21,52 +21,51 @@
       zen message
     </h4>
 
-    <div style="margin: auto; width: 60%;">
-      <ul style="font-size: 1.2rem; list-style: none;">
-        <li>Minimize unnecessary notifications</li>
-        <button>Normal</button>
-      </ul>
-    </div>
-  </div>
-
-  <div id="foo" class="ball" use:setupMovement></div>
-
-  {#each Array(4) as _, i}
-    <div class="message-bubble" style="width: {getRandomIntInclusive(40, 200)}px" use:autoMove>
-    </div>
-  {/each}
-
-  <div>
     <div style="font-family: Roboto, sans-serif; color: grey; font-size: 1.2rem;">
-      <div class="quick-fade-in" style="text-align: center">Re-arrange your contacts</div>
+      <div class="quick-fade-in" style="text-align: center; margin-bottom: 40px; color: rgb(105,105,105);">
+        Fewer notifications
+      </div>
+    </div> 
+  </div>
+
+  {#if !isShowingPhoneLogin}
+  <div class="fade-out" id="demo-messages-wrapper" use:setupEndListener>
+    {#each Array(3) as _, i}
+      <div class="message-bubble" style="width: {getRandomIntInclusive(40, 200)}px" use:autoMove>
+      </div>
+    {/each}
+  </div>
+  {:else}
+    <div style="margin: auto;" class="fade-in">
+      <PhoneLogin 
+        canTakeInternationalNumbers
+      />
     </div>
-  </div>
+  {/if}
 
-  <div style="margin-bottom: 500px;"></div>
+  <!-- BALL THAT MOVES TO xy COORDINATES -->
+  <!-- <div id="foo" class="ball" use:setupMovement></div> -->
 
-  <div style="margin: auto;">
-    <PhoneLogin 
-      canTakeInternationalNumbers
-    />
-  </div>
+  <!-- <div style="font-family: Roboto, sans-serif; color: grey; font-size: 1.2rem;">
+    <div class="quick-fade-in" style="text-align: center">Re-arrange your contacts</div>
+  </div> -->
 {/if}
 
 <script>
   import db from '../db.js'
   import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
-  import ChatWindow from '../chatWindow.svelte'
   import { hasFetchedUser, user } from '../store.js'
   import { getRandomID } from '../helpers.js'
   import PhoneLogin from '../PhoneLogin.svelte'
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { goto } from '$app/navigation'
 
   let unsub
 
-  let chatRoomID = ''
   let userRef = null
   let hasLogoExited = false
+  let isShowingPhoneLogin = false 
 
   onMount(() => {
     const Elem = document.getElementById('loading-screen-logo-start')
@@ -75,6 +74,13 @@
     })
   })
 
+  function setupEndListener (node) {
+    const epsilon = 800
+    setTimeout(() => {
+      isShowingPhoneLogin = true
+    }, 2000 + 3001 + epsilon) 
+  }
+
   function setupMovement (node) {
     document.addEventListener('click', (ev) => {
       node.style.transform = `translateY(${ev.clientY - 25}px)`;
@@ -82,35 +88,43 @@
     }, false);
   }
 
-  function autoMove (node) {
-    node.style.width = `${getRandomIntInclusive(30, 300)}px;`
-    console.log("node.style =", node.style)
-    console.log("node.style.width =", node.style.width)
-    node.style.transform = `translateX(${-400}px)`
+  async function autoMove (node) {
+    let deviceWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    if (deviceWidth < 480) {
+      node.style.background = `hsl(118, 70%, ${getRandomIntInclusive(25, 75)}%)` // `hsl(118, 70%, ${getRandomIntInclusive(40, 60)}%)}`  // random shade of green
+      node.style.width = '40px'
+      node.style.transform = `translateX(${-200}px)`
+      await tick()
+      await tick()
+      setTimeout(() => {
+        node.style.transform = `translateX(${150}px)`
+        node.style.transition = 'transform 2s ease-out'
+      }, getRandomIntInclusive(0, 3001))
+    } else {
+      node.style.width = '300px'
+      node.style.transform = `translateX(${-400}px)`
 
-    setTimeout(() => {
-      node.style.transform = `translateX(${600}px)`
-    }, getRandomIntInclusive(0, 9000))
+      setTimeout(() => {
+        node.style.transform = `translateX(${600}px)`
+        node.style.transition = 'transform 2s ease-out'
+      }, getRandomIntInclusive(0, 3001))
+    }
+
+
+    node.style.transition = 'opacity 3s ease-in'
   }
 
   function getRandomIntInclusive(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min + 1) + min); // The maximum is inclusive and the minimum is inclusive
+    return Math.floor(Math.random() * (max - min + 1) + min) // The maximum is inclusive and the minimum is inclusive
   }
-
-
 
   function action (node) {
     node.addEventListener('animationend', e => {
        hasLogoExited = true
     })
   } 
-
-  $: if (currentFriendUID) {
-    chatRoomID = $user.uid < currentFriendUID ? ($user.uid + currentFriendUID) : (currentFriendUID + $user.uid)
-    console.log('chatRoomID =', chatRoomID)
-  }
 
   $: if ($user) {
     userRef = doc(db, 'users', $user.uid)
@@ -119,41 +133,6 @@
   let friendUIDsWithNewMessages = [] 
   
   const auth = getAuth();
-
-  let currentFriendUID = ''
-  let accounts = []
-  let isAddingFriend = false 
-
-  const docsRef = collection(db, 'users')
-  getDocs(docsRef).then(snap => {
-    snap.docs.forEach(doc => {
-      accounts.push({ uid: doc.id, ...doc.data() })
-    })
-  })
-
-  async function addFriend ({ name, uid }) {
-    for (const friend of $user.friends) {
-      if (friend.uid === uid) {
-        alert("You're already friends")
-        isAddingFriend = false
-        return 
-      }
-    }
-
-    const ref = doc(db, 'users', $user.uid)
-    await updateDoc(ref, {
-      friends: arrayUnion({ name, uid, category: $user.peopleCategories[0] })
-    })
-
-    const chatRoomID = $user.uid < uid ? ($user.uid + uid) : (uid + $user.uid)
-    const chatRef = doc(db, 'chats', chatRoomID)
-    await setDoc(chatRef, {
-      participantUIDs: [uid, $user.uid],
-      messages: []
-    })
-    isAddingFriend = false
-  }
-
   onAuthStateChanged(auth, async (resultUser) => {
     if (resultUser) {
       const docRef = doc(db, "users", resultUser.uid);
@@ -195,25 +174,26 @@
   }
 
   .message-bubble {
-    /* border: 2px solid red; */
     padding-top: 10px;
     padding-left: 18px;
-    /* width: 200px; */
-    height: 30px;
     border-radius: 30px;
-    background-color: green;
-    color: white;
+    /* background-color: green; */
+    /* color: white; */
   }
 
   /* phones */
   @media screen and (min-width: 320px) {
     #app-title {
-      font-size: 3rem;
+      font-size: 2.6rem;
     }
     .app-loading-logo {
-      width: 150px; 
-      height: 150px;
-      border-radius: 20px;
+      width: 110px; 
+      height: 110px;
+      border-radius: 18px;
+    }
+    .message-bubble {
+      height: 15px;
+      margin-bottom: 10px;
     }
   }
 
@@ -226,21 +206,24 @@
       height: 250px;
       border-radius: 40px;
     }
+    .message-bubble {
+      height: 30px;
+      margin-bottom: 20px;
+    }
   }
-
 
   #app-title {
     text-align: center; 
     font-weight: 500;
     margin-top: 30vh; 
-    margin-bottom: 48px;
+    margin-bottom: 24px;
     letter-spacing: 0.01em;
     color: rgb(105,105,105);
   }
 
   /* ease-in means slow start (so visible image stays longer) */
   .fade-out {
-    animation: fadeout 0.8s ease-in 1 forwards;
+    animation: fadeout 7s ease-in 1 forwards;
   } 
   /* forwards: retains the last keyframe (so the image doesn't just appear again) 
     `1` is the number of repeats
@@ -271,49 +254,40 @@
       to   { opacity: 1; }
   }
 
+  /* From Prabhakar's centering solution that works for iOS unlike StackOverflow
+  https://github.com/project-feynman/v3/blob/d864f54d9a69e6cdf0beb7818e8b07a85cebb7eb/src/components/SeeExplanation.vue */
   .center {
     position: absolute;
-    top:0;
-    bottom: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%)
+  }
+
+  .elementToFadeInAndOut {
+    animation: fadeInOut 1s ease-out 1 forwards;
+  }
+
+  @keyframes fadeInOut {
+    0% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .ball {
+    border-radius: 25px;
+    width: 50px;
+    height: 50px;
+    background: #c00;
+    position: absolute;
+    top: 0;
     left: 0;
-    right: 0;
-    
-    margin: auto;
-
-    /* safari iOS doesn't work without this */
-    -webkit-transform: translate(-50%,-50%); 
+    transition: transform 1s;
   }
-
-.elementToFadeInAndOut {
-  animation: fadeInOut 1s ease-out 1 forwards;
-}
-
-@keyframes fadeInOut {
-  0% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-.ball {
-  border-radius: 25px;
-  width: 50px;
-  height: 50px;
-  background: #c00;
-  position: absolute;
-  top: 0;
-  left: 0;
-  transition: transform 1s;
-}
-
-.message-bubble {
-  margin-bottom: 20px;
-  transition: transform 5s;
-}
 </style>
 

@@ -4,13 +4,18 @@
       <!-- <div class="copied-from-koa" style="color: purple">Log in with phone:</div> -->
 
       {#if canTakeInternationalNumbers}
-        <input type="tel" id="phone-country-code" minlength="2" maxlength="4" placeholder="+1" bind:value={countryCode} style="margin-left: 15px; width: 72px; height: 40px; font-size: 2rem; margin-right: 10px">
+        <input type="tel" id="phone-country-code" minlength="2" maxlength="4" placeholder="+1" bind:value={countryCode} 
+        class="phone-number-input">
       {/if}
-      <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="503" bind:value={phoneNumSegment1} style="margin-left: 15px; width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
+      <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="503" bind:value={phoneNumSegment1} 
+        class="phone-number-input">
 
-      <input type="tel" id="phone-input-2" minlength="3" maxlength="3" placeholder="250" bind:value={phoneNumSegment2} style="width: 54px; height: 40px; font-size: 2rem; margin-right: 10px">
+      <input type="tel" id="phone-input-2" minlength="3" maxlength="3" placeholder="250" bind:value={phoneNumSegment2} 
+        class="phone-number-input">
 
-      <input type="tel" id="phone-input-3" minlength="4" maxlength="4" placeholder="3868" bind:value={phoneNumSegment3} style="width: 76px; height: 40px; font-size: 2rem; margin-right: 10px">
+      <input type="tel" id="phone-input-3" minlength="4" maxlength="4" placeholder="3868" bind:value={phoneNumSegment3} 
+        class="phone-number-input"
+      >
       <button id="sign-in-button" on:click={signInWithPhone} style="display: none; color: {hasEnteredPhoneNumber ? 'rgb(116 28 183)' : 'grey'}; margin-bottom: 2px" disabled={!hasEnteredPhoneNumber}>
         Sign Up
       </button>
@@ -23,14 +28,15 @@
 
       <!-- autocomplete allows iPhone users to just use text suggestion https://stackoverflow.com/a/56770419/7812829 -->
       <!-- <input autocomplete="one-time-code"> -->
-      
-      <input minlength="1" maxlength="1" bind:value={confirm1} bind:this={c1} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="1" autocomplete="one-time-code">
-      <input minlength="1" maxlength="1" bind:value={confirm2} bind:this={c2} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="2">  
-      <input minlength="1" maxlength="1" bind:value={confirm3} bind:this={c3} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="3">
-      <input minlength="1" maxlength="1" bind:value={confirm4} bind:this={c4} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="4">
-      <input minlength="1" maxlength="1" bind:value={confirm5} bind:this={c5} style="width: 20px; font-size: 2rem; margin-left: 15px;" placeholder="5">
-      <input minlength="1" maxlength="1" bind:value={confirm6} bind:this={c6} style="width: 20px; font-size: 2rem; margin-left: 15px; margin-right: 10px" placeholder="6">
-      <button on:click={verifyConfirmationCode} style="display: none; color: {hasEnteredConfirmCode ? 'rgb(116 28 183)' : 'grey'}; margin-bottom: 2px;" disabled={!hasEnteredConfirmCode}>Confirm code</button>
+      <input autocomplete="one-time-code" minlength="1" maxlength="1" bind:value={confirm1} bind:this={c1} class="six-digit-input" placeholder="1">
+      <input minlength="1" maxlength="1" bind:value={confirm2} bind:this={c2} class="six-digit-input" placeholder="2">  
+      <input minlength="1" maxlength="1" bind:value={confirm3} bind:this={c3} class="six-digit-input" placeholder="3">
+      <input minlength="1" maxlength="1" bind:value={confirm4} bind:this={c4} class="six-digit-input" placeholder="4">
+      <input minlength="1" maxlength="1" bind:value={confirm5} bind:this={c5} class="six-digit-input" placeholder="5">
+      <input minlength="1" maxlength="1" bind:value={confirm6} bind:this={c6} class="six-digit-input" placeholder="6">
+      <button on:click={verifyConfirmationCode} style="display: none; color: {hasEnteredConfirmCode ? 'rgb(116 28 183)' : 'grey'}; margin-bottom: 2px;" disabled={!hasEnteredConfirmCode}>
+        Confirm code
+      </button>
     </div>
   {/if}
 </div>
@@ -159,5 +165,35 @@
 
   .copied-from-koa {
     font: 20px/1.7 "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, Verdana, sans-serif
+  }
+
+  @media screen and (min-width: 320px) {
+    .phone-number-input {
+      margin-left: 5px; 
+      width: 36px; 
+      height: 30px; 
+      font-size: 1.4rem; 
+      margin-right: px;
+    }
+    .six-digit-input {
+      width: 10px; 
+      font-size: 1rem; 
+      margin-left: 7px;
+    }
+  }
+
+  @media screen and (min-width: 768px) {
+    .phone-number-input {
+      margin-left: 15px; 
+      width: 62px; 
+      height: 44px; 
+      font-size: 2.3rem; 
+      margin-right: 10px
+    }
+    .six-digit-input {
+      width: 20px; 
+      font-size: 2rem; 
+      margin-left: 15px;
+    }
   }
 </style>
