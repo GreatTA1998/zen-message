@@ -12,10 +12,13 @@
   </div>
 {/if}
 
+<!-- TO-DO: people need to *actually understand* how notification throttling works
+  immediately from looking at the home page
+-->
 {#if hasLogoExited && $hasFetchedUser && !$user}
   <div 
     class="quick-fade-in" 
-    style="font-family: Roboto, sans-serif; margin-top: 20px;"
+    style="margin-top: 20px;"
   >
     <h4 id="app-title">
       zen message
@@ -91,8 +94,8 @@
 
   async function autoMove (node) {
     let deviceWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-    if (deviceWidth < 480) {
-      node.style.background = `hsl(118, 70%, ${getRandomIntInclusive(25, 75)}%)` // `hsl(118, 70%, ${getRandomIntInclusive(40, 60)}%)}`  // random shade of green
+    node.style.background = `hsl(118, 70%, ${getRandomIntInclusive(25, 75)}%)`
+    if (deviceWidth < 480) { // `hsl(118, 70%, ${getRandomIntInclusive(40, 60)}%)}`  // random shade of green
       node.style.width = '40px'
       node.style.transform = `translateX(${-200}px)`
       await tick()
@@ -214,6 +217,7 @@
   }
 
   #app-title {
+    font-family: Roboto, sans-serif; 
     text-align: center; 
     font-weight: 500;
     margin-top: 30vh; 

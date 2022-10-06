@@ -116,13 +116,13 @@ const allFriends = []
 const allFamily = [] 
 const everyoneElse = [] 
 
-import db from '../db.js'
+import db from '../../db.js'
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
 import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
-import ChatWindow from '../chatWindow.svelte'
-import { hasFetchedUser, user } from '../store.js'
-import { getRandomID } from '../helpers.js'
-import PhoneLogin from '../PhoneLogin.svelte'
+import ChatWindow from '../../chatWindow.svelte'
+import { hasFetchedUser, user } from '../../store.js'
+import { getRandomID } from '../../helpers.js'
+import PhoneLogin from '../../PhoneLogin.svelte'
 import { onMount } from 'svelte'
 
 let unsub
@@ -136,7 +136,8 @@ let currentMessageRequestName = ''
 let newlyTypedCategory = ''
 
 onMount(() => {
-
+  // const docRef = doc(db, "users", resultUser.uid);
+  // const docSnap = await getDoc(docRef);
 })
 
 $: if (currentFriendUID) {
@@ -185,6 +186,11 @@ async function addFriend ({ name, uid }) {
   })
   isAddingFriend = false
 }
+
+
+
+
+
 
 onAuthStateChanged(auth, async (resultUser) => {
   if (resultUser) {
@@ -311,69 +317,5 @@ span:hover {
   color: rgb(119, 110, 110);
   margin-top: 5px;
   margin-bottom: 5px;
-}
-
-/* ease-in means slow start (so visible image stays longer) */
-.fade-out {
-  animation: fadeout 0.5s ease-in 1 forwards;
-} 
-/* forwards: retains the last keyframe (so the image doesn't just appear again) 
-  `1` is the number of repeats
-*/
-
-@keyframes fadeout {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
-
- /* Safari, Chrome and Opera > 12.1 */
-/* @-webkit-keyframes fadeout {
-    from { opacity: 1; }
-    to   { opacity: 0; }
-} */
-
-/* ease-out means slow end, so visible image stays longer */
-.fade-in {
-  animation: fadein 0.8s ease-out 1 forwards;
-}
-
-
-@keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Firefox < 16 */
-@-moz-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Safari, Chrome and Opera > 12.1 */
-@-webkit-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Internet Explorer */
-@-ms-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-/* Opera < 12.1 */
-@-o-keyframes fadein {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-.center {
-  position: absolute;
-  top:0;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  
-  margin: auto;
 }
 </style>

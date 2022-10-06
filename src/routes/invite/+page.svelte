@@ -1,12 +1,4 @@
-<script context="module">
-  export function load ({ params }) {
-    return {
-      props: {
-        uid: params.uid
-      }
-    }
-  }  
-</script>
+
 
 <input 
   style="width: 300px; box-sizing: border-box" 
@@ -41,11 +33,13 @@
 </ul>
 
 <script>
-  import { user } from '../store.js'
-  import PhoneLogin from '../PhoneLogin.svelte'
+  //  new Error("@migration task: Add data prop (https://github.com/sveltejs/kit/discussions/5774#discussioncomment-3292707)");
+
+  import { user } from '../../store.js'
+  import PhoneLogin from '../../PhoneLogin.svelte'
   import { doc, updateDoc } from "firebase/firestore";
   import { arrayUnion } from 'firebase/firestore'
-  import db from "../db.js"
+  import db from "../../db.js"
 
   export let uid
 
