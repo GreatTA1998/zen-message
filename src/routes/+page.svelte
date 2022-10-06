@@ -1,21 +1,7 @@
-{#if !hasLogoExited}
-  <div 
-    id="loading-screen-logo-start"
-    style="opacity: 0; width: 30vw; height: 30vh"
-    class="elementToFadeInAndOut center"
-  >
-    <img 
-      src="/largest-zen-bird.jpg" 
-      class="app-loading-logo center"
-      alt="logo"
-    />
-  </div>
-{/if}
-
 <!-- TO-DO: people need to *actually understand* how notification throttling works
   immediately from looking at the home page
 -->
-{#if hasLogoExited && $hasFetchedUser && !$user}
+{#if $hasFetchedUser && !$user && $hasLogoExited}
   <div 
     class="quick-fade-in" 
     style="margin-top: 20px;"
@@ -39,7 +25,7 @@
     {/each}
   </div>
   {:else}
-    <div style="margin: auto;" class="fade-in">
+    <div style="margin: auto;" class="quick-fade-in">
       <PhoneLogin 
         canTakeInternationalNumbers
       />
@@ -58,24 +44,13 @@
   import db from '../db.js'
   import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
   import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
-  import { hasFetchedUser, user } from '../store.js'
+  import { hasFetchedUser, user, hasLogoExited } from '../store.js'
   import { getRandomID } from '../helpers.js'
   import PhoneLogin from '../PhoneLogin.svelte'
   import { onMount, tick } from 'svelte'
   import { goto } from '$app/navigation'
 
-  let unsub
-
-  let userRef = null
-  let hasLogoExited = false
   let isShowingPhoneLogin = false 
-
-  onMount(() => {
-    const Elem = document.getElementById('loading-screen-logo-start')
-    Elem.addEventListener('animationend', (e) => {
-      hasLogoExited = true
-    })
-  })
 
   function setupEndListener (node) {
     const epsilon = 100
@@ -123,53 +98,6 @@
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min + 1) + min) // The maximum is inclusive and the minimum is inclusive
   }
-
-  function action (node) {
-    node.addEventListener('animationend', e => {
-       hasLogoExited = true
-    })
-  } 
-
-  $: if ($user) {
-    userRef = doc(db, 'users', $user.uid)
-  }
-
-  let friendUIDsWithNewMessages = [] 
-  
-  const auth = getAuth();
-  onAuthStateChanged(auth, async (resultUser) => {
-    if (resultUser) {
-      const docRef = doc(db, "users", resultUser.uid);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        user.set(docSnap.data())
-        // $user = docSnap.data()
-      } else {
-        const initialUserDoc =  {
-          uid: resultUser.uid,
-          name: resultUser.displayName || 'John Apple',
-          phoneNumber: resultUser.phoneNumber,
-          friends: [],
-          peopleCategories: ['Friends', 'Family'],
-          friendUIDsWithNewMessages: []
-        }
-        await setDoc(doc(db, 'users', resultUser.uid), initialUserDoc)
-        // $user = initialUserDoc
-        user.set(initialUserDoc)
-      }
-      unsub = onSnapshot(doc(db, 'users', resultUser.uid), (snap) => {
-        user.set(snap.data())
-        if ($user.friendUIDsWithNewMessages) {
-          friendUIDsWithNewMessages = $user.friendUIDsWithNewMessages
-        }
-      })
-      
-      goto(`/${$user.uid}`)
-    }
-    console.log('fetched user')
-    hasFetchedUser.set(true) 
-  })
 </script>
 
 <style>
@@ -190,11 +118,6 @@
     #app-title {
       font-size: 2.6rem;
     }
-    .app-loading-logo {
-      width: 110px; 
-      height: 110px;
-      border-radius: 18px;
-    }
     .message-bubble {
       height: 15px;
       margin-bottom: 10px;
@@ -204,11 +127,6 @@
   @media screen and (min-width: 768px) {
     #app-title {
       font-size: 6rem;
-    }
-    .app-loading-logo {
-      width: 250px;
-      height: 250px;
-      border-radius: 40px;
     }
     .message-bubble {
       height: 30px;
@@ -259,32 +177,7 @@
       to   { opacity: 1; }
   }
 
-  /* From Prabhakar's centering solution that works for iOS unlike StackOverflow
-  https://github.com/project-feynman/v3/blob/d864f54d9a69e6cdf0beb7818e8b07a85cebb7eb/src/components/SeeExplanation.vue */
-  .center {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%)
-  }
-
-  .elementToFadeInAndOut {
-    animation: fadeInOut 1s ease-out 1 forwards;
-  }
-
-  @keyframes fadeInOut {
-    0% {
-      opacity: 0;
-    }
-    50% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-
-  .ball {
+  /* .ball {
     border-radius: 25px;
     width: 50px;
     height: 50px;
@@ -293,6 +186,6 @@
     top: 0;
     left: 0;
     transition: transform 1s;
-  }
+  } */
 </style>
 

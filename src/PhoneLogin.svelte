@@ -8,13 +8,13 @@
         class="phone-number-input">
       {/if}
       <input type="tel" id="phone-input-1" minlength="3" maxlength="3" placeholder="503" bind:value={phoneNumSegment1} 
-        class="phone-number-input">
+        class="phone-number-input three-digits">
 
       <input type="tel" id="phone-input-2" minlength="3" maxlength="3" placeholder="250" bind:value={phoneNumSegment2} 
-        class="phone-number-input">
+        class="phone-number-input three-digits">
 
       <input type="tel" id="phone-input-3" minlength="4" maxlength="4" placeholder="3868" bind:value={phoneNumSegment3} 
-        class="phone-number-input"
+        class="phone-number-input four-digits" 
       >
       <button id="sign-in-button" on:click={signInWithPhone} style="display: none; color: {hasEnteredPhoneNumber ? 'rgb(116 28 183)' : 'grey'}; margin-bottom: 2px" disabled={!hasEnteredPhoneNumber}>
         Sign Up
@@ -173,7 +173,13 @@
       width: 36px; 
       height: 30px; 
       font-size: 1.4rem; 
-      margin-right: px;
+      margin-right: 5px;
+    }
+    .three-digits {
+      width: 37px; 
+    }
+    .four-digits {
+      width: 50px; 
     }
     .six-digit-input {
       width: 10px; 
@@ -184,11 +190,17 @@
 
   @media screen and (min-width: 768px) {
     .phone-number-input {
-      margin-left: 15px; 
+      margin-left: 8px; 
       width: 62px; 
       height: 44px; 
       font-size: 2.3rem; 
       margin-right: 10px
+    }
+    .three-digits {
+      width: 62px; 
+    }
+    .four-digits {
+      width: 82px; 
     }
     .six-digit-input {
       width: 20px; 
@@ -198,7 +210,7 @@
   }
 
   .phone-number-input {
-    border: 2px solid rgb(220, 220, 220);
-    border-radius: 6px;
+    border: 1px solid rgb(220, 220, 220);
+    border-radius: 2px;
   }
 </style>
