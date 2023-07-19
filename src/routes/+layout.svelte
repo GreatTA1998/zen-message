@@ -25,7 +25,7 @@
   import db from '../db.js'
   import { goto } from '$app/navigation'
   import { onMount } from 'svelte'
-  import { hasFetchedUser, user, hasLogoExited, firstTimeUserFullName, invitedByUID } from '../store.js'
+  import { hasFetchedUser, user, hasLogoExited, firstTimeUserFullName, invitedByUID, viewportHeight } from '../store.js'
   import { page } from '$app/stores';
   import { addFriend } from '/src/helpers.js'
 
@@ -35,6 +35,17 @@
   let unsub
 
   onMount(() => {
+    // UI resize logic (mainly because of iOS keyboard)
+    // Viewport := the amount of available space to display web content, EXCLUDING keyboard
+    function viewportHandler(event) {
+      var viewport = event.target;
+      console.log('viewport.height', viewport.height)
+      viewportHeight.set(viewport.height)
+    }
+
+    window.visualViewport.addEventListener('scroll', viewportHandler);
+    window.visualViewport.addEventListener('resize', viewportHandler);
+
     const auth = getAuth()
     onAuthStateChanged(auth, async (resultUser) => {
       console.log('resultUser =', resultUser)

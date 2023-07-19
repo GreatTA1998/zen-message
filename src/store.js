@@ -7,3 +7,4 @@ export const user = writable(null)
 export const hasFetchedUser = writable(false)
 export const hasLogoExited = writable(false)
 
+export const viewportHeight = writable(null)

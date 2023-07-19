@@ -1,5 +1,5 @@
 <div style="width: 300px;">
-  <div id="chat-window" style="height: {400 - 75}px; overflow-y: auto; overflow-x: hidden;">
+  <div id="chat-window" style="height: {$viewportHeight - 74}px; max-height: 316px; overflow-y: auto; overflow-x: hidden;">
     {#if chatDoc.messages}
       {#each chatDoc.messages as message, i}
         <div style="
@@ -14,14 +14,14 @@
             <p style="font-size: 1em; margin-left: auto; margin-right: 0; margin-bottom: 4px">
               {message.content} 
             </p>
-            <p style="font-size: 1em; color: grey; margin-left: 4px; margin-bottom: 0px; margin-top: 18px">
+            <p style="font-size: 0.8em; color: grey; margin-left: 4px; margin-bottom: 0px; margin-top: 18px">
               {' ' + displayDate(message.timestamp)}
             </p>
           {:else}
             <p style="font-size: 1em; margin-right: 4px; margin-left: 0; margin-bottom: 4px">
               {message.content}
             </p>
-            <p style="font-size: 1em; color: grey; margin-left: 0; margin-right: auto; margin-top: 18px">
+            <p style="font-size: 0.8em; color: grey; margin-left: 0; margin-right: auto; margin-top: 18px">
               {' ' + displayDate(message.timestamp)}
             </p>
           {/if}
@@ -35,28 +35,39 @@
   </div>
 
   <!-- border-box needed otherwise 410px <input> isn't equivalent to 410px on <button> -->
-  <div class="my-flexbox my-font" style="width: 140px;">
-    <input type="checkbox">
-    <div style="font-size: 0.9em; color: grey">
-      Notify immediately
-    </div>
+  <div class="my-flexbox my-font" style="width: 220px; margin-top: 3%; margin-bottom: 1%;">
+    <!-- change this to toggle -->
+    <input type="checkbox" bind:checked={willSendNotif}>
+    {#if replyWithin === replyTimingOptionsEnum.ANY_TIME}
+      <div style="font-size: 0.8em; font-weight: 600; color: darkgrey">
+        Send notification immediately
+      </div>
+    {:else if replyWithin === replyTimingOptionsEnum.NOW}
+      <div style="font-size: 0.8em; font-weight: 600; color: #498bf5">
+        Send notification immediately
+      </div>
+    {/if}
+
   </div>
 
-  <div class="my-flexbox">
-    <input 
-      class="my-message-input" 
-      placeholder="Message..." 
-      type="text"
-      bind:value={newMessage}
-      bind:this={MessageField}
-    >
-    <div 
-      on:click={sendMessage}
-      style="color: { newMessage.length > 0 ? 'white' : 'grey'}; font-family: sans-serif; font-size: 1em; font-weight: 600; margin-left: 4px;"
-    >
-      Send
+  <!-- <form> element automatically handles ENTER KEY as a submit event -->
+  <form on:submit|preventDefault={() => sendMessage()}>
+    <div class="my-flexbox">
+      <input 
+        class="my-message-input" 
+        placeholder="Message..." 
+        type="text"
+        bind:value={newMessage}
+        bind:this={MessageField}
+      >
+      <div 
+        on:click={sendMessage}
+        style="color: { newMessage.length > 0 ? 'white' : 'grey'}; font-family: sans-serif; font-size: 1em; font-weight: 600; margin-left: 4px;"
+      >
+        Send
+      </div>
     </div>
-  </div>
+  </form>
 
   <!-- <div style="display: flex; margin-top: 5px; align-items: center; flex-wrap: nowrap">
     <div style="color: grey;">Want reply:</div> 
@@ -84,6 +95,8 @@
   import { getFunctions, httpsCallable } from "firebase/functions"
   import { updateCurrentUser } from 'firebase/auth'
   import { tick } from 'svelte'
+  import { viewportHeight } from '/src/store.js'
+  import { page } from '$app/stores'
 
   const functions = getFunctions()
   const sendTextMessage = httpsCallable(functions, 'sendTextMessage');
@@ -92,6 +105,23 @@
   let AutoscrollTargetElem
   let chatID
   let newMessage = ''
+
+  const replyTimingOptionsEnum = {
+    NOW: 'now',
+    TODAY: 'today',
+    ANY_TIME: 'any time'
+  }
+
+  let willSendNotif
+  $: {
+    if (willSendNotif) {
+      replyWithin =  replyTimingOptionsEnum.NOW
+    } 
+    else {
+      replyWithin = replyTimingOptionsEnum.ANY_TIME
+    }
+  }
+
   let replyTimingOptions = ['now', 'today', 'any time']
   let replyWithin = 'any time'
   let unsub
@@ -182,15 +212,16 @@
 
     // get the other person's phone number
     const otherPersonSnap = await getDoc(otherRef)
+    const otherPersonDoc = otherPersonSnap.data()
 
     // HANDLE SMS NOTIFICATION
     switch (replyWithin) {
       case 'any time': 
         break
       case 'now': 
-        console.log('sending text to ,', otherPersonSnap.data().phoneNumber)
+        console.log('sending text to ,', otherPersonDoc.phoneNumber)
         sendTextMessage({ 
-          content: `${currentUser.name} wrote "${newMessage}"`,
+          content: `${currentUser.name} wrote: "${newMessage}". ${$page.url.origin}/${otherPersonDoc.uid}`,
           toWho: otherPersonSnap.data().phoneNumber
         })
       case 'today':

@@ -1,6 +1,6 @@
 {#if $hasFetchedUser && $user && $hasLogoExited && $user.uid === uid}
   <div class="quick-fade-in" style="display: flex;">
-    <div style="width: 150px; height: 400px; overflow-y: auto;">
+    <div style="width: 150px; height: {$viewportHeight}px; max-height: 392px; overflow-y: auto;">
       <!-- LIST CATEGORIES -->
       <!-- For v0, everyone is "family" technically -->
       <div on:click={() => currentFriendUID = ''} style="color: white;" 
@@ -120,25 +120,33 @@
             Resolve and delete
           </button>
         {:else if currentFriendUID === 'add-person'}
-          <div style="color: white;">
-            Invite URL:
+          <div class="my-basic-text">
+            To add an existing user, type their exact full name
+          </div>
+          <input placeholder="Search exact name">
+
+          <div class="my-basic-text" style="margin-top: 24px;">
+            To invite someone new to zen-message, send them this URL: { $page.url.origin + `/invite/${$user.uid}` }
           </div>
 
-          <div style="color: white;">
-            Create group chat
+          <div class="my-basic-text" style="margin-top: 24px">
+            Coming soon: create a group chat
           </div>
 
-          <input placeholder="Search EXACT name">
         {:else if $user}
           <div style="display: flex; align-items: center;">
             <input type="checkbox">
             <div>
               <div style="color: white; font-family: sans-serif; font-size: 1rem; font-weight: 600;">
-                Receive daily summary
+                Get summarized notifications
               </div>
 
               <div style="color: white; font-family: sans-serif; font-size: 0.8em;">
-                Sent to you everyday at 5 pm <i>(future update: set custom schedules e.g. Mon-Fri 7 pm, Sat-Sun 1 pm)</i>
+                Every day zen-message will condense all messages you receive into one notification at 5 pm <i>(future update: set custom schedules e.g. Mon-Fri 7 pm, Sat-Sun 1 pm)</i>
+              </div>
+
+              <div style="margin-top: 40px; color: white; font-family: sans-serif; font-size: 1rem; font-weight: 600;">
+                Put app to homescreen
               </div>
             </div>
           </div>
@@ -183,13 +191,14 @@ import db from '../../db.js'
 import { getAuth, onAuthStateChanged } from "firebase/auth"	
 import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
 import ChatWindow from '../../chatWindow.svelte'
-import { hasFetchedUser, user, hasLogoExited } from '../../store.js'
+import { hasFetchedUser, user, hasLogoExited, viewportHeight } from '../../store.js'
 import { getRandomID } from '../../helpers.js'
 import { onMount } from 'svelte'
 import { goto } from '$app/navigation';
 import PersonAvatar from '$lib/PersonAvatar.svelte'
 import SettingsAvatar from '$lib/SettingsAvatar.svelte'
 import PlusSignAvatar from '$lib/PlusSignAvatar.svelte'
+import { page } from '$app/stores'
 
 export let data 
 let { uid } = data
@@ -327,6 +336,25 @@ function dragstart_handler (e, friendUID) {
 </script>
 
 <style>
+  .my-basic-text {
+    color: white;
+    font-family: sans-serif;
+  }
+
+  /* Copying Notion scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #949191;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #EDECE9;
+  }
+
 .left-drawer-item {
   border-radius: 1px; 
   height: 56px; 

@@ -11,8 +11,8 @@
   background-image: url('/duck-with-knife-larger.jpg');
   
   /* make a square container */
-  width: 21px;
-  height: 21px;
+  width: 25px;
+  height: 25px;
 
   /* fill the container, preserving aspect ratio, and cropping to fit */
   background-size: cover;
