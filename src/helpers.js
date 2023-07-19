@@ -1,3 +1,20 @@
+import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
+import db from './db.js'
+
+export async function addFriend ({ uid1, name2, uid2, category = 'Family' }) {
+  const ref = doc(db, 'users', uid1)
+  await updateDoc(ref, {
+    friends: arrayUnion({ name: name2, uid: uid2, category })
+  })
+
+  const chatRoomID = uid1 < uid2 ? (uid1 + uid2) : (uid2 + uid1)
+  const chatRef = doc(db, 'chats', chatRoomID)
+  await setDoc(chatRef, {
+    participantUIDs: [uid1, uid2],
+    messages: []
+  })
+}
+
 export function getRandomID () {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let autoId = '';

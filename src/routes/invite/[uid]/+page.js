@@ -1,6 +1,6 @@
 
 export function load ({ params }) {
   return {
-  uid: params.uid
-}
+    uid: params.uid
+  }
 }  

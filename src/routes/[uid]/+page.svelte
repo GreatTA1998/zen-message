@@ -1,23 +1,42 @@
-{#if $hasFetchedUser && $user && $hasLogoExited}
+{#if $hasFetchedUser && $user && $hasLogoExited && $user.uid === uid}
   <div class="quick-fade-in" style="display: flex;">
-    <div style="width: 100px;">
+    <div style="width: 150px; height: 400px; overflow-y: auto;">
       <!-- LIST CATEGORIES -->
+      <!-- For v0, everyone is "family" technically -->
+      <div on:click={() => currentFriendUID = ''} style="color: white;" 
+        class="left-drawer-item"
+        class:highlighted-box={currentFriendUID === ''}
+      >
+        <SettingsAvatar/>
+        <span class="left-drawer-item-text">
+          Settings
+        </span>
+      </div>
+
       {#if $user.peopleCategories instanceof Array}
         {#each $user.peopleCategories as category}
-          <div on:drop={(e) => drop_handler(e, category)} on:dragover={dragover_handler}>
-            <h2 class="message-group-title">
+          <div on:drop={(e) => drop_handler(e, category)} on:dragover={dragover_handler} 
+            style="
+              background-color: black;
+            "
+          >
+
+            <!-- <h2 class="message-group-title">
               {category}
-            </h2>
+            </h2> -->
             {#each $user.friends.filter(f => f.category === category) as friend}
               <div 
                 on:click={() => currentFriendUID = friend.uid} 
-                draggable="true" 
                 on:dragstart={(e) => dragstart_handler(e, friend.uid)}
-                style="border: 1px solid orange; border-radius: 1px; height: 40px; display: flex; align-items: center;"
-                class:highlighted-box={friend.uid === currentFriendUID}
+                draggable="true" 
+
+                class="left-drawer-item"
+                class:highlighted-box={currentFriendUID === friend.uid}
                 class:highlighted-blue={friendUIDsWithNewMessages.includes(friend.uid)}
               >
-                <span style="margin-left: 5px; font-family: Roboto, sans-serif">
+                <PersonAvatar/>
+
+                <span class="left-drawer-item-text">
                   {friend.name}
                 </span>
               </div>
@@ -26,16 +45,29 @@
         {/each}
       {/if}
 
-        <h2 class="message-group-title" style="margin-top: 50px;">
-          Editable category
-        </h2>
-        <button on:click={createNewCategory}>New category</button>
-        <input bind:value={newlyTypedCategory} style="width: 90px">
+
+      <div on:click={() => currentFriendUID = 'add-person'} style="color: white;" 
+        class="left-drawer-item"
+        class:highlighted-box={currentFriendUID === 'add-person'}
+      >
+        <PlusSignAvatar/>
+        <span class="left-drawer-item-text">
+          Add chat
+        </span>
+      </div>
+
+        <!-- FOR FUTURE, EDITABLE CATEGORY
+          <h2 class="message-group-title" style="margin-top: 50px;">
+            Editable category
+          </h2>
+          <button on:click={createNewCategory}>New category</button>
+          <input bind:value={newlyTypedCategory} style="width: 90px"> 
+        -->
 
         <!-- ADD NEW PERSON -->
-        <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
+        <!-- <button style="margin-top: 20px;" on:click={() => isAddingFriend = !isAddingFriend}>
           Add person
-        </button>
+        </button> -->
 
         {#if isAddingFriend}
           <div>Here are all accounts:</div>
@@ -51,7 +83,7 @@
         {/if}
 
 
-        <h2 class="message-group-title" style="margin-top: 50px;">
+        <!-- <h2 class="message-group-title" style="margin-top: 50px;">
           Outside Messages
         </h2>
         
@@ -64,48 +96,75 @@
               {newName}
             </div>
           {/each}
-        {/if}
+        {/if} -->
       </div>
 
       <div style="width: 320px; margin-left: 5px; margin-top: 5px;">
-      {#if currentFriendUID && $user && chatRoomID}
-        {#key currentFriendUID}
-          <div class="quick-fade-in">
-            <ChatWindow 
-              {chatRoomID}
-              friendUID={currentFriendUID} 
-              otherPersonUID={currentFriendUID}
-              currentUser={$user}
-            />
+        {#if currentFriendUID && currentFriendUID !== 'add-person' && $user && chatRoomID}
+          {#key currentFriendUID}
+            <div class="quick-fade-in">
+              <ChatWindow 
+                {chatRoomID}
+                friendUID={currentFriendUID} 
+                otherPersonUID={currentFriendUID}
+                currentUser={$user}
+              />
+            </div>
+          {/key}
+        {:else if currentMessageRequestName}
+          <div>
+            {currentMessageRequestContent}
           </div>
-        {/key}
-      {:else if currentMessageRequestName}
-      <div>
-        {currentMessageRequestContent}
-      </div>
 
-      <button on:click={() => resolveMessageRequest(currentMessageRequestName)}>
-        Resolve and delete
-      </button>
+          <button on:click={() => resolveMessageRequest(currentMessageRequestName)}>
+            Resolve and delete
+          </button>
+        {:else if currentFriendUID === 'add-person'}
+          <div style="color: white;">
+            Invite URL:
+          </div>
 
-      {:else if $user}
-      <div style="margin-top: 5px; margin-bottom: 12px;">
-        Click any chat on the left-side
-      </div> 
+          <div style="color: white;">
+            Create group chat
+          </div>
 
-      <input placeholder="John Apple" bind:value={newUserName}>
+          <input placeholder="Search EXACT name">
+        {:else if $user}
+          <div style="display: flex; align-items: center;">
+            <input type="checkbox">
+            <div>
+              <div style="color: white; font-family: sans-serif; font-size: 1rem; font-weight: 600;">
+                Receive daily summary
+              </div>
 
-      <button on:click={updateUserName}>
-        Update name
-      </button>
+              <div style="color: white; font-family: sans-serif; font-size: 0.8em;">
+                Sent to you everyday at 5 pm <i>(future update: set custom schedules e.g. Mon-Fri 7 pm, Sat-Sun 1 pm)</i>
+              </div>
+            </div>
+          </div>
 
-      <div style="margin-top: 10px;">
-        Give this link to close friends & family so they can message you without a zen-message account:
-      </div>
+          <div style="margin-top: 2%"></div>
 
-      <a style="font-size: 0.8rem; color: blue" href="https://zen-message.com/{$user.uid}" target="_blank">
-        zen-message.com/{$user.uid}
-      </a>
+          <!-- HANGOUT MODE FOR FUTURE -->
+          <!-- <div style="display: flex; align-items: center;">
+            <input type="checkbox">
+            <div>
+              <div style="color: white; font-family: sans-serif; font-size: 0.4em; font-weight: 600;">
+                Hangout mode
+              </div>
+              <div style="color: white; font-family: sans-serif; font-size: 0.3em;">
+                Temporarily get notified for all messages
+                <i>(future update: auto-expires after 30 minutes of inactivity)</i>
+              </div>
+            </div>
+          </div> -->
+
+
+        <!-- <input placeholder="John Apple" bind:value={newUserName}> -->
+
+        <!-- <button on:click={updateUserName}>
+          Update name
+        </button> -->
       {/if}
     </div>
   </div>
@@ -121,14 +180,16 @@ const allFamily = []
 const everyoneElse = [] 
 
 import db from '../../db.js'
-import { GoogleAuthProvider, getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword } from "firebase/auth"	
+import { getAuth, onAuthStateChanged } from "firebase/auth"	
 import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
 import ChatWindow from '../../chatWindow.svelte'
 import { hasFetchedUser, user, hasLogoExited } from '../../store.js'
 import { getRandomID } from '../../helpers.js'
-import PhoneLogin from '../../PhoneLogin.svelte'
 import { onMount } from 'svelte'
 import { goto } from '$app/navigation';
+import PersonAvatar from '$lib/PersonAvatar.svelte'
+import SettingsAvatar from '$lib/SettingsAvatar.svelte'
+import PlusSignAvatar from '$lib/PlusSignAvatar.svelte'
 
 export let data 
 let { uid } = data
@@ -148,36 +209,6 @@ $: if ($user) {
     friendUIDsWithNewMessages = $user.friendUIDsWithNewMessages
   }
 }
-
-onMount(async () => {
-  onAuthStateChanged(auth, async (resultUser) => {
-    if (!resultUser) {
-      goto('/')
-    } 
-    else if (resultUser.uid !== uid) {
-      goto('/')
-    }
-  })
-
-  const docRef = doc(db, "users", uid)
-  const docSnap = await getDoc(docRef)
-  
-  if (docSnap.exists()) {
-    user.set(docSnap.data())
-  } 
-  
-  // $: if ($user) {
-    
-  // }
-
-  unsub = onSnapshot(doc(db, 'users', uid), (snap) => {
-    user.set(snap.data())
-    if ($user.friendUIDsWithNewMessages) {
-      friendUIDsWithNewMessages = $user.friendUIDsWithNewMessages
-    }
-  })
-  hasFetchedUser.set(true) 
-})
 
 $: if (currentFriendUID) {
   chatRoomID = $user.uid < currentFriendUID ? ($user.uid + currentFriendUID) : (currentFriendUID + $user.uid)
@@ -296,12 +327,26 @@ function dragstart_handler (e, friendUID) {
 </script>
 
 <style>
+.left-drawer-item {
+  border-radius: 1px; 
+  height: 56px; 
+  display: flex; 
+  align-items: center;
+  padding-left: 4px;
+}
+
+.left-drawer-item-text {
+  margin-left: 5px; font-family: Roboto, sans-serif; color: white; font-size: 1em;
+}
+
+
 .ul .li {
   margin-left: 4px;
 }
 
 .highlighted-box {
-  background-color: orange;
+  background-color: #2b2928; 
+  /* background-color: orange; */
 }
 
 .highlighted-blue {
