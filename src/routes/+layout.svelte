@@ -21,11 +21,13 @@
 
 <script>
   import { getAuth, onAuthStateChanged } from 'firebase/auth'
-  import { onSnapshot, doc } from 'firebase/firestore'
+  import { onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore'
   import db from '../db.js'
   import { goto } from '$app/navigation'
   import { onMount } from 'svelte'
-  import { hasFetchedUser, user, hasLogoExited } from '../store.js'
+  import { hasFetchedUser, user, hasLogoExited, firstTimeUserFullName, invitedByUID } from '../store.js'
+  import { page } from '$app/stores';
+  import { addFriend } from '/src/helpers.js'
 
   export let data  
 
@@ -33,37 +35,62 @@
   let unsub
 
   onMount(() => {
-    // TO-DO:  handle creating new user accounts
-    // const initialUserDoc =  {
-    //   uid: resultUser.uid,
-    //   name: resultUser.displayName || 'John Apple',
-    //   phoneNumber: resultUser.phoneNumber,
-    //   friends: [],
-    //   peopleCategories: ['Friends', 'Family'],
-    //   friendUIDsWithNewMessages: []
-    // }
-    // await setDoc(doc(db, 'users', resultUser.uid), initialUserDoc)
-    // // $user = initialUserDoc
-    // user.set(initialUserDoc)
-
     const auth = getAuth()
     onAuthStateChanged(auth, async (resultUser) => {
-      const routeUserID = uid 
-      if (routeUserID) {
-        if (!resultUser) goto('/')
-        else if (resultUser.uid !== uid) goto('/')
-      }
-      else {
-        if (resultUser) {
-          if (resultUser.uid) { 
-            goto('/' + resultUser.uid)
-            unsub = onSnapshot(doc(db, 'users', uid), (snap) => {
-              user.set(snap.data())
+      console.log('resultUser =', resultUser)
+      hasFetchedUser.set(true) 
+
+      // logged in flow
+      if (resultUser && resultUser.uid) {
+        const userRef = doc(db, 'users', resultUser.uid)
+
+        // has initial mirror doc in Firstore been created
+        unsub = onSnapshot(userRef, async (snap) => {
+          if (!snap.exists()) {
+            const newName = $firstTimeUserFullName || 'John Apple'
+
+            await setDoc(userRef, {
+              uid: resultUser.uid, 
+              name: newName,
+              phoneNumber: resultUser.phoneNumber,
+              friends: [],
+              peopleCategories: ['Friends', 'Family'],
+              friendUIDsWithNewMessages: []
             })
+
+            if ($invitedByUID) {
+              const inviterResult = await getDoc(
+                doc(db, 'users', $invitedByUID)
+              )
+      
+              const inviterDoc = inviterResult.data()
+              addFriend({ 
+                uid1: resultUser.uid, 
+                uid2: inviterDoc.uid,
+                name2: inviterDoc.name
+              })
+              addFriend({
+                uid1: inviterDoc.uid,
+                uid2: resultUser.uid, 
+                name2: newName
+              })
+            }
+            goto('/' + resultUser.uid)
           }
+          else {
+            user.set(snap.data())
+          }
+        })
+        
+        if ($page.url.pathname === '/') {
+          goto('/' + resultUser.uid)
         }
       }
-      hasFetchedUser.set(true) 
+
+      // logged out workflow
+      else {
+        // goto('/')
+      }
     })
 
     const Elem = document.getElementById('loading-screen-logo-start')

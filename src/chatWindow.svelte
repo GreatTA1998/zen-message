@@ -1,20 +1,27 @@
 <div style="width: 300px;">
-  <div id="chat-window" style="height: 200px; overflow-y: auto; overflow-x: hidden;">
+  <div id="chat-window" style="height: {400 - 75}px; overflow-y: auto; overflow-x: hidden;">
     {#if chatDoc.messages}
       {#each chatDoc.messages as message, i}
-        <div style="display: flex; width: 280px; margin-right: 20px;">
+        <div style="
+          display: flex; 
+          width: 280px; 
+          margin-right: 20px; 
+
+          color: white;
+          font-family: sans-serif;"
+        >
           {#if message.authorUID === currentUser.uid}
-            <p style="margin-left: auto; margin-right: 0; margin-bottom: 4px">
+            <p style="font-size: 1em; margin-left: auto; margin-right: 0; margin-bottom: 4px">
               {message.content} 
             </p>
-            <p style="font-size: 0.7rem; color: grey; margin-left: 4px; margin-bottom: 0px; margin-top: 18px">
+            <p style="font-size: 1em; color: grey; margin-left: 4px; margin-bottom: 0px; margin-top: 18px">
               {' ' + displayDate(message.timestamp)}
             </p>
           {:else}
-            <p style="margin-right: 4px; margin-left: 0; margin-bottom: 4px">
+            <p style="font-size: 1em; margin-right: 4px; margin-left: 0; margin-bottom: 4px">
               {message.content}
             </p>
-            <p style="font-size: 0.8rem; color: grey; margin-left: 0; margin-right: auto; margin-top: 18px">
+            <p style="font-size: 1em; color: grey; margin-left: 0; margin-right: auto; margin-top: 18px">
               {' ' + displayDate(message.timestamp)}
             </p>
           {/if}
@@ -28,28 +35,40 @@
   </div>
 
   <!-- border-box needed otherwise 410px <input> isn't equivalent to 410px on <button> -->
-  <input 
-    style="width: 300px; box-sizing: border-box" 
-    placeholder="Type message here..." 
-    bind:value={newMessage}
-    bind:this={MessageField}
-  >
+  <div class="my-flexbox my-font" style="width: 140px;">
+    <input type="checkbox">
+    <div style="font-size: 0.9em; color: grey">
+      Notify immediately
+    </div>
+  </div>
 
-  <div style="display: flex; margin-top: 5px; align-items: center; flex-wrap: nowrap">
+  <div class="my-flexbox">
+    <input 
+      class="my-message-input" 
+      placeholder="Message..." 
+      type="text"
+      bind:value={newMessage}
+      bind:this={MessageField}
+    >
+    <div 
+      on:click={sendMessage}
+      style="color: { newMessage.length > 0 ? 'white' : 'grey'}; font-family: sans-serif; font-size: 1em; font-weight: 600; margin-left: 4px;"
+    >
+      Send
+    </div>
+  </div>
+
+  <!-- <div style="display: flex; margin-top: 5px; align-items: center; flex-wrap: nowrap">
     <div style="color: grey;">Want reply:</div> 
     {#each replyTimingOptions as replyTimingOption}
       <div on:click={() => replyWithin = replyTimingOption} 
         class:highlighted-box={replyWithin === replyTimingOption} 
         class="clickable-option" 
-        style="margin-left: 4px;">
+        style="margin-left: 4px; color: white;">
         {replyTimingOption}
       </div>
     {/each}
-  </div>
-
-  <button on:click={sendMessage} style="margin-top: 12px; height: 30px; width: 300px;">
-    Send message
-  </button>
+  </div> -->
 </div>
 
 <script>
@@ -72,7 +91,7 @@
   let MessageField
   let AutoscrollTargetElem
   let chatID
-  let newMessage
+  let newMessage = ''
   let replyTimingOptions = ['now', 'today', 'any time']
   let replyWithin = 'any time'
   let unsub
@@ -142,6 +161,7 @@
   }
 
   async function sendMessage () {
+    if (newMessage.length === 0) return
     const ref = doc(db, 'chats', chatRoomID)
     updateDoc(ref, {
       messages: arrayUnion({
@@ -188,6 +208,65 @@
 </script>
 
 <style>
+  /* Copying Notion scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #949191;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #EDECE9;
+  }
+
+
+  .my-message-input {
+    width: 280px; 
+    height: 28px;
+    box-sizing: border-box;
+    background: #3e3f40;
+    color: white;
+
+    border-radius: 16px;
+    padding-left: 6px;
+    padding-bottom: 1px;
+
+
+    /* text styles */
+    font-size: 1em;
+
+    /* resetting User Agent Stylesheet default values */
+    appearance: none;
+    -moz-appearance: none;
+    -webkit-appearance: none;
+    
+    border: 1px solid;
+    box-shadow: none;
+  }
+
+  input[type="text"], textarea {
+    background-color : #3e3f40; 
+  }
+
+  ::placeholder {
+    color: #a7abb0;
+    font-size: 1em;
+  }
+
+  .my-font {
+    color: white;
+    font-family: sans-serif; 
+  }
+
+  .my-flexbox {
+    display: flex; 
+    align-items: center;
+    justify-content: center;
+  }
+  
  ::-webkit-scrollbar {
     /* width: em;
     height: 2em */
