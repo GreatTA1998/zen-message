@@ -124,7 +124,7 @@
         <!-- ADD FRIEND / INVITE LINK -->
         {:else if currentFriendUID === 'add-person'}
           <div class="quick-fade-in" style="width: {chatWindowWidth}px; padding-top: 12px; padding-left: 12px;">
-            <div class="my-basic-text" style="margin-top: 24px;">
+            <div class="my-basic-text" style="margin-top: 24px; font-size: 0.8em">
               To add your friend, send them the invite link below (click to copy)
               <a on:click={() => copyToClipboard($page.url.origin + `/invite/${$user.uid}`)} style="font-size: 0.7em; color: orange;">
                 { $page.url.origin + `/invite/${$user.uid}` }
@@ -157,12 +157,21 @@
             </div>
 
             <div style="display: flex; align-items: center; margin-top: 40px;">
-              <input type="checkbox" style="transform: scale(2.0)">
+              <input type="checkbox" on:click={() => isShowingGIF = !isShowingGIF} style="transform: scale(2.0)">
 
               <div style="margin-left: 6px; color: white; font-family: sans-serif; font-size: 0.8em; font-weight: 600;">
                 Put app to homescreen
               </div>
             </div>
+
+            {#if isShowingGIF}
+              <div style="margin-top: 12px; margin-bottom: 12px; color: white; font-family: sans-serif; font-size: 0.7em;">
+                Look for the "export" button on the bottom of Safari. Then, scroll down and look for the "Add to Home Screen" option (see video guide below below)
+              </div>
+
+             <iframe src="https://giphy.com/embed/C8DKLmflaaPyo8XAuT" width="222" height="480" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/C8DKLmflaaPyo8XAuT">via GIPHY</a></p>
+
+            {/if}
           </div>
 
           <!-- HANGOUT MODE FOR FUTURE -->
@@ -191,14 +200,6 @@
 {/if}
 
 <script>
-
-let newUserName = ''
-
-const chatID = ''
-const allFriends = [] 
-const allFamily = [] 
-const everyoneElse = [] 
-
 import db from '../../db.js'
 import { getAuth, onAuthStateChanged } from "firebase/auth"	
 import { doc, collection, getDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from "firebase/firestore"
@@ -214,7 +215,17 @@ import { page } from '$app/stores'
 
 export let data 
 
+
 let { uid } = data
+
+let isShowingGIF = false
+
+let newUserName = ''
+
+const chatID = ''
+const allFriends = [] 
+const allFamily = [] 
+const everyoneElse = [] 
 
 let chatWindowWidth = 300
 

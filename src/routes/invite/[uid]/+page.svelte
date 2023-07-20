@@ -22,7 +22,8 @@
 
   <br>
   <br>
-  Because your friend sent you an invite link, you'll automatically be added to each other's contact list after you log in. No QR code shenanigans. 
+  Because your friend sent you an invite link, you'll automatically be added to each other's contact list after you log in. 
+  Group chats are coming soon!
 </div>
 
 <div>
