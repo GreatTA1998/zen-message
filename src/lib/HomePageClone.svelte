@@ -1,7 +1,7 @@
 <!-- TO-DO: people need to *actually understand* how notification throttling works
   immediately from looking at the home page
 -->
-{#if $hasFetchedUser && !$user && $hasLogoExited}
+{#if $hasLogoExited}
   <div 
     class="quick-fade-in" 
     style="margin-top: 20px;"
@@ -26,6 +26,10 @@
   </div>
   {:else}
     <div style="margin: auto;" class="quick-fade-in">
+      <slot>
+        <!-- For entering name -->
+      </slot>
+
       <PhoneLogin 
         canTakeInternationalNumbers
       />
@@ -46,6 +50,10 @@
   import { onMount, tick } from 'svelte'
 
   let isShowingPhoneLogin = false 
+
+  onMount(() => {
+    console.log('home page clone was created!')
+  })
 
   function setupEndListener (node) {
     const epsilon = 100
@@ -137,6 +145,7 @@
     margin-bottom: 20px;
     letter-spacing: 0.01em;
     color: rgb(105,105,105);
+    color: white;
   }
 
   /* ease-in means slow start (so visible image stays longer) */

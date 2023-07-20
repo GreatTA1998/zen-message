@@ -131,7 +131,7 @@
               </a>
             </div>
 
-            <div class="my-basic-text" style="margin-top: 48px; font-size: 0.8em">
+            <div class="my-basic-text" style="margin-top: 48px; font-size: 0.6em">
               Coming soon: group chats + can add existing users
             </div>
 
@@ -143,23 +143,23 @@
 
         <!-- SETTINGS -->
         {:else if $user}
-          <div class="quick-fade-in" style="width: {chatWindowWidth}px; padding-top: 12px; padding-left: 12px;">
+          <div class="quick-fade-in" style="width: {chatWindowWidth}px; padding-top: 12px; padding-left: 6px;">
             <div style="display: flex; align-items: center;">
               <input type="checkbox" style="transform: scale(2.0)">
         
-              <div style="margin-left: 6px; color: white; font-family: sans-serif; font-size: 0.9em; font-weight: 600;">
+              <div style="margin-left: 6px; color: white; font-family: sans-serif; font-size: 0.8em; font-weight: 600;">
                 Merge notifications into daily summary
               </div>
             </div>
             
-            <div style="margin-top: 12px; color: white; font-family: sans-serif; font-size: 0.8em;">
+            <div style="margin-top: 12px; color: white; font-family: sans-serif; font-size: 0.7em;">
               Every day zen-message will condense all messages you receive into one notification at 5:10 pm <i>(future update: set custom schedules e.g. Mon-Fri 7 pm, Sat-Sun 1 pm)</i>
             </div>
 
             <div style="display: flex; align-items: center; margin-top: 40px;">
               <input type="checkbox" style="transform: scale(2.0)">
 
-              <div style="margin-left: 6px; color: white; font-family: sans-serif; font-size: 0.9em; font-weight: 600;">
+              <div style="margin-left: 6px; color: white; font-family: sans-serif; font-size: 0.8em; font-weight: 600;">
                 Put app to homescreen
               </div>
             </div>
