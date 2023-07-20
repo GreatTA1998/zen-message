@@ -36,7 +36,7 @@
               >
                 <PersonAvatar/>
 
-                <span class="left-drawer-item-text">
+                <span class="left-drawer-item-text my-truncated-text" style="width: {150 - 10}px">
                   {friend.name}
                 </span>
               </div>
@@ -108,6 +108,7 @@
                 friendUID={currentFriendUID} 
                 otherPersonUID={currentFriendUID}
                 currentUser={$user}
+                {chatWindowWidth}
               />
             </div>
           {/key}
@@ -119,39 +120,50 @@
           <button on:click={() => resolveMessageRequest(currentMessageRequestName)}>
             Resolve and delete
           </button>
+
+        <!-- ADD FRIEND / INVITE LINK -->
         {:else if currentFriendUID === 'add-person'}
-          <div class="my-basic-text">
-            To add an existing user, type their exact full name
-          </div>
-          <input placeholder="Search exact name">
+          <div class="quick-fade-in" style="width: {chatWindowWidth}px; padding-top: 12px; padding-left: 12px;">
+            <div class="my-basic-text" style="margin-top: 24px;">
+              To add your friend, send them the invite link below (click to copy)
+              <a on:click={() => copyToClipboard($page.url.origin + `/invite/${$user.uid}`)} style="font-size: 0.7em; color: orange;">
+                { $page.url.origin + `/invite/${$user.uid}` }
+              </a>
+            </div>
 
-          <div class="my-basic-text" style="margin-top: 24px;">
-            To invite someone new to zen-message, send them this URL: { $page.url.origin + `/invite/${$user.uid}` }
+            <div class="my-basic-text" style="margin-top: 48px; font-size: 0.8em">
+              Coming soon: group chats + can add existing users
+            </div>
+
+            <!-- <div class="my-basic-text">
+              To add an existing user, type their exact full name
+            </div>
+            <input placeholder="Search exact name"> -->
           </div>
 
-          <div class="my-basic-text" style="margin-top: 24px">
-            Coming soon: create a group chat
-          </div>
-
+        <!-- SETTINGS -->
         {:else if $user}
-          <div style="display: flex; align-items: center;">
-            <input type="checkbox">
-            <div>
-              <div style="color: white; font-family: sans-serif; font-size: 1rem; font-weight: 600;">
-                Get summarized notifications
+          <div class="quick-fade-in" style="width: {chatWindowWidth}px; padding-top: 12px; padding-left: 12px;">
+            <div style="display: flex; align-items: center;">
+              <input type="checkbox" style="transform: scale(2.0)">
+        
+              <div style="margin-left: 6px; color: white; font-family: sans-serif; font-size: 0.9em; font-weight: 600;">
+                Merge notifications into daily summary
               </div>
+            </div>
+            
+            <div style="margin-top: 12px; color: white; font-family: sans-serif; font-size: 0.8em;">
+              Every day zen-message will condense all messages you receive into one notification at 5:10 pm <i>(future update: set custom schedules e.g. Mon-Fri 7 pm, Sat-Sun 1 pm)</i>
+            </div>
 
-              <div style="color: white; font-family: sans-serif; font-size: 0.8em;">
-                Every day zen-message will condense all messages you receive into one notification at 5 pm <i>(future update: set custom schedules e.g. Mon-Fri 7 pm, Sat-Sun 1 pm)</i>
-              </div>
+            <div style="display: flex; align-items: center; margin-top: 40px;">
+              <input type="checkbox" style="transform: scale(2.0)">
 
-              <div style="margin-top: 40px; color: white; font-family: sans-serif; font-size: 1rem; font-weight: 600;">
+              <div style="margin-left: 6px; color: white; font-family: sans-serif; font-size: 0.9em; font-weight: 600;">
                 Put app to homescreen
               </div>
             </div>
           </div>
-
-          <div style="margin-top: 2%"></div>
 
           <!-- HANGOUT MODE FOR FUTURE -->
           <!-- <div style="display: flex; align-items: center;">
@@ -201,7 +213,10 @@ import PlusSignAvatar from '$lib/PlusSignAvatar.svelte'
 import { page } from '$app/stores'
 
 export let data 
+
 let { uid } = data
+
+let chatWindowWidth = 300
 
 let unsub
 
@@ -242,6 +257,11 @@ getDocs(docsRef).then(snap => {
     accounts.push({ uid: doc.id, ...doc.data() })
   })
 })
+
+function copyToClipboard (copyText) {
+  navigator.clipboard.writeText(copyText)
+  alert('Successfully copied invite link.')
+}
 
 async function addFriend ({ name, uid }) {
   for (const friend of $user.friends) {
@@ -336,6 +356,14 @@ function dragstart_handler (e, friendUID) {
 </script>
 
 <style>
+  /* used from https://developer.mozilla.org/en-US/docs/Web/CSS/text-overflow  */
+  /* NOTE: you MUST set a width explicitly */
+  .my-truncated-text {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
   .my-basic-text {
     color: white;
     font-family: sans-serif;

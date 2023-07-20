@@ -1,4 +1,4 @@
-<div style="width: 300px;">
+<div style="width: {chatWindowWidth}px;">
   <div id="chat-window" style="height: {$viewportHeight - 74}px; max-height: 316px; overflow-y: auto; overflow-x: hidden;">
     {#if chatDoc.messages}
       {#each chatDoc.messages as message, i}
@@ -35,9 +35,9 @@
   </div>
 
   <!-- border-box needed otherwise 410px <input> isn't equivalent to 410px on <button> -->
-  <div class="my-flexbox my-font" style="width: 220px; margin-top: 3%; margin-bottom: 1%;">
+  <div class="my-font" style="display: flex; align-items: center; width: 220px; margin-top: 3%; margin-bottom: 1%;">
     <!-- change this to toggle -->
-    <input type="checkbox" bind:checked={willSendNotif}>
+    <input type="checkbox" bind:checked={willSendNotif} style="transform: scale(1.4); margin-right: 4px;">
     {#if replyWithin === replyTimingOptionsEnum.ANY_TIME}
       <div style="font-size: 0.8em; font-weight: 600; color: darkgrey">
         Send notification immediately
@@ -83,10 +83,6 @@
 </div>
 
 <script>
-  export let friendUID
-  export let chatRoomID
-  export let currentUser
-
   import { where, getDoc, getDocs, query, collection, doc, updateDoc, arrayUnion, onSnapshot, arrayRemove } from 'firebase/firestore'
   import db from './db';
   import { onMount } from 'svelte'
@@ -97,6 +93,11 @@
   import { tick } from 'svelte'
   import { viewportHeight } from '/src/store.js'
   import { page } from '$app/stores'
+
+  export let friendUID
+  export let chatRoomID
+  export let currentUser
+  export let chatWindowWidth 
 
   const functions = getFunctions()
   const sendTextMessage = httpsCallable(functions, 'sendTextMessage');
@@ -126,6 +127,7 @@
   let replyWithin = 'any time'
   let unsub
   let chatDoc = { messages: [] }
+  const isInitialFetch = true
   
   $: console.log('reply within =', replyWithin)
 
@@ -136,28 +138,33 @@
         chatDoc = snap.data()
 
         // mark chat as read
-        const myRef = doc(db, 'users', currentUser.uid)
-        updateDoc(myRef, {
-          friendUIDsWithNewMessages: arrayRemove(friendUID)
-        })
+        if (isInitialFetch) {
+          isInitialFetch = false
+          const myRef = doc(db, 'users', currentUser.uid)
+          updateDoc(myRef, {
+            friendUIDsWithNewMessages: arrayRemove(friendUID)
+          })
 
-        await tick() // let message divs render
+          await tick() // let message divs render
 
-        focusAndOpenKeyboard(MessageField, 300)
-        // MessageField.focus()
-        // MessageField.scrollIntoView({
-        //   block: 'center',
-        //   behavior: 'smooth'
-        // })
-        
-        // scroll to the bottom
-        const ChatWindow = document.getElementById('chat-window')
-        ChatWindow.scrollTop = ChatWindow.scrollHeight
+          // DELAY WON'T WORK FOR IOS, IT'S A FEATURE NOT A BUG OF THE PLATFORM TO NOT ALLOW AUTOFOCUS
 
-        // AutoscrollTargetElem.scrollIntoView({
-        //   block: 'center',
-        //   behavior: 'smooth'
-        // })
+          focusAndOpenKeyboard(MessageField, 300)
+          // MessageField.focus()
+          // MessageField.scrollIntoView({
+          //   block: 'center',
+          //   behavior: 'smooth'
+          // })
+
+          // scroll to the bottom
+          const ChatWindow = document.getElementById('chat-window')
+          ChatWindow.scrollTop = ChatWindow.scrollHeight
+
+          // AutoscrollTargetElem.scrollIntoView({
+          //   block: 'center',
+          //   behavior: 'smooth'
+          // })
+        }
       }
     })
   })

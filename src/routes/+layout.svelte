@@ -48,7 +48,6 @@
 
     const auth = getAuth()
     onAuthStateChanged(auth, async (resultUser) => {
-      console.log('resultUser =', resultUser)
       hasFetchedUser.set(true) 
 
       // logged in flow
