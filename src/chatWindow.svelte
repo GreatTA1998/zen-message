@@ -169,7 +169,7 @@
         const intervalID = setInterval(resetPositionOfPage, 1)
         setTimeout(() => {
           clearInterval(intervalID)
-        })
+        }, 1000)
         // resetPositionOfPage()
       })
       window.visualViewport.addEventListener('resize', () => resetPositionOfPage())
