@@ -94,11 +94,14 @@
   import { viewportHeight } from '/src/store.js'
   import { page } from '$app/stores'
   import { beforeUpdate, afterUpdate } from 'svelte';
+  import { browser } from '$app/environment'
 
   export let friendUID
   export let chatRoomID
   export let currentUser
   export let chatWindowWidth 
+  
+  let NewMessageInput
 
   let div;
 	let autoscroll;
@@ -144,6 +147,19 @@
   let isInitialFetch = true
 
   onMount(() => {
+    // Prevents Safari keyboard from pushing content offscreen (it does so by shoving <html> upwards)
+    // see https://stackoverflow.com/questions/38619762/how-to-prevent-ios-keyboard-from-pushing-the-view-off-screen-with-css-or-js
+    if (browser) {
+      document.ontouchmove = function(e){
+        e.preventDefault();
+      }
+
+      MessageField.onfocus = function () {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+      }
+    }
+
     unsub = onSnapshot(doc(db, 'chats', chatRoomID), async (snap) => {
       if (snap.data()) {
         chatDoc = snap.data()
