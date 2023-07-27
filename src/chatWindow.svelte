@@ -1,5 +1,5 @@
 <div style="width: {chatWindowWidth}px;">
-  <div id="chat-window" style="height: {$viewportHeight - 74}px; max-height: 316px; overflow-y: auto; overflow-x: hidden;">
+  <div bind:this={div} id="chat-window" style="height: {$viewportHeight - 74}px; max-height: 316px; overflow-y: auto; overflow-x: hidden;">
     {#if chatDoc.messages}
       {#each chatDoc.messages as message, i}
         <div style="
@@ -93,11 +93,25 @@
   import { tick } from 'svelte'
   import { viewportHeight } from '/src/store.js'
   import { page } from '$app/stores'
+  import { beforeUpdate, afterUpdate } from 'svelte';
 
   export let friendUID
   export let chatRoomID
   export let currentUser
   export let chatWindowWidth 
+
+  let div;
+	let autoscroll;
+
+  // whenever state changes the DOM, scroll automatically (I think, not sure)
+  // https://svelte.dev/tutorial/update
+	beforeUpdate(() => {
+		autoscroll = div && div.offsetHeight + div.scrollTop > div.scrollHeight - 20;
+	});
+
+	afterUpdate(() => {
+		if (autoscroll) div.scrollTo(0, div.scrollHeight);
+	})
 
   const functions = getFunctions()
   const sendTextMessage = httpsCallable(functions, 'sendTextMessage');
