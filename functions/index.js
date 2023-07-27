@@ -116,10 +116,12 @@ exports.scheduledFunctionCrontab = functions.pubsub.schedule('10 17 * * *')
       
       let textContent
       if (summaryOfMessages.length === 0) {
-        textContent = "zen-message: no messages today, have a great day"
+        return
+        // textContent = "zen-message: no messages today, have a great day"
       } 
       else {
-        textContent = `zen-message: today ${summaryOfMessages.length} people sent messages: '` 
+        textContent = `zen-message: today ${summaryOfMessages.length} ${summaryOfMessages.length > 1 ? 'people' : 'person'} sent messages: `
+        + '\n'
         + summaryOfMessages.join(', ') 
         + `. https://zen-message.com/${userSnap.data().uid}`
       }

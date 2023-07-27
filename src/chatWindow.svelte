@@ -141,7 +141,7 @@
   let replyWithin = 'any time'
   let unsub
   let chatDoc = { messages: [] }
-  const isInitialFetch = true
+  let isInitialFetch = true
   
   $: console.log('reply within =', replyWithin)
 
