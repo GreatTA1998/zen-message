@@ -164,6 +164,7 @@
       
       // both 'scroll' and 'resize' event are fired, but
       // 'scroll' happens later, which is safer as a timing mechanism
+      // THIS IS A NULLIFIER DESIGN: you continuously "dispel"/reset the page positioning while iOS is scrolling it
       window.visualViewport.addEventListener('scroll', () => {
         const intervalID = setInterval(resetPositionOfPage, 1)
         setTimeout(() => {
