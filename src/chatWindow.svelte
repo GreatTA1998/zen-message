@@ -142,12 +142,9 @@
   let unsub
   let chatDoc = { messages: [] }
   let isInitialFetch = true
-  
-  $: console.log('reply within =', replyWithin)
 
   onMount(() => {
     unsub = onSnapshot(doc(db, 'chats', chatRoomID), async (snap) => {
-      console.log("Current data: ", snap.data());
       if (snap.data()) {
         chatDoc = snap.data()
 
@@ -162,22 +159,7 @@
           await tick() // let message divs render
 
           // DELAY WON'T WORK FOR IOS, IT'S A FEATURE NOT A BUG OF THE PLATFORM TO NOT ALLOW AUTOFOCUS
-
-          focusAndOpenKeyboard(MessageField, 300)
-          // MessageField.focus()
-          // MessageField.scrollIntoView({
-          //   block: 'center',
-          //   behavior: 'smooth'
-          // })
-
-          // scroll to the bottom
-          const ChatWindow = document.getElementById('chat-window')
-          ChatWindow.scrollTop = ChatWindow.scrollHeight
-
-          // AutoscrollTargetElem.scrollIntoView({
-          //   block: 'center',
-          //   behavior: 'smooth'
-          // })
+          // focusAndOpenKeyboard(MessageField, 300)
         }
       }
     })
