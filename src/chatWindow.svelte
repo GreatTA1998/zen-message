@@ -153,13 +153,15 @@
 
   onMount(() => {
 
-
+    // Why iOS does this: https://stackoverflow.com/a/66393991/7812829
+    //    just don't allow scrolling in the first place
+    //    document.body.style.overflowY = 'hidden'
+    // But that won't work. See above for detailed explanation.
 
     // Prevents Safari keyboard from pushing content offscreen (it does so by shoving <html> upwards)
-    // see https://stackoverflow.com/questions/38619762/how-to-prevent-ios-keyboard-from-pushing-the-view-off-screen-with-css-or-js
+    // solutions from: https://stackoverflow.com/questions/38619762/how-to-prevent-ios-keyboard-from-pushing-the-view-off-screen-with-css-or-js
     if (browser) {
-      // just don't allow scrolling in the first place
-      document.body.style.overflowY = 'hidden'
+
       
       // both 'scroll' and 'resize' event are fired, but
       // 'scroll' happens later, which is safer as a timing mechanism
@@ -167,6 +169,8 @@
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
       })
+
+
 
       // not sure if necessary but keep just in-case for now
       document.ontouchmove = function(e){
