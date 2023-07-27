@@ -48,7 +48,7 @@
       </div>
     {/if}
 
-    <div>debugLog: {debugLog}</div>
+    <!-- <div>debugLog: {debugLog}</div> -->
 
   </div>
 
@@ -158,6 +158,8 @@
     // Prevents Safari keyboard from pushing content offscreen (it does so by shoving <html> upwards)
     // see https://stackoverflow.com/questions/38619762/how-to-prevent-ios-keyboard-from-pushing-the-view-off-screen-with-css-or-js
     if (browser) {
+      // both 'scroll' and 'resize' event are fired, but
+      // 'scroll' happens later, which is safer as a timing mechanism
       window.visualViewport.addEventListener('scroll', () => {
         debugLog = 'starting window scroll'
         window.scrollTo(0, 0);
@@ -165,12 +167,12 @@
         debugLog = 'Successfully calling window scroll scroll'
       })
 
-      window.visualViewport.addEventListener('resize', () => {
-        debugLog = 'starting window resize'
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-        debugLog = 'Successfully calling window scroll resize'
-      })
+      // window.visualViewport.addEventListener('resize', () => {
+      //   debugLog = 'starting window resize'
+      //   window.scrollTo(0, 0);
+      //   document.body.scrollTop = 0;
+      //   debugLog = 'Successfully calling window scroll resize'
+      // })
 
       document.ontouchmove = function(e){
         e.preventDefault();
