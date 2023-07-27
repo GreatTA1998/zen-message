@@ -48,6 +48,8 @@
       </div>
     {/if}
 
+    <div>debugLog: {debugLog}</div>
+
   </div>
 
   <!-- <form> element automatically handles ENTER KEY as a submit event -->
@@ -101,7 +103,7 @@
   export let currentUser
   export let chatWindowWidth 
   
-  let NewMessageInput
+  let debugLog
 
   let div;
 	let autoscroll;
@@ -154,9 +156,16 @@
         e.preventDefault();
       }
 
+      console.log("MessageField =", MessageField)
+
       MessageField.onfocus = function () {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
+        setTimeout(() => {
+          debugLog('starting window scroll')
+          window.scrollTo(0, 0);
+          document.body.scrollTop = 0;
+          debugLog = 'Successfully calling window scroll'
+
+        }, 3000)
       }
     }
 
