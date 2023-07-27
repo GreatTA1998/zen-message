@@ -150,43 +150,41 @@
 
 
   onMount(() => {
+    // BEST ANIMATION TO EXPLAIN WHY: https://stackoverflow.com/a/66393991/7812829
     // UNDERSTAND THIS BEFORE DEBUGGING: THE ANIMATION WILL REVEAL INSIGHTS
     // THE SCROLLING CAN'T BE PREVENTED WITH CSS BECAUSE SAFARI LITERALLY ADDS A NEW ELEMENT OUTSIDE OF <html>
-    // Why iOS does this: https://stackoverflow.com/a/66393991/7812829
-    //    just don't allow scrolling in the first place
-    //    document.body.style.overflowY = 'hidden'
-    // But that won't work. See above for detailed explanation.
+    //    For example, these won't work:
+    //        document.body.style.overflowY = 'hidden'
+
+    // TO AVOID JUMPY BEHAVIOR: 
+    //  THIS IS A NULLIFIER DESIGN: you continuously "dispel"/reset the page positioning while iOS is scrolling it
+    //      // const intervalID = setInterval(resetPositionOfPage, 1)
+    // setTimeout(() => {
+    //   clearInterval(intervalID)
+    // }, 1000)
+    // resetPositionOfPage()
 
     // Prevents Safari keyboard from pushing content offscreen (it does so by shoving <html> upwards)
     // solutions from: https://stackoverflow.com/questions/38619762/how-to-prevent-ios-keyboard-from-pushing-the-view-off-screen-with-css-or-js
     if (browser) {
-
-      
       // both 'scroll' and 'resize' event are fired, but
       // 'scroll' happens later, which is safer as a timing mechanism
-      // THIS IS A NULLIFIER DESIGN: you continuously "dispel"/reset the page positioning while iOS is scrolling it
-      window.visualViewport.addEventListener('scroll', () => {
-        const intervalID = setInterval(resetPositionOfPage, 1)
-        setTimeout(() => {
-          clearInterval(intervalID)
-        }, 1000)
-        // resetPositionOfPage()
-      })
-      window.visualViewport.addEventListener('resize', () => resetPositionOfPage())
-
-      MessageField.onfocus = function () {
-        resetPositionOfPage()
-      }
-
-      // not sure if necessary but keep just in-case for now
-      document.ontouchmove = function(e){
-        e.preventDefault();
-      }
+    
+      window.visualViewport.addEventListener('scroll', () => resetPositionOfPage())
 
       function resetPositionOfPage () {
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
       }
+
+      // window.visualViewport.addEventListener('resize', () => resetPositionOfPage())
+      // MessageField.onfocus = function () {
+      //   resetPositionOfPage()
+      // }
+      // // not sure if necessary but keep just in-case for now
+      // document.ontouchmove = function(e){
+      //   e.preventDefault();
+      // }
     }
 
     unsub = onSnapshot(doc(db, 'chats', chatRoomID), async (snap) => {
