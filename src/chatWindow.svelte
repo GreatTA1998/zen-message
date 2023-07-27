@@ -160,7 +160,7 @@
 
       MessageField.onfocus = function () {
         setTimeout(() => {
-          debugLog('starting window scroll')
+          debugLog = 'starting window scroll'
           window.scrollTo(0, 0);
           document.body.scrollTop = 0;
           debugLog = 'Successfully calling window scroll'
