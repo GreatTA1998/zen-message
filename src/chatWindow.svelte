@@ -162,14 +162,14 @@
         debugLog = 'starting window scroll'
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
-        debugLog = 'Successfully calling window scroll'
+        debugLog = 'Successfully calling window scroll scroll'
       })
 
       window.visualViewport.addEventListener('resize', () => {
         debugLog = 'starting window resize'
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
-        debugLog = 'Successfully calling window scroll'
+        debugLog = 'Successfully calling window scroll resize'
       })
 
       document.ontouchmove = function(e){
