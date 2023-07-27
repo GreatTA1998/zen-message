@@ -148,25 +148,49 @@
   let chatDoc = { messages: [] }
   let isInitialFetch = true
 
+
+
+
   onMount(() => {
+
+
+
     // Prevents Safari keyboard from pushing content offscreen (it does so by shoving <html> upwards)
     // see https://stackoverflow.com/questions/38619762/how-to-prevent-ios-keyboard-from-pushing-the-view-off-screen-with-css-or-js
     if (browser) {
+      window.visualViewport.addEventListener('scroll', () => {
+        debugLog = 'starting window scroll'
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        debugLog = 'Successfully calling window scroll'
+      })
+
+      window.visualViewport.addEventListener('resize', () => {
+        debugLog = 'starting window resize'
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        debugLog = 'Successfully calling window scroll'
+      })
+
       document.ontouchmove = function(e){
         e.preventDefault();
       }
 
       console.log("MessageField =", MessageField)
 
-      MessageField.onfocus = function () {
-        setTimeout(() => {
-          debugLog = 'starting window scroll'
-          window.scrollTo(0, 0);
-          document.body.scrollTop = 0;
-          debugLog = 'Successfully calling window scroll'
+      // MessageField.onfocus = function () {
 
-        }, 3000)
-      }
+
+
+
+      //   setTimeout(() => {
+      //     debugLog = 'starting window scroll'
+      //     window.scrollTo(0, 0);
+      //     document.body.scrollTop = 0;
+      //     debugLog = 'Successfully calling window scroll'
+
+      //   }, 3000)
+      // }
     }
 
     unsub = onSnapshot(doc(db, 'chats', chatRoomID), async (snap) => {
