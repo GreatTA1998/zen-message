@@ -164,7 +164,13 @@
       
       // both 'scroll' and 'resize' event are fired, but
       // 'scroll' happens later, which is safer as a timing mechanism
-      window.visualViewport.addEventListener('scroll', () => resetPositionOfPage())
+      window.visualViewport.addEventListener('scroll', () => {
+        const intervalID = setInterval(resetPositionOfPage, 1)
+        setTimeout(() => {
+          clearInterval(intervalID)
+        })
+        // resetPositionOfPage()
+      })
       window.visualViewport.addEventListener('resize', () => resetPositionOfPage())
 
       MessageField.onfocus = function () {
