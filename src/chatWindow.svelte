@@ -149,10 +149,9 @@
   let isInitialFetch = true
 
 
-
-
   onMount(() => {
-
+    // UNDERSTAND THIS BEFORE DEBUGGING: THE ANIMATION WILL REVEAL INSIGHTS
+    // THE SCROLLING CAN'T BE PREVENTED WITH CSS BECAUSE SAFARI LITERALLY ADDS A NEW ELEMENT OUTSIDE OF <html>
     // Why iOS does this: https://stackoverflow.com/a/66393991/7812829
     //    just don't allow scrolling in the first place
     //    document.body.style.overflowY = 'hidden'
@@ -165,16 +164,21 @@
       
       // both 'scroll' and 'resize' event are fired, but
       // 'scroll' happens later, which is safer as a timing mechanism
-      window.visualViewport.addEventListener('scroll', () => {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-      })
+      window.visualViewport.addEventListener('scroll', () => resetPositionOfPage())
+      window.visualViewport.addEventListener('resize', () => resetPositionOfPage())
 
-
+      MessageField.onfocus = function () {
+        resetPositionOfPage()
+      }
 
       // not sure if necessary but keep just in-case for now
       document.ontouchmove = function(e){
         e.preventDefault();
+      }
+
+      function resetPositionOfPage () {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
       }
     }
 
