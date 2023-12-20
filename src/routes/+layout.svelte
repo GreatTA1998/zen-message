@@ -6,9 +6,10 @@
     class="elementToFadeInAndOut center"
   >
     <img 
-      src="/largest-zen-bird.jpg" 
+      src="/three-pebbles-no-bg.png" 
       class="app-loading-logo center"
       alt="logo"
+      style="width: 48px; height: 48px;"
     />
   </div>
 {/if}

@@ -1,6 +1,14 @@
 {#if $hasFetchedUser && $user && $hasLogoExited && $user.uid === uid}
   <div class="quick-fade-in" style="display: flex;">
     <div style="width: 150px; height: {$viewportHeight}px; max-height: 392px; overflow-y: auto;">
+      <!-- Logo -->
+      <img 
+        src="/three-pebbles-no-bg.png" 
+        class="app-loading-logo center"
+        alt="logo"
+        style="width: 48px; height: 48px; margin-left: 12px;"
+      />
+ 
       <!-- LIST CATEGORIES -->
       <!-- For v0, everyone is "family" technically -->
       <div on:click={() => currentFriendUID = ''} style="color: white;" 
