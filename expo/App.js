@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { CONTACTS, LOGO } from './src/contacts';
 import {
   INTENTS,
@@ -29,7 +30,23 @@ function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function scheduleLines(scheduleId) {
+  if (scheduleId === 'daily-1-7') return ['Batched daily', '1pm, 7pm'];
+  if (scheduleId === 'daily-8') return ['Daily', '8am'];
+  if (scheduleId === 'hourly') return ['Hourly'];
+  return ['Every 3 hours'];
+}
+
 export default function App() {
+  return (
+    <SafeAreaProvider style={styles.provider}>
+      <StatusBar style="dark" />
+      <ChatScreen />
+    </SafeAreaProvider>
+  );
+}
+
+function ChatScreen() {
   const [state, setState] = useState(createState);
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState('');
@@ -115,9 +132,12 @@ export default function App() {
   const contact = CONTACTS.find((item) => item.id === state.contactId) ?? CONTACTS[0];
   const messages = threadMessages(state.messages, contact.id);
   const schedule = scheduleById(state.scheduleId);
+  const relaxed = state.mode === 'relaxed';
+  const lines = scheduleLines(schedule.id);
+  const canSend = draft.trim().length > 0;
 
-  function send() {
-    const body = draft.trim();
+  function send(text = draft) {
+    const body = text.trim();
     if (!body) return;
     setDraft('');
     apply({
@@ -130,6 +150,16 @@ export default function App() {
     });
   }
 
+  function onChangeDraft(value) {
+    if (Platform.OS === 'web' && value.endsWith('\n')) {
+      const next = value.replace(/\n+$/, '');
+      setDraft(next);
+      if (next.trim()) send(next);
+      return;
+    }
+    setDraft(value);
+  }
+
   if (!ready) {
     return <View style={styles.boot} />;
   }
@@ -139,20 +169,22 @@ export default function App() {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar style="dark" />
-      <View style={styles.phone}>
+      <SafeAreaView style={styles.phone} edges={['top', 'bottom']}>
         <View style={styles.top}>
           <View style={styles.header}>
             <Pressable
               testID="mode-toggle"
               accessibilityRole="button"
-              accessibilityLabel={state.mode === 'relaxed' ? 'Relaxed' : 'Batched'}
-              onPress={() => apply({ type: 'set-mode', mode: state.mode === 'relaxed' ? 'batched' : 'relaxed' })}
-              style={[styles.toggle, state.mode === 'relaxed' && styles.toggleRelaxed]}
+              accessibilityLabel={relaxed ? 'Relaxed' : 'Batched'}
+              hitSlop={6}
+              onPress={() => apply({ type: 'set-mode', mode: relaxed ? 'batched' : 'relaxed' })}
+              style={styles.toggle}
             >
-              <Image source={LOGO} style={styles.toggleImage} />
-              <Text testID="mode-label" style={styles.toggleLabel}>
-                {state.mode === 'relaxed' ? 'Relaxed' : 'Batched'}
+              <View style={[styles.toggleRing, relaxed && styles.toggleRingOn]}>
+                <Image source={LOGO} resizeMode="cover" style={styles.toggleImage} />
+              </View>
+              <Text testID="mode-label" style={[styles.toggleLabel, relaxed && styles.toggleLabelOn]}>
+                {relaxed ? 'Relaxed' : 'Batched'}
               </Text>
             </Pressable>
             <View style={styles.headerRule} />
@@ -163,7 +195,13 @@ export default function App() {
               onPress={() => setMenuOpen((open) => !open)}
               style={styles.schedule}
             >
-              <Text style={styles.scheduleLabel}>{schedule.label}</Text>
+              <View style={styles.scheduleCopy}>
+                {lines.map((line) => (
+                  <Text key={line} style={styles.scheduleLine}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
               <Text style={styles.chevron}>{menuOpen ? '▴' : '▾'}</Text>
             </Pressable>
           </View>
@@ -195,6 +233,7 @@ export default function App() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.contacts}
           style={styles.contactStrip}
         >
@@ -208,9 +247,10 @@ export default function App() {
                 accessibilityLabel={item.name}
                 accessibilityState={{ selected }}
                 onPress={() => apply({ type: 'select-contact', contactId: item.id })}
-                style={[styles.contact, selected && styles.contactSelected]}
+                style={styles.contact}
               >
-                <Image source={item.avatar} style={styles.avatar} />
+                <Image source={item.avatar} resizeMode="cover" style={styles.avatar} />
+                <View style={[styles.contactMark, selected && styles.contactMarkOn]} />
                 <Text style={[styles.contactName, selected && styles.contactNameSelected]}>{item.name}</Text>
               </Pressable>
             );
@@ -221,6 +261,7 @@ export default function App() {
           ref={threadRef}
           style={styles.thread}
           contentContainerStyle={styles.threadContent}
+          keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
         >
           {messages.map((message) => (
@@ -242,13 +283,10 @@ export default function App() {
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   onPress={() => setIntent(item.id)}
-                  style={[
-                    styles.intent,
-                    index === INTENTS.length - 1 && styles.intentLast,
-                    selected && styles.intentSelected,
-                  ]}
+                  style={[styles.intent, index === INTENTS.length - 1 && styles.intentLast]}
                 >
                   <Text style={[styles.intentText, selected && styles.intentTextSelected]}>{label}</Text>
+                  {selected ? <View style={styles.intentBar} /> : null}
                 </Pressable>
               );
             })}
@@ -257,84 +295,94 @@ export default function App() {
             <TextInput
               testID="composer"
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={onChangeDraft}
               placeholder="Message"
-              placeholderTextColor="#8d8d8d"
+              placeholderTextColor="#8a8a8a"
               multiline
               style={styles.input}
-              onKeyPress={(event) => {
-                if (event.nativeEvent.key === 'Enter' && !event.nativeEvent.shiftKey) {
-                  send();
-                }
-              }}
             />
             <Pressable
               testID="send"
               accessibilityRole="button"
               accessibilityLabel="Send"
-              disabled={!draft.trim()}
-              onPress={send}
-              style={[styles.send, !draft.trim() && styles.sendDisabled]}
+              disabled={!canSend}
+              onPress={() => send()}
+              style={[styles.send, canSend && styles.sendReady]}
             >
-              <Text style={styles.sendText}>Send</Text>
+              <Text style={[styles.sendText, canSend && styles.sendTextReady]}>Send</Text>
             </Pressable>
           </View>
         </View>
-      </View>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
 
 const ink = '#1c1c1c';
+const paper = '#fff';
 
 const styles = StyleSheet.create({
   boot: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: paper,
+  },
+  provider: {
+    flex: 1,
+    backgroundColor: paper,
   },
   root: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: paper,
     alignItems: 'center',
   },
   phone: {
     flex: 1,
     width: '100%',
     maxWidth: 480,
-    backgroundColor: '#fff',
+    backgroundColor: paper,
   },
   top: {
     zIndex: 2,
-    backgroundColor: '#fff',
+    backgroundColor: paper,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: ink,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 12,
+    paddingLeft: 14,
+    paddingRight: 16,
+    paddingVertical: 12,
+    gap: 14,
   },
   toggle: {
-    width: 64,
+    width: 72,
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
-  toggleRelaxed: {
-    opacity: 1,
+  toggleRing: {
+    borderWidth: 1,
+    borderColor: ink,
+    borderRadius: 22,
+    padding: 2,
+    backgroundColor: paper,
+  },
+  toggleRingOn: {
+    borderWidth: 2,
+    backgroundColor: '#eadcc4',
   },
   toggleImage: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: ink,
-    backgroundColor: '#fff',
   },
   toggleLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: ink,
+    letterSpacing: 0.2,
+  },
+  toggleLabelOn: {
+    fontWeight: '700',
   },
   headerRule: {
     width: 1,
@@ -345,40 +393,41 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    minHeight: 48,
   },
-  scheduleLabel: {
+  scheduleCopy: {
     flex: 1,
+    gap: 1,
+  },
+  scheduleLine: {
+    color: ink,
+    fontSize: 17,
+    lineHeight: 21,
+  },
+  chevron: {
     color: ink,
     fontSize: 16,
     lineHeight: 20,
   },
-  chevron: {
-    color: ink,
-    fontSize: 14,
-  },
   menu: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: ink,
-    zIndex: 3,
+    backgroundColor: paper,
   },
   menuRow: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
     borderTopWidth: 1,
     borderTopColor: ink,
   },
   menuRowSelected: {
-    backgroundColor: '#f3f3f3',
+    backgroundColor: '#f6f3ee',
   },
   menuText: {
     color: ink,
     fontSize: 16,
+    lineHeight: 21,
   },
   menuTextSelected: {
     fontWeight: '700',
@@ -399,32 +448,36 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   contacts: {
-    paddingHorizontal: 10,
-    paddingTop: 12,
-    paddingBottom: 8,
-    gap: 16,
+    paddingHorizontal: 12,
+    paddingTop: 14,
+    paddingBottom: 10,
+    gap: 18,
   },
   contact: {
+    width: 68,
     alignItems: 'center',
-    width: 64,
-    paddingBottom: 6,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  contactSelected: {
-    borderBottomColor: ink,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     borderWidth: 1,
     borderColor: ink,
-    backgroundColor: '#fff',
+    backgroundColor: paper,
+  },
+  contactMark: {
+    marginTop: 7,
+    width: 44,
+    height: 3,
+    backgroundColor: 'transparent',
+  },
+  contactMarkOn: {
+    backgroundColor: ink,
   },
   contactName: {
     marginTop: 4,
     fontSize: 12,
+    lineHeight: 15,
     color: ink,
   },
   contactNameSelected: {
@@ -434,32 +487,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   threadContent: {
-    paddingHorizontal: 14,
-    paddingVertical: 16,
-    gap: 10,
-    flexGrow: 1,
-    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 20,
+    gap: 12,
   },
   bubble: {
     alignSelf: 'flex-end',
-    maxWidth: '78%',
+    maxWidth: '84%',
     borderWidth: 1,
     borderColor: ink,
-    borderRadius: 16,
-    borderBottomRightRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderBottomRightRadius: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: paper,
   },
   bubbleText: {
     color: ink,
-    fontSize: 16,
-    lineHeight: 21,
+    fontSize: 17,
+    lineHeight: 22,
   },
   footer: {
     borderTopWidth: 1,
     borderTopColor: ink,
-    backgroundColor: '#fff',
+    backgroundColor: paper,
   },
   intents: {
     flexDirection: 'row',
@@ -468,62 +520,67 @@ const styles = StyleSheet.create({
   },
   intent: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     borderRightWidth: 1,
     borderRightColor: ink,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
   },
   intentLast: {
     borderRightWidth: 0,
   },
-  intentSelected: {
-    borderBottomColor: ink,
+  intentBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: ink,
   },
   intentText: {
     color: ink,
-    fontSize: 13,
+    fontSize: 14,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   intentTextSelected: {
     fontWeight: '700',
   },
   composer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    padding: 10,
+    alignItems: 'stretch',
+    minHeight: 76,
   },
   input: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
-    borderWidth: 1,
-    borderColor: ink,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
+    minHeight: 76,
+    maxHeight: 140,
+    borderWidth: 0,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 14,
+    fontSize: 17,
+    lineHeight: 22,
     color: ink,
     outlineStyle: 'none',
   },
   send: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: ink,
+    width: 76,
     alignItems: 'center',
     justifyContent: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: ink,
+  },
+  sendReady: {
     backgroundColor: ink,
   },
-  sendDisabled: {
-    opacity: 0.35,
-  },
   sendText: {
-    color: '#fff',
+    color: '#9a9a9a',
     fontSize: 15,
+  },
+  sendTextReady: {
+    color: paper,
   },
 });
