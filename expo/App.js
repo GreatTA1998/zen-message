@@ -22,11 +22,11 @@ import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
 
-function scheduleLines(scheduleId) {
-  if (scheduleId === 'daily-1-7') return ['Batched daily', '1pm, 7pm'];
-  if (scheduleId === 'daily-8') return ['Daily', '8am'];
-  if (scheduleId === 'hourly') return ['Hourly'];
-  return ['Every 3 hours'];
+function scheduleLines(scheduleId, relaxed) {
+  if (scheduleId === 'daily-1-7') return [relaxed ? 'Relaxed daily' : 'Batched daily', '1pm, 7pm'];
+  if (scheduleId === 'daily-8') return [relaxed ? 'Relaxed daily' : 'Daily', '8am'];
+  if (scheduleId === 'hourly') return [relaxed ? 'Relaxed hourly' : 'Hourly'];
+  return [relaxed ? 'Relaxed, every 3 hours' : 'Every 3 hours'];
 }
 
 const MISSING = {
@@ -200,7 +200,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const messages = contact && state ? threadMessages(state.messages, contact.id) : [];
   const schedule = scheduleById(state?.scheduleId);
   const relaxed = state?.mode === 'relaxed';
-  const lines = scheduleLines(schedule.id);
+  const lines = scheduleLines(schedule.id, relaxed);
   const canSend = Boolean(contact) && draft.trim().length > 0;
 
   const syncTail = useCallback(() => {
@@ -262,15 +262,12 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               <View style={[styles.toggleRing, relaxed && styles.toggleRingOn]}>
                 <Image source={LOGO} resizeMode="cover" style={styles.toggleImage} />
               </View>
-              <Text testID="mode-label" style={[styles.toggleLabel, relaxed && styles.toggleLabelOn]}>
-                {relaxed ? 'Relaxed' : 'Batched'}
-              </Text>
             </Pressable>
             <View style={styles.headerRule} />
             <Pressable
               testID="schedule-button"
               accessibilityRole="button"
-              accessibilityLabel={schedule.label}
+              accessibilityLabel={lines.join(', ')}
               onPress={() => setMenuOpen((open) => !open)}
               style={styles.schedule}
             >
@@ -473,12 +470,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 14,
   },
-  toggle: { width: 72, alignItems: 'center', gap: 5 },
+  toggle: { alignItems: 'center' },
   toggleRing: { borderWidth: 1, borderColor: ink, borderRadius: 22, padding: 2, backgroundColor: paper },
   toggleRingOn: { borderWidth: 2, backgroundColor: '#eadcc4' },
   toggleImage: { width: 36, height: 36, borderRadius: 18 },
-  toggleLabel: { fontSize: 12, color: ink, letterSpacing: 0.2 },
-  toggleLabelOn: { fontWeight: '700' },
   headerRule: { width: 1, alignSelf: 'stretch', backgroundColor: ink },
   schedule: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 },
   scheduleCopy: { flex: 1, gap: 1 },
