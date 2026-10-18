@@ -22,11 +22,11 @@ import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
 
-function scheduleLines(scheduleId, relaxed) {
-  if (scheduleId === 'daily-1-7') return [relaxed ? 'Relaxed daily' : 'Batched daily', '1pm, 7pm'];
-  if (scheduleId === 'daily-8') return [relaxed ? 'Relaxed daily' : 'Daily', '8am'];
-  if (scheduleId === 'hourly') return [relaxed ? 'Relaxed hourly' : 'Hourly'];
-  return [relaxed ? 'Relaxed, every 3 hours' : 'Every 3 hours'];
+function scheduleLabel(scheduleId, relaxed) {
+  if (scheduleId === 'daily-1-7') return relaxed ? 'Relaxed daily, 1pm, 7pm' : 'Batched daily, 1pm, 7pm';
+  if (scheduleId === 'daily-8') return relaxed ? 'Relaxed daily, 8am' : 'Daily, 8am';
+  if (scheduleId === 'hourly') return relaxed ? 'Relaxed hourly' : 'Hourly';
+  return relaxed ? 'Relaxed, every 3 hours' : 'Every 3 hours';
 }
 
 const MISSING = {
@@ -200,7 +200,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const messages = contact && state ? threadMessages(state.messages, contact.id) : [];
   const schedule = scheduleById(state?.scheduleId);
   const relaxed = state?.mode === 'relaxed';
-  const lines = scheduleLines(schedule.id, relaxed);
+  const label = scheduleLabel(schedule.id, relaxed);
   const canSend = Boolean(contact) && draft.trim().length > 0;
 
   const syncTail = useCallback(() => {
@@ -267,17 +267,13 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
             <Pressable
               testID="schedule-button"
               accessibilityRole="button"
-              accessibilityLabel={lines.join(', ')}
+              accessibilityLabel={label}
               onPress={() => setMenuOpen((open) => !open)}
               style={styles.schedule}
             >
-              <View style={styles.scheduleCopy}>
-                {lines.map((line) => (
-                  <Text key={line} style={styles.scheduleLine}>
-                    {line}
-                  </Text>
-                ))}
-              </View>
+              <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
+                {label}
+              </Text>
               <Text style={styles.chevron}>{menuOpen ? '▴' : '▾'}</Text>
             </Pressable>
           </View>
@@ -467,7 +463,7 @@ const styles = StyleSheet.create({
     borderBottomColor: ink,
     paddingLeft: 14,
     paddingRight: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     gap: 14,
   },
   toggle: { alignItems: 'center' },
@@ -475,9 +471,8 @@ const styles = StyleSheet.create({
   toggleRingOn: { borderWidth: 2, backgroundColor: '#eadcc4' },
   toggleImage: { width: 36, height: 36, borderRadius: 18 },
   headerRule: { width: 1, alignSelf: 'stretch', backgroundColor: ink },
-  schedule: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 },
-  scheduleCopy: { flex: 1, gap: 1 },
-  scheduleLine: { color: ink, fontSize: 17, lineHeight: 21 },
+  schedule: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scheduleLine: { flex: 1, color: ink, fontSize: 16, lineHeight: 20 },
   chevron: { color: ink, fontSize: 16, lineHeight: 20 },
   menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
