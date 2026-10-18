@@ -45,7 +45,7 @@ test('relaxed anytime is silent and private', () => {
   assert.equal(JSON.stringify({ effects: result.senderEffects, message: result.sender.messages[0] }).includes('relax'), false);
 });
 
-test('timely is one quiet push and realtime is one normal push', () => {
+test('timely waits for the batch and realtime is one normal push', () => {
   const bea = person({ id: 'bea', username: 'bea', pushToken: 'ExponentPushToken[bea]' });
   const timely = deliverMessage(person({ id: 'ada', username: 'ada' }), bea, {
     id: 't',
@@ -59,22 +59,25 @@ test('timely is one quiet push and realtime is one normal push', () => {
     intent: 'realtime',
     now,
   });
-  assert.equal(timely.pushes.length, 1);
-  assert.equal(timely.pushes[0].sound, null);
-  assert.equal(timely.pushes[0].interruptionLevel, 'passive');
-  assert.equal(timely.pushes[0].data.kind, 'timely');
+  assert.equal(timely.recipient.messages[0].visible, false);
+  assert.equal(timely.recipientEffects[0].type, 'schedule-digest');
+  assert.deepEqual(timely.pushes, []);
+  assert.deepEqual(timely.senderEffects, []);
+  assert.equal(JSON.stringify(timely.senderEffects).includes('relax'), false);
   assert.equal(realtime.pushes.length, 1);
   assert.equal(realtime.pushes[0].sound, 'default');
   assert.equal(realtime.pushes[0].interruptionLevel, 'active');
   assert.equal(realtime.recipientEffects[0].plan.quiet, false);
   const relaxed = changeMode(bea, 'relaxed').state;
-  const still = deliverMessage(person({ id: 'ada', username: 'ada' }), { ...bea, mode: relaxed.mode }, {
+  const sooner = deliverMessage(person({ id: 'ada', username: 'ada' }), { ...bea, mode: relaxed.mode }, {
     id: 't2',
     body: 'Soon',
     intent: 'timely',
     now,
   });
-  assert.equal(still.pushes[0].interruptionLevel, 'passive');
+  assert.equal(sooner.recipient.messages[0].visible, true);
+  assert.deepEqual(sooner.pushes, []);
+  assert.equal(JSON.stringify({ effects: sooner.senderEffects, message: sooner.sender.messages[0] }).includes('relax'), false);
 });
 
 test('the window sends one digest push', () => {

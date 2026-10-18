@@ -36,10 +36,12 @@ export function changeMode(user, mode) {
   return reduce(user, { type: 'set-mode', mode });
 }
 
-export function changeSchedule(user, scheduleId, now) {
+export function changeSchedule(user, scheduleId, now, weekly) {
   return reduce(user, {
     type: 'set-schedule',
     scheduleId,
+    weekDay: weekly?.weekDay,
+    weekHour: weekly?.weekHour,
     now,
     offsetMinutes: user.offsetMinutes,
   });

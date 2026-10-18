@@ -3,7 +3,11 @@ export const SCHEDULES = [
   { id: 'hourly', label: 'Hourly' },
   { id: 'daily-8', label: 'Daily, 8am' },
   { id: 'every-3-hours', label: 'Every 3 hours' },
+  { id: 'weekly', label: 'Weekly, Sunday 5pm' },
 ];
+
+export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const WEEK_HOURS = [8, 12, 17, 19, 21];
 
 export const INTENTS = [
   { id: 'anytime', label: 'anytime' },
@@ -17,6 +21,8 @@ export function createState() {
   return {
     mode: 'batched',
     scheduleId: 'daily-1-7',
+    weekDay: 0,
+    weekHour: 17,
     contactId: null,
     messages: [],
     digest: null,
@@ -27,12 +33,76 @@ export function scheduleById(id) {
   return SCHEDULES.find((item) => item.id === id) ?? SCHEDULES[0];
 }
 
-export function nextWindow(now, scheduleId, offsetMinutes) {
+export function nextWindow(now, scheduleId, offsetMinutes, weekly) {
   const date = now instanceof Date ? now : new Date(now);
+  const rhythm = weeklyRhythm(weekly);
   if (offsetMinutes == null) {
-    return nextWindowLocal(date, scheduleId);
+    return nextWindowLocal(date, scheduleId, rhythm);
   }
-  return nextWindowZoned(date.getTime(), scheduleId, offsetMinutes);
+  return nextWindowZoned(date.getTime(), scheduleId, offsetMinutes, rhythm);
+}
+
+export function clockLabel(hour, minute = 0) {
+  const suffix = hour >= 12 ? 'pm' : 'am';
+  const shown = hour % 12 || 12;
+  if (!minute) return `${shown}${suffix}`;
+  return `${shown}:${String(minute).padStart(2, '0')}${suffix}`;
+}
+
+export function weeklyWhen(weekDay, weekHour) {
+  return `${WEEKDAYS[clampDay(weekDay)]} ${clockLabel(clampHour(weekHour))}`;
+}
+
+export function receiptPhrase(now, schedule = {}) {
+  const offset = schedule.offsetMinutes;
+  const at = nextWindow(now, schedule.scheduleId || 'daily-1-7', offset, schedule);
+  const nowDate = now instanceof Date ? now : new Date(now);
+  const atParts = partsInZone(at, offset);
+  const nowParts = partsInZone(nowDate, offset);
+  const dayDiff = dayNumber(atParts) - dayNumber(nowParts);
+  const when = dayDiff === 0 ? 'today' : dayDiff === 1 ? 'tomorrow' : WEEKDAYS[atParts.weekday];
+  return `Received at ${clockLabel(atParts.hour, atParts.minute)} ${when}`;
+}
+
+function weeklyRhythm(weekly) {
+  return {
+    weekDay: clampDay(weekly?.weekDay),
+    weekHour: clampHour(weekly?.weekHour),
+  };
+}
+
+function clampDay(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 6 ? value : 0;
+}
+
+function clampHour(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 23 ? value : 17;
+}
+
+function partsInZone(date, offsetMinutes) {
+  if (offsetMinutes == null) {
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth(),
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      weekday: date.getDay(),
+    };
+  }
+  const local = new Date(date.getTime() - offsetMinutes * 60000);
+  return {
+    year: local.getUTCFullYear(),
+    month: local.getUTCMonth(),
+    day: local.getUTCDate(),
+    hour: local.getUTCHours(),
+    minute: local.getUTCMinutes(),
+    weekday: local.getUTCDay(),
+  };
+}
+
+function dayNumber(parts) {
+  return Math.floor(Date.UTC(parts.year, parts.month, parts.day) / 86400000);
 }
 
 function scheduleHours(scheduleId) {
@@ -42,7 +112,8 @@ function scheduleHours(scheduleId) {
   return [13, 19];
 }
 
-function nextWindowLocal(date, scheduleId) {
+function nextWindowLocal(date, scheduleId, weekly) {
+  if (scheduleId === 'weekly') return nextWeeklyLocal(date, weekly);
   if (scheduleId === 'hourly') {
     const next = new Date(date);
     next.setMinutes(0, 0, 0);
@@ -52,7 +123,17 @@ function nextWindowLocal(date, scheduleId) {
   return nextClockTime(date, scheduleHours(scheduleId));
 }
 
-function nextWindowZoned(nowMs, scheduleId, offsetMinutes) {
+function nextWeeklyLocal(now, weekly) {
+  const next = new Date(now);
+  const delta = (weekly.weekDay - now.getDay() + 7) % 7;
+  next.setDate(now.getDate() + delta);
+  next.setHours(weekly.weekHour, 0, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 7);
+  return next;
+}
+
+function nextWindowZoned(nowMs, scheduleId, offsetMinutes, weekly) {
+  if (scheduleId === 'weekly') return nextWeeklyZoned(nowMs, offsetMinutes, weekly);
   const local = new Date(nowMs - offsetMinutes * 60000);
   const year = local.getUTCFullYear();
   const month = local.getUTCMonth();
@@ -69,6 +150,23 @@ function nextWindowZoned(nowMs, scheduleId, offsetMinutes) {
     }
   }
   return new Date(Date.UTC(year, month, day + 1, hours[0], 0, 0) + offsetMinutes * 60000);
+}
+
+function nextWeeklyZoned(nowMs, offsetMinutes, weekly) {
+  const local = new Date(nowMs - offsetMinutes * 60000);
+  const delta = (weekly.weekDay - local.getUTCDay() + 7) % 7;
+  const candidate = Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth(),
+    local.getUTCDate() + delta,
+    weekly.weekHour,
+    0,
+    0,
+    0
+  );
+  const at = candidate + offsetMinutes * 60000;
+  if (at <= nowMs) return new Date(candidate + 7 * 86400000 + offsetMinutes * 60000);
+  return new Date(at);
 }
 
 function nextClockTime(now, hours) {
@@ -152,7 +250,7 @@ export function digestPlan(messages) {
 }
 
 function heldMessages(messages) {
-  return messages.filter((item) => item.intent === 'anytime' && !item.visible);
+  return messages.filter((item) => (item.intent === 'anytime' || item.intent === 'timely') && !item.visible);
 }
 
 function revealIds(messages, ids) {
@@ -169,7 +267,7 @@ export function reduce(state, action) {
     case 'set-mode':
       return setMode(state, action.mode);
     case 'set-schedule':
-      return setSchedule(state, action.scheduleId, now, action.offsetMinutes);
+      return setSchedule(state, action.scheduleId, now, action.offsetMinutes, action);
     case 'send':
       return send(state, action, now);
     case 'outgoing':
@@ -199,13 +297,21 @@ function setMode(state, mode) {
   };
 }
 
-function setSchedule(state, scheduleId, now, offsetMinutes) {
+function setSchedule(state, scheduleId, now, offsetMinutes, weekly) {
   if (!SCHEDULES.some((item) => item.id === scheduleId)) return { state, effects: [] };
-  if (scheduleId === state.scheduleId) return { state, effects: [] };
+  const rhythm =
+    scheduleId === 'weekly'
+      ? weeklyRhythm({
+          weekDay: weekly?.weekDay ?? state.weekDay,
+          weekHour: weekly?.weekHour ?? state.weekHour,
+        })
+      : { weekDay: state.weekDay ?? 0, weekHour: state.weekHour ?? 17 };
+  const sameDay = rhythm.weekDay === state.weekDay && rhythm.weekHour === state.weekHour;
+  if (scheduleId === state.scheduleId && (scheduleId !== 'weekly' || sameDay)) return { state, effects: [] };
   if (!state.digest || state.digest.presented) {
-    return { state: { ...state, scheduleId }, effects: [] };
+    return { state: { ...state, scheduleId, ...rhythm }, effects: [] };
   }
-  const at = nextWindow(new Date(now), scheduleId, offsetMinutes).getTime();
+  const at = nextWindow(new Date(now), scheduleId, offsetMinutes, rhythm).getTime();
   const ids = new Set(state.digest.messageIds);
   const messages = state.messages.map((item) =>
     ids.has(item.id) && !item.visible ? { ...item, releaseAt: at } : item
@@ -215,6 +321,7 @@ function setSchedule(state, scheduleId, now, offsetMinutes) {
     state: {
       ...state,
       scheduleId,
+      ...rhythm,
       messages,
       digest: { at, messageIds: plan.data.messageIds, presented: false, platformScheduled: false },
     },
@@ -256,7 +363,7 @@ function send(state, action, now) {
     direction: 'in',
   };
 
-  if (message.intent === 'timely' || message.intent === 'realtime') {
+  if (message.intent === 'realtime') {
     const visible = { ...message, visible: true };
     return {
       state: { ...state, messages: [...state.messages, visible] },
@@ -271,9 +378,9 @@ function send(state, action, now) {
     };
   }
 
-  const at = nextWindow(new Date(now), state.scheduleId, action.offsetMinutes).getTime();
+  const at = nextWindow(new Date(now), state.scheduleId, action.offsetMinutes, state).getTime();
   const messages = [...state.messages, { ...message, releaseAt: at }].map((item) =>
-    item.intent === 'anytime' && !item.visible ? { ...item, releaseAt: at } : item
+    (item.intent === 'anytime' || item.intent === 'timely') && !item.visible ? { ...item, releaseAt: at } : item
   );
   const held = heldMessages(messages);
   const plan = digestPlan(held);
@@ -350,6 +457,8 @@ export function sanitize(raw) {
   return {
     mode: raw.mode === 'relaxed' ? 'relaxed' : 'batched',
     scheduleId: SCHEDULES.some((item) => item.id === raw.scheduleId) ? raw.scheduleId : base.scheduleId,
+    weekDay: clampDay(raw.weekDay),
+    weekHour: clampHour(raw.weekHour),
     contactId: typeof raw.contactId === 'string' ? raw.contactId : base.contactId,
     messages: Array.isArray(raw.messages) ? raw.messages.filter(isMessage) : [],
     digest: isDigest(raw.digest)

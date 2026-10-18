@@ -16,7 +16,17 @@ import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR, LOGO } from './src/contacts';
-import { INTENTS, SCHEDULES, messagePhoto, scheduleById, threadMessages } from './src/delivery';
+import {
+  INTENTS,
+  SCHEDULES,
+  WEEKDAYS,
+  WEEK_HOURS,
+  clockLabel,
+  messagePhoto,
+  receiptPhrase,
+  threadMessages,
+  weeklyWhen,
+} from './src/delivery';
 import { LoginView } from './src/LoginView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
@@ -24,7 +34,13 @@ import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
 
-function scheduleLabel(scheduleId, relaxed) {
+function scheduleLabel(state) {
+  const relaxed = state?.mode === 'relaxed';
+  const scheduleId = state?.scheduleId;
+  if (scheduleId === 'weekly') {
+    const when = weeklyWhen(state?.weekDay, state?.weekHour);
+    return relaxed ? `Relaxed weekly, ${when}` : `Batched weekly, ${when}`;
+  }
   if (scheduleId === 'daily-1-7') return relaxed ? 'Relaxed daily, 1pm, 7pm' : 'Batched daily, 1pm, 7pm';
   if (scheduleId === 'daily-8') return relaxed ? 'Relaxed daily, 8am' : 'Daily, 8am';
   if (scheduleId === 'hourly') return relaxed ? 'Relaxed hourly' : 'Hourly';
@@ -202,9 +218,17 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const contacts = inbox?.contacts ?? [];
   const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
   const messages = contact && state ? threadMessages(state.messages, contact.id) : [];
-  const schedule = scheduleById(state?.scheduleId);
   const relaxed = state?.mode === 'relaxed';
-  const label = scheduleLabel(schedule.id, relaxed);
+  const label = scheduleLabel(state);
+  const phrase =
+    intent === 'timely' && contact
+      ? receiptPhrase(new Date(), {
+          scheduleId: contact.scheduleId,
+          weekDay: contact.weekDay,
+          weekHour: contact.weekHour,
+          offsetMinutes: contact.offsetMinutes,
+        })
+      : '';
   const canSend = Boolean(contact) && (draft.trim().length > 0 || Boolean(photo));
 
   const syncTail = useCallback(() => {
@@ -262,6 +286,10 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
     if (next) setPhoto(next);
   }
 
+  function chooseWeek(weekDay, weekHour) {
+    mutate('/v1/schedule', { scheduleId: 'weekly', weekDay, weekHour });
+  }
+
   function onChangeDraft(value) {
     setDraft(value);
   }
@@ -274,7 +302,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.phone}>
-        <View style={styles.top}>
+        <View testID="schedule-panel" style={styles.top}>
           <View testID="top-bar" style={styles.header}>
             <Pressable
               testID="mode-toggle"
@@ -304,7 +332,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
           </View>
           {menuOpen ? (
             <View testID="schedule-menu" style={styles.menu}>
-              {SCHEDULES.map((option) => {
+              {SCHEDULES.filter((option) => option.id !== 'weekly').map((option) => {
                 const selected = option.id === state?.scheduleId;
                 return (
                   <Pressable
@@ -321,6 +349,59 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
                   </Pressable>
                 );
               })}
+              <Pressable
+                testID="schedule-weekly"
+                accessibilityRole="button"
+                onPress={() =>
+                  chooseWeek(
+                    state?.scheduleId === 'weekly' ? state.weekDay : 0,
+                    state?.scheduleId === 'weekly' ? state.weekHour : 17
+                  )
+                }
+                style={[styles.menuRow, state?.scheduleId === 'weekly' && styles.menuRowSelected]}
+              >
+                <Text style={[styles.menuText, state?.scheduleId === 'weekly' && styles.menuTextSelected]}>
+                  {state?.scheduleId === 'weekly'
+                    ? `Weekly, ${weeklyWhen(state.weekDay, state.weekHour)}`
+                    : 'Weekly, Sunday 5pm'}
+                </Text>
+              </Pressable>
+              <View testID="weekly-setting" style={styles.weekBlock}>
+                <View style={styles.weekRow}>
+                  {WEEKDAYS.map((name, day) => {
+                    const selected = state?.scheduleId === 'weekly' && state.weekDay === day;
+                    return (
+                      <Pressable
+                        key={name}
+                        testID={`week-day-${day}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={name}
+                        onPress={() => chooseWeek(day, state?.scheduleId === 'weekly' ? state.weekHour : 17)}
+                        style={[styles.weekChip, selected && styles.weekChipOn]}
+                      >
+                        <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{name.slice(0, 3)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={styles.weekRow}>
+                  {WEEK_HOURS.map((hour) => {
+                    const selected = state?.scheduleId === 'weekly' && state.weekHour === hour;
+                    return (
+                      <Pressable
+                        key={hour}
+                        testID={`week-hour-${hour}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={clockLabel(hour)}
+                        onPress={() => chooseWeek(state?.scheduleId === 'weekly' ? state.weekDay : 0, hour)}
+                        style={[styles.weekChip, selected && styles.weekChipOn]}
+                      >
+                        <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{clockLabel(hour)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
             </View>
           ) : null}
         </View>
@@ -411,6 +492,11 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
             })}
           </View>
           <View testID="composer-bar" style={styles.composer}>
+            {phrase ? (
+              <Text testID="receipt-phrase" style={styles.receipt}>
+                {phrase}
+              </Text>
+            ) : null}
             {photo ? (
               <View style={styles.previewWrap}>
                 <Image testID="photo-preview" source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
@@ -537,6 +623,12 @@ const styles = StyleSheet.create({
   scheduleLine: { flex: 1, color: ink, fontSize: 16, lineHeight: 20 },
   menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
+  weekBlock: { paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: ink, gap: 8 },
+  weekRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 18 },
+  weekChip: { borderWidth: 1, borderColor: ink, paddingHorizontal: 8, paddingVertical: 6 },
+  weekChipOn: { backgroundColor: ink },
+  weekChipText: { color: ink, fontSize: 13, lineHeight: 16 },
+  weekChipTextOn: { color: paper },
   menuRowSelected: { backgroundColor: '#f6f3ee' },
   menuText: { color: ink, fontSize: 16, lineHeight: 21 },
   menuTextSelected: { fontWeight: '700' },
@@ -645,6 +737,13 @@ const styles = StyleSheet.create({
   intentBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: ink },
   intentText: { color: ink, fontSize: 14, textAlign: 'center', lineHeight: 18 },
   intentTextSelected: { fontWeight: '700' },
+  receipt: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    color: ink,
+    fontSize: 15,
+    lineHeight: 20,
+  },
   composer: {
     marginHorizontal: 12,
     marginTop: 10,

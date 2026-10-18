@@ -5,6 +5,7 @@ import {
   digestPlan,
   immediatePlan,
   nextWindow,
+  receiptPhrase,
   reduce,
   sanitize,
   threadMessages,
@@ -104,17 +105,16 @@ test('batched does not hide a message that was already visible', () => {
   assert.equal(batched.effects.length, 0);
 });
 
-test('timely is immediate, quiet, and not part of the digest', () => {
+test('timely waits for the next batch and does not notify early', () => {
   const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
   const result = send(held.state, { id: 'c', body: 'Today', intent: 'timely' }, at(10, 20));
-  assert.equal(result.state.messages.find((item) => item.id === 'c').visible, true);
-  assert.deepEqual(result.state.digest.messageIds, ['a']);
+  assert.equal(result.state.messages.find((item) => item.id === 'c').visible, false);
+  assert.deepEqual(result.state.digest.messageIds, ['a', 'c']);
   assert.equal(result.effects.length, 1);
-  assert.equal(result.effects[0].type, 'present');
-  assert.equal(result.effects[0].plan.quiet, true);
-  assert.equal(result.effects[0].plan.data.kind, 'timely');
-  assert.deepEqual(result.effects[0].plan.data.messageIds, ['c']);
-  assert.equal(immediatePlan(result.state.messages[1]).data.kind, 'timely');
+  assert.equal(result.effects[0].type, 'schedule-digest');
+  assert.equal(result.effects[0].plan.data.kind, 'digest');
+  assert.equal(JSON.stringify(result.effects).includes('relax'), false);
+  assert.equal(immediatePlan({ ...result.state.messages[1], intent: 'timely' }).data.kind, 'timely');
 });
 
 test('realtime is one normal notification', () => {
@@ -133,12 +133,18 @@ test('realtime is one normal notification', () => {
   ]);
 });
 
-test('timely and realtime still notify while relaxed', () => {
+test('relaxed timely is readable sooner and stays private', () => {
   const relaxed = reduce(createState(), { type: 'set-mode', mode: 'relaxed' }).state;
   const timely = send(relaxed, { id: 't', body: 'Soon', intent: 'timely' }, at(10, 15));
   const realtime = send(relaxed, { id: 'r', body: 'Now', intent: 'realtime' }, at(10, 16));
-  assert.equal(timely.effects[0].plan.quiet, true);
+  assert.equal(timely.state.messages[0].visible, true);
+  assert.deepEqual(timely.effects, []);
+  assert.equal(JSON.stringify({ effects: timely.effects, message: timely.state.messages[0] }).includes('relax'), false);
   assert.equal(realtime.effects[0].plan.quiet, false);
+  assert.equal(
+    receiptPhrase(at(10, 15), { scheduleId: 'daily-1-7', offsetMinutes: 0, mode: 'relaxed' }).includes('relax'),
+    false
+  );
 });
 
 test('a schedule change moves the one pending digest', () => {
@@ -210,9 +216,10 @@ test('a photo uses the same delivery as text and is not a video', () => {
   assert.deepEqual(shown.effects, []);
 
   const timely = send(createState(), { id: 'p3', body: 'Look', photo, intent: 'timely' }, at(10, 15));
-  assert.equal(timely.state.messages[0].visible, true);
-  assert.equal(timely.effects[0].plan.body, 'Look');
-  assert.equal(timely.effects[0].plan.quiet, true);
+  assert.equal(timely.state.messages[0].visible, false);
+  assert.equal(timely.state.messages[0].photo, photo);
+  assert.equal(timely.effects[0].type, 'schedule-digest');
+  assert.equal(timely.effects[0].plan.body, 'Wren: Look');
 
   const state = createState();
   assert.equal(
@@ -247,6 +254,57 @@ test('an outgoing message is visible and tells the sender nothing', () => {
   assert.equal(result.state.messages[0].direction, 'out');
   assert.deepEqual(result.effects, []);
   assert.equal(JSON.stringify(result).includes('relax'), false);
+});
+
+test('weekly rhythm is one day and one time, default Sunday 5pm', () => {
+  const morning = new Date(2026, 9, 18, 10, 0, 0, 0);
+  while (morning.getDay() !== 0) morning.setDate(morning.getDate() + 1);
+  const today = nextWindow(morning, 'weekly');
+  assert.equal(today.getDay(), 0);
+  assert.equal(today.getHours(), 17);
+  assert.equal(today.getDate(), morning.getDate());
+  const after = nextWindow(new Date(morning.getFullYear(), morning.getMonth(), morning.getDate(), 18, 0), 'weekly');
+  assert.equal(after.getDay(), 0);
+  assert.equal(after.getHours(), 17);
+  assert.ok(after.getTime() - morning.getTime() > 6 * 86400000);
+  const wednesday = nextWindow(morning, 'weekly', undefined, { weekDay: 3, weekHour: 17 });
+  assert.equal(wednesday.getDay(), 3);
+  assert.equal(wednesday.getHours(), 17);
+});
+
+test('receipt phrase names today, tomorrow, or the weekday and ignores relax mode', () => {
+  const morning = new Date(Date.UTC(2026, 9, 18, 10, 0));
+  while (morning.getUTCDay() !== 0) morning.setUTCDate(morning.getUTCDate() + 1);
+  const evening = new Date(morning.getTime() + 10 * 3600000);
+  assert.equal(receiptPhrase(morning, { scheduleId: 'daily-1-7', offsetMinutes: 0 }), 'Received at 1pm today');
+  assert.equal(receiptPhrase(evening, { scheduleId: 'daily-1-7', offsetMinutes: 0 }), 'Received at 1pm tomorrow');
+  assert.equal(
+    receiptPhrase(morning, { scheduleId: 'weekly', weekDay: 0, weekHour: 17, offsetMinutes: 0 }),
+    'Received at 5pm today'
+  );
+  assert.equal(
+    receiptPhrase(morning, { scheduleId: 'weekly', weekDay: 3, weekHour: 17, offsetMinutes: 0, mode: 'relaxed' }),
+    'Received at 5pm Wednesday'
+  );
+});
+
+test('changing the weekly day moves the pending batch', () => {
+  const morning = new Date(2026, 9, 18, 10, 0, 0, 0);
+  while (morning.getDay() !== 0) morning.setDate(morning.getDate() + 1);
+  const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'timely' }, morning);
+  const moved = reduce(held.state, {
+    type: 'set-schedule',
+    scheduleId: 'weekly',
+    weekDay: 3,
+    weekHour: 17,
+    now: morning.getTime(),
+  });
+  assert.equal(moved.state.scheduleId, 'weekly');
+  assert.equal(moved.state.weekDay, 3);
+  assert.equal(moved.state.weekHour, 17);
+  assert.equal(new Date(moved.state.digest.at).getDay(), 3);
+  assert.equal(new Date(moved.state.digest.at).getHours(), 17);
+  assert.equal(moved.state.messages[0].visible, false);
 });
 
 test('sanitize drops broken saved data', () => {

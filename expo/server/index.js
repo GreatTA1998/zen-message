@@ -48,14 +48,27 @@ function publicUser(user) {
   };
 }
 
+function contactCard(contact) {
+  const person = users.get(contact.id);
+  return {
+    id: contact.id,
+    scheduleId: person?.scheduleId || 'daily-1-7',
+    weekDay: Number.isInteger(person?.weekDay) ? person.weekDay : 0,
+    weekHour: Number.isInteger(person?.weekHour) ? person.weekHour : 17,
+    offsetMinutes: Number.isInteger(person?.offsetMinutes) ? person.offsetMinutes : 0,
+  };
+}
+
 function inbox(user) {
   return {
     user: publicUser(user),
-    contacts: user.contacts,
+    contacts: user.contacts.map(contactCard),
     effects: user.pendingEffects,
     state: {
       mode: user.mode,
       scheduleId: user.scheduleId,
+      weekDay: user.weekDay,
+      weekHour: user.weekHour,
       contactId: user.contactId,
       messages: user.messages,
       digest: user.digest,
@@ -250,7 +263,10 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/schedule') {
-      const result = changeSchedule(user, body.scheduleId, Date.now());
+      const result = changeSchedule(user, body.scheduleId, Date.now(), {
+        weekDay: body.weekDay,
+        weekHour: body.weekHour,
+      });
       Object.assign(user, result.state);
       await notify(user, result.effects);
       save(user);
