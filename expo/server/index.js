@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { createState, reduce } from '../src/delivery.js';
-import { CODE_ALPHABET, CODE_LENGTH, isCode, normalizeCode } from '../src/people.js';
+import { CODE_ALPHABET, CODE_LENGTH, hasConfusingCharacter, isCode, normalizeCode } from '../src/people.js';
 import { changeMode, changeSchedule, deliverMessage, releaseDue } from './deliver.js';
 import { sendExpoPushes } from './push.js';
 
@@ -179,6 +179,10 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'POST' && url.pathname === '/v1/contacts') {
       const code = normalizeCode(body.code);
+      if (hasConfusingCharacter(code) || (code && !isCode(code))) {
+        send(response, 400, { error: 'code_invalid' });
+        return;
+      }
       const found = isCode(code) ? users.get(code) : null;
       if (!found || found.id === user.id) {
         send(response, 404, { error: 'person_not_found' });

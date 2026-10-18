@@ -17,7 +17,7 @@ import { PERSON_AVATAR, LOGO } from './src/contacts';
 import { INTENTS, SCHEDULES, scheduleById, threadMessages } from './src/delivery';
 import { LoginView } from './src/LoginView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
-import { isCode, normalizeCode } from './src/people';
+import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
@@ -146,6 +146,7 @@ function Root() {
 
   async function onAdd(raw) {
     const code = normalizeCode(raw);
+    if (hasConfusingCharacter(code)) return '1, I, and L are not used.';
     if (!isCode(code)) return 'Enter a 3-character ID.';
     if (code === user?.id) return 'That is your ID.';
     try {
@@ -154,6 +155,7 @@ function Root() {
       setSearching(false);
       return '';
     } catch (error) {
+      if (error.code === 'code_invalid') return '1, I, and L are not used.';
       if (error.code === 'person_not_found') return 'No one has that ID.';
       return 'Could not add that ID.';
     }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { CODE_LENGTH, isCode, normalizeCode } from './people';
+import { CODE_LENGTH, hasConfusingCharacter, isCode, normalizeCode } from './people';
 
 export function PlusView({ code, onClose, onAdd }) {
   const [value, setValue] = useState('');
@@ -47,8 +47,9 @@ export function PlusView({ code, onClose, onAdd }) {
           autoCorrect={false}
           maxLength={CODE_LENGTH + 2}
           onChangeText={(next) => {
-            setError('');
-            setValue(normalizeCode(next).slice(0, CODE_LENGTH));
+            const code = normalizeCode(next).slice(0, CODE_LENGTH);
+            setValue(code);
+            setError(hasConfusingCharacter(code) ? '1, I, and L are not used.' : '');
           }}
           placeholder="K7M"
           placeholderTextColor="#8a8a8a"
