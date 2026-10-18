@@ -1,5 +1,5 @@
 import { createState, reduce } from './delivery.js';
-import { CODE_ALPHABET, CODE_LENGTH, hasConfusingCharacter, isCode, normalizeCode } from './people.js';
+import { accountCode, firstName, hasConfusingCharacter, isCode, normalizeCode } from './people.js';
 import { changeMode, changeSchedule, deliverMessage, releaseDue } from '../server/deliver.js';
 
 const STORE_KEY = 'zen-message.device';
@@ -33,13 +33,14 @@ async function defaultBytes(length) {
 }
 
 function publicUser(user) {
-  return { id: user.id, provider: user.provider };
+  return { id: user.id, provider: user.provider, firstName: user.firstName || '' };
 }
 
 function contactCard(users, contact) {
   const person = users[contact.id];
   return {
     id: contact.id,
+    firstName: person?.firstName || '',
     scheduleId: person?.scheduleId || 'daily-1-7',
     weekDay: Number.isInteger(person?.weekDay) ? person.weekDay : 0,
     weekHour: Number.isInteger(person?.weekHour) ? person.weekHour : 17,
@@ -67,6 +68,7 @@ function inbox(state, user) {
 function keepAccount(user) {
   return {
     id: user.id,
+    firstName: user.firstName || '',
     contacts: user.contacts,
     pushToken: user.pushToken,
     offsetMinutes: user.offsetMinutes,
@@ -109,16 +111,24 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     return [...sample].map((value) => value.toString(16).padStart(2, '0')).join('');
   }
 
-  async function mintCode(users) {
-    for (let attempt = 0; attempt < 48; attempt += 1) {
-      let code = '';
-      const sample = await bytes(CODE_LENGTH);
-      for (let index = 0; index < CODE_LENGTH; index += 1) {
-        code += CODE_ALPHABET[sample[index] % CODE_ALPHABET.length];
+  function mintCode(users, provider, subject) {
+    const code = accountCode(provider, subject, (candidate) => {
+      const owner = users[candidate];
+      return Boolean(owner && (owner.provider !== provider || owner.subject !== subject));
+    });
+    if (!code) fail('code_exhausted');
+    return code;
+  }
+
+  function linkIncomingContacts(state, user) {
+    for (const message of user.messages || []) {
+      if (message.direction !== 'in' || !message.contactId || message.contactId === user.id) continue;
+      if (!state.users[message.contactId]) continue;
+      if (!user.contacts.some((item) => item.id === message.contactId)) {
+        user.contacts = [...user.contacts, { id: message.contactId }];
       }
-      if (!users[code]) return code;
+      if (!user.contactId) user.contactId = message.contactId;
     }
-    fail('code_exhausted');
   }
 
   function exclusive(work) {
@@ -166,14 +176,17 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
         existing ??
         {
           ...createState(),
-          id: await mintCode(state.users),
+          id: mintCode(state.users, provider, subject),
           provider,
           subject,
+          firstName: '',
           pushToken: null,
           offsetMinutes: 0,
           contacts: [],
           pendingEffects: [],
         };
+      const name = firstName(body?.firstName);
+      if (name) user.firstName = name;
       state.users[user.id] = user;
       const sessionToken = await hex(24);
       state.sessions[sessionToken] = user.id;
@@ -190,6 +203,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       const released = releaseDue(user, Date.now());
       adopt(user, released.state);
       if (released.effects.length) user.pendingEffects = released.effects;
+      linkIncomingContacts(state, user);
       await save(store, state);
       return inbox(state, user);
     }
@@ -225,6 +239,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       });
       adopt(user, result.sender);
       adopt(recipient, result.recipient);
+      linkIncomingContacts(state, recipient);
       if (result.recipientEffects.length) recipient.pendingEffects = result.recipientEffects;
       await save(store, state);
       if (typeof store.onDeliver === 'function') store.onDeliver(recipient, result.recipientEffects);

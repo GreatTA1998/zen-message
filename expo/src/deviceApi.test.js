@@ -12,9 +12,9 @@ test('an Apple credential opens a session when the phone has no Web Crypto', asy
       body: { provider: 'apple', subject: 'apple-user-001' },
     });
     assert.equal(session.token, '04'.repeat(24));
-    assert.equal(session.user.id, '555');
+    assert.match(session.user.id, /^[023456789ABCDEFGHJKMNOPQRSTUVWXYZ]{3}$/);
     const inbox = await api('/v1/inbox?offset=0', { token: session.token });
-    assert.equal(inbox.user.id, '555');
+    assert.equal(inbox.user.id, session.user.id);
   } finally {
     Object.defineProperty(globalThis, 'crypto', { value: previous, configurable: true });
   }
@@ -36,6 +36,18 @@ test('an Apple credential opens a session on the device', async () => {
   assert.equal(inbox.state.mode, 'batched');
   assert.equal(inbox.state.scheduleId, 'daily-1-7');
   assert.deepEqual(inbox.contacts, []);
+});
+
+test('the same account gets the same ID on an empty store', async () => {
+  const open = () =>
+    createDeviceApi(memoryStorage())('/v1/session', {
+      method: 'POST',
+      body: { provider: 'apple', subject: 'apple-user-001', firstName: 'Ada Lovelace' },
+    });
+  const first = await open();
+  const again = await open();
+  assert.equal(again.user.id, first.user.id);
+  assert.equal(first.user.firstName, 'Ada');
 });
 
 test('the same Apple credential keeps the same person after a relaunch', async () => {
@@ -87,7 +99,6 @@ test('two clients on one store can add each other and exchange a message', async
   assert.equal(google.user.provider, 'google');
   assert.notEqual(apple.user.id, google.user.id);
   await phone('/v1/contacts', { token: apple.token, method: 'POST', body: { code: google.user.id } });
-  await web('/v1/contacts', { token: google.token, method: 'POST', body: { code: apple.user.id } });
   await phone('/v1/messages', {
     token: apple.token,
     method: 'POST',
@@ -95,6 +106,7 @@ test('two clients on one store can add each other and exchange a message', async
   });
   const inbox = await web('/v1/inbox?offset=0', { token: google.token });
   assert.equal(inbox.contacts.some((item) => item.id === apple.user.id), true);
+  assert.equal(inbox.state.contactId, apple.user.id);
   assert.equal(
     inbox.state.messages.some((message) => message.body === 'hello from the phone' && message.visible),
     true

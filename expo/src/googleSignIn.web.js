@@ -24,7 +24,8 @@ function googleAuth() {
 
 function subjectFrom(user) {
   if (!user?.uid) return null;
-  return { provider: 'google', subject: user.uid };
+  const word = String(user.displayName || '').trim().split(/\s+/)[0] || '';
+  return { provider: 'google', subject: user.uid, firstName: word.slice(0, 18) };
 }
 
 export async function completeGoogleRedirect() {

@@ -14,7 +14,11 @@ export async function finishSignIn(provider, credential, { request, saveSession,
   try {
     const session = await request('/v1/session', {
       method: 'POST',
-      body: { provider: provider === 'google' ? 'google' : 'apple', subject: credential.user },
+      body: {
+        provider: provider === 'google' ? 'google' : 'apple',
+        subject: credential.user,
+        firstName: credential.firstName || '',
+      },
     });
     if (!session?.token) throw new Error('session_missing');
     await saveSession(session.token);

@@ -158,7 +158,7 @@ function Root() {
     }
     const outcome = await finishSignIn(
       result.provider === 'google' ? 'google' : 'apple',
-      { user: result.subject },
+      { user: result.subject, firstName: result.firstName || '' },
       {
         request: api,
         saveSession,
@@ -374,6 +374,9 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
                   resizeMode="cover"
                   style={styles.avatar}
                 />
+                <Text numberOfLines={1} style={styles.contactLabel}>
+                  {item.firstName || item.id}
+                </Text>
                 <View style={[styles.contactMark, panel === 'chat' && selected && styles.contactMarkOn]} />
               </Pressable>
             );
@@ -389,6 +392,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
             <View style={styles.plus}>
               <Text style={styles.plusMark}>+</Text>
             </View>
+            <Text style={styles.contactLabel}> </Text>
             <View style={[styles.contactMark, panel === 'add' && styles.contactMarkOn]} />
           </Pressable>
         </ScrollView>
@@ -663,6 +667,7 @@ const styles = StyleSheet.create({
   contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 18 },
   contact: { width: 68, alignItems: 'center' },
   avatar: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, backgroundColor: paper },
+  contactLabel: { marginTop: 4, maxWidth: 64, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
   plus: {
     width: 54,
     height: 54,

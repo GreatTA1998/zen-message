@@ -1,39 +1,72 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createCloudApi } from './cloudApi.js';
+import { createCloudApi, createFirestoreStorage } from './cloudApi.js';
+import { accountCode } from './people.js';
 
-const DOC = 'suite';
-const PROJECT = 'project-z-e00fd';
-const API_KEY = 'AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc';
+const DOC = 'live';
 
-test('a phone and a browser share one hosted store', async () => {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/%28default%29/documents/zenExpoState/${DOC}?key=${API_KEY}`;
-  await fetch(url, { method: 'DELETE' });
+async function removeSubjects(subjects) {
+  const storage = createFirestoreStorage(DOC);
+  await storage.transact(async (store) => {
+    const raw = await store.getItem('zen-message.device');
+    const state = raw ? JSON.parse(raw) : { users: {}, sessions: {} };
+    const drop = new Set(
+      Object.entries(state.users)
+        .filter(([, user]) => subjects.has(`${user.provider}:${user.subject}`))
+        .map(([id]) => id)
+    );
+    if (!drop.size) return;
+    for (const id of drop) delete state.users[id];
+    for (const [token, id] of Object.entries(state.sessions || {})) {
+      if (drop.has(id)) delete state.sessions[token];
+    }
+    for (const user of Object.values(state.users)) {
+      user.contacts = (user.contacts || []).filter((item) => !drop.has(item.id));
+      user.messages = (user.messages || []).filter((item) => !drop.has(item.contactId));
+      if (drop.has(user.contactId)) user.contactId = user.contacts[0]?.id ?? null;
+    }
+    await store.setItem('zen-message.device', JSON.stringify(state));
+  });
+}
+
+test('a phone and a browser share the live hosted store', async () => {
+  const stamp = `hosted-${Date.now()}`;
+  const appleSubject = `${stamp}-apple`;
+  const googleSubject = `${stamp}-google`;
+  const subjects = new Set([`apple:${appleSubject}`, `google:${googleSubject}`]);
   const phone = createCloudApi(DOC);
   const web = createCloudApi(DOC);
-  const stamp = `hosted-${Date.now()}`;
-  const apple = await phone('/v1/session', {
-    method: 'POST',
-    body: { provider: 'apple', subject: `${stamp}-apple` },
-  });
-  const google = await web('/v1/session', {
-    method: 'POST',
-    body: { provider: 'google', subject: `${stamp}-google` },
-  });
-  assert.match(apple.user.id, /^[023456789ABCDEFGHJKMNOPQRSTUVWXYZ]{3}$/);
-  assert.match(google.user.id, /^[023456789ABCDEFGHJKMNOPQRSTUVWXYZ]{3}$/);
-  assert.notEqual(apple.user.id, google.user.id);
-  await phone('/v1/contacts', { token: apple.token, method: 'POST', body: { code: google.user.id } });
-  await web('/v1/contacts', { token: google.token, method: 'POST', body: { code: apple.user.id } });
-  await web('/v1/messages', {
-    token: google.token,
-    method: 'POST',
-    body: { contactId: apple.user.id, body: 'hello from the laptop', intent: 'realtime' },
-  });
-  const inbox = await phone('/v1/inbox?offset=0', { token: apple.token });
-  assert.equal(
-    inbox.state.messages.some((message) => message.body === 'hello from the laptop' && message.visible),
-    true
-  );
-  await fetch(url, { method: 'DELETE' });
+  try {
+    const apple = await phone('/v1/session', {
+      method: 'POST',
+      body: { provider: 'apple', subject: appleSubject, firstName: 'Ada' },
+    });
+    const google = await web('/v1/session', {
+      method: 'POST',
+      body: { provider: 'google', subject: googleSubject },
+    });
+    const appleAgain = await phone('/v1/session', {
+      method: 'POST',
+      body: { provider: 'apple', subject: appleSubject },
+    });
+    assert.equal(apple.user.id, accountCode('apple', appleSubject));
+    assert.equal(appleAgain.user.id, apple.user.id);
+    assert.equal(google.user.id, accountCode('google', googleSubject));
+    assert.notEqual(apple.user.id, google.user.id);
+    await phone('/v1/contacts', { token: apple.token, method: 'POST', body: { code: google.user.id } });
+    await phone('/v1/messages', {
+      token: apple.token,
+      method: 'POST',
+      body: { contactId: google.user.id, body: 'hello from the phone', intent: 'realtime' },
+    });
+    const inbox = await web('/v1/inbox?offset=0', { token: google.token });
+    assert.equal(inbox.contacts.some((item) => item.id === apple.user.id && item.firstName === 'Ada'), true);
+    assert.equal(inbox.state.contactId, apple.user.id);
+    assert.equal(
+      inbox.state.messages.some((message) => message.body === 'hello from the phone' && message.visible),
+      true
+    );
+  } finally {
+    await removeSubjects(subjects);
+  }
 });

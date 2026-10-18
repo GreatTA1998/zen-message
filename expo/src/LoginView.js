@@ -76,7 +76,13 @@ async function signInWithApple(onSubject) {
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
     });
-    if (credential?.user) onSubject({ provider: 'apple', subject: credential.user });
+    if (credential?.user) {
+      onSubject({
+        provider: 'apple',
+        subject: credential.user,
+        firstName: credential.fullName?.givenName || '',
+      });
+    }
   } catch (error) {
     if (error?.code === 'ERR_REQUEST_CANCELED') return;
     onSubject({ provider: 'apple', missing: 'apple_capability' });
