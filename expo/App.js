@@ -89,23 +89,29 @@ function Root() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      await prepareNotifications();
-      const saved = await loadSession();
-      if (!alive) return;
-      if (!saved) {
-        setReady(true);
-        return;
-      }
-      tokenRef.current = saved;
-      setToken(saved);
       try {
-        await refresh();
-      } catch {
-        tokenRef.current = null;
-        setToken(null);
-        await saveSession(null);
+        await Promise.race([
+          prepareNotifications(),
+          new Promise((resolve) => setTimeout(resolve, 4000)),
+        ]);
+        const saved = await loadSession();
+        if (!alive) return;
+        if (saved) {
+          tokenRef.current = saved;
+          setToken(saved);
+          try {
+            await refresh();
+          } catch (error) {
+            if (error?.code === 'sign_in_required') {
+              tokenRef.current = null;
+              setToken(null);
+              await saveSession(null);
+            }
+          }
+        }
+      } finally {
+        if (alive) setReady(true);
       }
-      if (alive) setReady(true);
     })();
     return () => {
       alive = false;
@@ -150,15 +156,22 @@ function Root() {
       return;
     }
     setNotice('');
-    const session = await api('/v1/session', {
-      method: 'POST',
-      body: { provider: result.provider, subject: result.subject },
-    });
-    tokenRef.current = session.token;
-    setToken(session.token);
-    setUser(session.user);
-    await saveSession(session.token);
-    await refresh();
+    try {
+      const session = await api('/v1/session', {
+        method: 'POST',
+        body: { provider: result.provider, subject: result.subject },
+      });
+      if (!session?.token) throw new Error('session_missing');
+      tokenRef.current = session.token;
+      setToken(session.token);
+      setUser(session.user);
+      await saveSession(session.token);
+      await refresh();
+    } catch {
+      tokenRef.current = null;
+      setToken(null);
+      setNotice('Could not finish sign-in.');
+    }
   }
 
   async function onAdd(raw) {

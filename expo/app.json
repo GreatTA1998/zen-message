@@ -4,10 +4,19 @@
     "slug": "zen-message",
     "owner": "eltonlin",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e3fc4578-dcc0-44a6-a242-23af1e9e637f",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "plugins": [
+      "expo-updates",
       [
         "expo-notifications",
         {
