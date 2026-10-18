@@ -8,7 +8,6 @@ function person(fields) {
   return {
     ...createState(),
     id: fields.id,
-    username: fields.username,
     mode: fields.mode ?? 'batched',
     pushToken: fields.pushToken ?? null,
     offsetMinutes: fields.offsetMinutes ?? 0,

@@ -1,24 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isUsername, normalizeUsername, searchPeople } from './people.js';
+import { CODE_LENGTH, isCode, normalizeCode } from './people.js';
 
-test('usernames are short and start with a letter', () => {
-  assert.equal(normalizeUsername('  Ada_Bird '), 'ada_bird');
-  assert.equal(isUsername('ada'), true);
-  assert.equal(isUsername('a'), false);
-  assert.equal(isUsername('1ada'), false);
-});
-
-test('search matches usernames and skips people already added', () => {
-  const people = [
-    { id: 'me', username: 'ada' },
-    { id: '1', username: 'pip' },
-    { id: '2', username: 'piper' },
-    { id: '3', username: 'moss' },
-  ];
-  assert.deepEqual(
-    searchPeople(people, 'pip', { selfId: 'me', excludeIds: ['1'] }).map((person) => person.username),
-    ['piper']
-  );
-  assert.deepEqual(searchPeople(people, '   ', { selfId: 'me' }), []);
+test('ids are 3 characters, digits and letters, either case', () => {
+  assert.equal(CODE_LENGTH, 3);
+  assert.equal(normalizeCode('  k7m '), 'K7M');
+  assert.equal(isCode('k7m'), true);
+  assert.equal(isCode('K7M'), true);
+  assert.equal(isCode('K7'), false);
+  assert.equal(isCode('K7MM'), false);
+  assert.equal(isCode('K7-'), false);
 });

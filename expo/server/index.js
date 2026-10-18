@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { createState, reduce } from '../src/delivery.js';
-import { isUsername, normalizeUsername, searchPeople } from '../src/people.js';
+import { CODE_ALPHABET, CODE_LENGTH, isCode, normalizeCode } from '../src/people.js';
 import { changeMode, changeSchedule, deliverMessage, releaseDue } from './deliver.js';
 import { sendExpoPushes } from './push.js';
 
@@ -9,13 +9,24 @@ const users = new Map();
 const sessions = new Map();
 const port = Number(process.env.PORT || 8787);
 
+function mintCode() {
+  for (let attempt = 0; attempt < 48; attempt += 1) {
+    const bytes = randomBytes(CODE_LENGTH);
+    let code = '';
+    for (let index = 0; index < CODE_LENGTH; index += 1) {
+      code += CODE_ALPHABET[bytes[index] % CODE_ALPHABET.length];
+    }
+    if (!users.has(code)) return code;
+  }
+  throw new Error('code_exhausted');
+}
+
 function createUser(provider, subject) {
   return {
     ...createState(),
-    id: randomBytes(8).toString('hex'),
+    id: mintCode(),
     provider,
     subject,
-    username: '',
     pushToken: null,
     offsetMinutes: 0,
     contacts: [],
@@ -33,7 +44,6 @@ function findByIdentity(provider, subject) {
 function publicUser(user) {
   return {
     id: user.id,
-    username: user.username,
     provider: user.provider,
   };
 }
@@ -158,28 +168,6 @@ const server = createServer(async (request, response) => {
     const body = request.method === 'POST' ? await readBody(request) : {};
     applyClock(user, body.offsetMinutes);
 
-    if (request.method === 'POST' && url.pathname === '/v1/username') {
-      const username = normalizeUsername(body.username);
-      if (!isUsername(username)) {
-        send(response, 400, { error: 'username_invalid' });
-        return;
-      }
-      const taken = [...users.values()].some((item) => item.id !== user.id && item.username === username);
-      if (taken) {
-        send(response, 409, { error: 'username_taken' });
-        return;
-      }
-      user.username = username;
-      save(user);
-      send(response, 200, { user: publicUser(user) });
-      return;
-    }
-
-    if (!user.username) {
-      send(response, 409, { error: 'username_required' });
-      return;
-    }
-
     if (request.method === 'GET' && url.pathname === '/v1/inbox') {
       applyClock(user, Number(url.searchParams.get('offset')));
       const effects = releaseUser(user, Date.now());
@@ -189,26 +177,15 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (request.method === 'GET' && url.pathname === '/v1/users') {
-      const people = [...users.values()].filter((item) => item.username);
-      send(response, 200, {
-        people: searchPeople(people, url.searchParams.get('q') || '', {
-          selfId: user.id,
-          excludeIds: user.contacts.map((item) => item.id),
-        }).map((item) => ({ id: item.id, username: item.username })),
-      });
-      return;
-    }
-
     if (request.method === 'POST' && url.pathname === '/v1/contacts') {
-      const username = normalizeUsername(body.username);
-      const found = [...users.values()].find((item) => item.username === username);
+      const code = normalizeCode(body.code);
+      const found = isCode(code) ? users.get(code) : null;
       if (!found || found.id === user.id) {
         send(response, 404, { error: 'person_not_found' });
         return;
       }
       if (!user.contacts.some((item) => item.id === found.id)) {
-        user.contacts = [...user.contacts, { id: found.id, username: found.username }];
+        user.contacts = [...user.contacts, { id: found.id }];
       }
       if (!user.contactId) user.contactId = found.id;
       save(user);
@@ -237,7 +214,6 @@ const server = createServer(async (request, response) => {
       });
       Object.assign(user, result.sender, {
         contacts: user.contacts,
-        username: user.username,
         pushToken: user.pushToken,
         offsetMinutes: user.offsetMinutes,
         provider: user.provider,
@@ -246,7 +222,6 @@ const server = createServer(async (request, response) => {
       });
       Object.assign(recipient, result.recipient, {
         contacts: recipient.contacts,
-        username: recipient.username,
         pushToken: recipient.pushToken,
         offsetMinutes: recipient.offsetMinutes,
         provider: recipient.provider,

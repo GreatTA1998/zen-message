@@ -15,10 +15,11 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR, LOGO } from './src/contacts';
 import { INTENTS, SCHEDULES, scheduleById, threadMessages } from './src/delivery';
-import { LoginView, UsernameView } from './src/LoginView';
+import { LoginView } from './src/LoginView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
+import { isCode, normalizeCode } from './src/people';
+import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
-import { SearchView } from './src/SearchView';
 import { loadSession, saveSession } from './src/session';
 
 function scheduleLines(scheduleId) {
@@ -82,14 +83,10 @@ function Root() {
       setToken(saved);
       try {
         await refresh();
-      } catch (error) {
-        if (error.code === 'username_required') {
-          setUser({ username: '' });
-        } else {
-          tokenRef.current = null;
-          setToken(null);
-          await saveSession(null);
-        }
+      } catch {
+        tokenRef.current = null;
+        setToken(null);
+        await saveSession(null);
       }
       if (alive) setReady(true);
     })();
@@ -99,15 +96,15 @@ function Root() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!token || !user?.username) return undefined;
+    if (!token) return undefined;
     const handle = setInterval(() => {
       refresh().catch(() => {});
     }, 4000);
     return () => clearInterval(handle);
-  }, [refresh, token, user?.username]);
+  }, [refresh, token]);
 
   useEffect(() => {
-    if (!token || !user?.username) return undefined;
+    if (!token) return undefined;
     let alive = true;
     (async () => {
       const pushToken = await readExpoPushToken();
@@ -117,7 +114,7 @@ function Root() {
     return () => {
       alive = false;
     };
-  }, [token, user?.username]);
+  }, [token]);
 
   useEffect(() => {
     const subscription = listenForDigest(() => {
@@ -144,34 +141,22 @@ function Root() {
     setToken(session.token);
     setUser(session.user);
     await saveSession(session.token);
-    if (session.user.username) await refresh();
+    await refresh();
   }
 
-  async function onUsername(value) {
+  async function onAdd(raw) {
+    const code = normalizeCode(raw);
+    if (!isCode(code)) return 'Enter a 3-character ID.';
+    if (code === user?.id) return 'That is your ID.';
     try {
-      const result = await api('/v1/username', { token, method: 'POST', body: { username: value } });
-      setUser(result.user);
-      await refresh();
+      const next = await api('/v1/contacts', { token, method: 'POST', body: { code } });
+      applyInbox(next);
+      setSearching(false);
       return '';
     } catch (error) {
-      if (error.code === 'username_taken') return 'That username is taken.';
-      return 'Use 3–20 letters, numbers, or underscores.';
+      if (error.code === 'person_not_found') return 'No one has that ID.';
+      return 'Could not add that ID.';
     }
-  }
-
-  const onSearch = useCallback(
-    async (query) => {
-      if (!query.trim()) return [];
-      const result = await api(`/v1/users?q=${encodeURIComponent(query)}`, { token });
-      return result.people;
-    },
-    [token]
-  );
-
-  async function onAdd(username) {
-    const next = await api('/v1/contacts', { token, method: 'POST', body: { username } });
-    applyInbox(next);
-    setSearching(false);
   }
 
   if (!ready) return <View style={styles.boot} />;
@@ -179,10 +164,8 @@ function Root() {
   let body = null;
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
-  } else if (!user?.username) {
-    body = <UsernameView onSubmit={onUsername} />;
   } else if (searching) {
-    body = <SearchView onClose={() => setSearching(false)} onSearch={onSearch} onAdd={onAdd} />;
+    body = <PlusView code={user?.id} onClose={() => setSearching(false)} onAdd={onAdd} />;
   } else {
     body = (
       <ChatScreen
@@ -206,6 +189,9 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const [intent, setIntent] = useState('anytime');
   const [menuOpen, setMenuOpen] = useState(false);
   const threadRef = useRef(null);
+  const frameRef = useRef(null);
+  const avatarRefs = useRef({});
+  const [tailX, setTailX] = useState(null);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
   const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
@@ -214,6 +200,23 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const relaxed = state?.mode === 'relaxed';
   const lines = scheduleLines(schedule.id);
   const canSend = Boolean(contact) && draft.trim().length > 0;
+
+  const syncTail = useCallback(() => {
+    const avatar = avatarRefs.current[contact?.id];
+    const frame = frameRef.current;
+    if (!avatar?.measureInWindow || !frame?.measureInWindow) return;
+    avatar.measureInWindow((x, _y, width) => {
+      frame.measureInWindow((frameX, _frameY, frameWidth) => {
+        const center = x + width / 2 - frameX;
+        setTailX(Math.max(20, Math.min(center, frameWidth - 20)));
+      });
+    });
+  }, [contact?.id]);
+
+  useEffect(() => {
+    const handle = requestAnimationFrame(syncTail);
+    return () => cancelAnimationFrame(handle);
+  }, [syncTail, contacts.length, messages.length]);
 
   async function mutate(path, body) {
     const next = await api(path, { token, method: 'POST', body });
@@ -310,22 +313,32 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.contacts}
           style={styles.contactStrip}
+          scrollEventThrottle={16}
+          onScroll={syncTail}
         >
           {contacts.map((item) => {
             const selected = item.id === contact?.id;
             return (
               <Pressable
                 key={item.id}
-                testID={`contact-${item.username}`}
+                testID={`contact-${item.id}`}
                 accessibilityRole="button"
-                accessibilityLabel={item.username}
+                accessibilityLabel={item.id}
                 accessibilityState={{ selected }}
                 onPress={() => mutate('/v1/open', { contactId: item.id })}
                 style={styles.contact}
               >
-                <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatar} />
+                <Image
+                  ref={(node) => {
+                    avatarRefs.current[item.id] = node;
+                  }}
+                  onLayout={syncTail}
+                  source={PERSON_AVATAR}
+                  resizeMode="cover"
+                  style={styles.avatar}
+                />
                 <View style={[styles.contactMark, selected && styles.contactMarkOn]} />
-                <Text style={[styles.contactName, selected && styles.contactNameSelected]}>{item.username}</Text>
+                <Text style={[styles.contactName, selected && styles.contactNameSelected]}>{item.id}</Text>
               </Pressable>
             );
           })}
@@ -344,19 +357,19 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
           </Pressable>
         </ScrollView>
 
-        <ScrollView
-          ref={threadRef}
-          style={styles.thread}
-          contentContainerStyle={styles.threadContent}
-          keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
-        >
-          {messages.map((message) => (
-            <View key={message.id} style={[styles.bubble, message.direction === 'in' && styles.bubbleIn]}>
-              <Text style={styles.bubbleText}>{message.body}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        <View ref={frameRef} style={styles.thread} onLayout={syncTail}>
+          <ScrollView
+            ref={threadRef}
+            style={styles.thread}
+            contentContainerStyle={styles.threadContent}
+            keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
+          >
+            {messages.map((message) => (
+              <Bubble key={message.id} message={message} tailX={tailX} />
+            ))}
+          </ScrollView>
+        </View>
 
         <View style={styles.footer}>
           <View style={styles.intents}>
@@ -402,6 +415,39 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
         </View>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+function Bubble({ message, tailX }) {
+  const incoming = message.direction === 'in';
+  const [width, setWidth] = useState(0);
+  if (!incoming) {
+    return (
+      <View style={styles.bubble}>
+        <Text style={styles.bubbleText}>{message.body}</Text>
+        <View testID="tail-own" style={styles.ownTail}>
+          <View style={styles.ownTailInk} />
+          <View style={styles.ownTailPaper} />
+          <View style={styles.ownTailJoin} />
+        </View>
+      </View>
+    );
+  }
+  const tailLeft = Math.max(8, (tailX ?? 34) - 16 - 9);
+  const minWidth = Math.max(72, tailLeft + 30);
+  return (
+    <View
+      testID="bubble-in"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={[styles.bubble, styles.bubbleIn, { minWidth: Math.min(minWidth, Math.max(width, minWidth)) }]}
+    >
+      <View testID="tail-in" style={[styles.theirTail, { left: Math.min(tailLeft, Math.max(minWidth, width) - 26) }]}>
+        <View style={styles.theirTailInk} />
+        <View style={styles.theirTailPaper} />
+        <View style={styles.theirTailJoin} />
+      </View>
+      <Text style={styles.bubbleText}>{message.body}</Text>
+    </View>
   );
 }
 
@@ -461,19 +507,76 @@ const styles = StyleSheet.create({
   contactName: { marginTop: 4, fontSize: 12, lineHeight: 15, color: ink },
   contactNameSelected: { fontWeight: '700' },
   thread: { flex: 1 },
-  threadContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 20, gap: 12 },
+  threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 28, gap: 14, overflow: 'visible' },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
     borderWidth: 1,
     borderColor: ink,
     borderRadius: 18,
-    borderBottomRightRadius: 5,
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: paper,
+    overflow: 'visible',
+    marginBottom: 6,
   },
-  bubbleIn: { alignSelf: 'flex-start', borderBottomRightRadius: 18, borderBottomLeftRadius: 5 },
+  bubbleIn: { alignSelf: 'flex-start', maxWidth: '100%', marginTop: 8, marginBottom: 0 },
+  ownTail: { position: 'absolute', right: 6, bottom: -11, width: 18, height: 12 },
+  ownTailInk: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 16,
+    borderRightWidth: 2,
+    borderTopWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: ink,
+  },
+  ownTailPaper: {
+    position: 'absolute',
+    right: 1,
+    bottom: 2,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 12,
+    borderRightWidth: 1,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: paper,
+  },
+  ownTailJoin: { position: 'absolute', right: 2, top: -1, width: 12, height: 3, backgroundColor: paper },
+  theirTail: { position: 'absolute', top: -11, width: 18, height: 12, zIndex: 1 },
+  theirTailInk: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 9,
+    borderRightWidth: 9,
+    borderBottomWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: ink,
+  },
+  theirTailPaper: {
+    position: 'absolute',
+    left: 2,
+    top: 3,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderBottomWidth: 9,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: paper,
+  },
+  theirTailJoin: { position: 'absolute', left: 2, bottom: -2, width: 14, height: 4, backgroundColor: paper },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { borderTopWidth: 1, borderTopColor: ink, backgroundColor: paper },
   intents: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: ink },

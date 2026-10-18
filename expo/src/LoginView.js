@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import { LOGO } from './contacts';
@@ -99,42 +98,6 @@ async function signInWithApple(onSubject) {
   }
 }
 
-export function UsernameView({ onSubmit }) {
-  const [value, setValue] = useState('');
-  const [error, setError] = useState('');
-  return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Choose a username</Text>
-      <Text style={styles.help}>Other people search for this name.</Text>
-      <TextInput
-        testID="username"
-        value={value}
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={(next) => {
-          setError('');
-          setValue(next);
-        }}
-        placeholder="username"
-        placeholderTextColor="#8a8a8a"
-        style={styles.input}
-      />
-      {error ? <Text style={styles.notice}>{error}</Text> : null}
-      <Pressable
-        testID="username-continue"
-        accessibilityRole="button"
-        onPress={async () => {
-          const result = await onSubmit(value);
-          if (result) setError(result);
-        }}
-        style={[styles.provider, styles.apple]}
-      >
-        <Text style={[styles.providerText, styles.appleText]}>Continue</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 const ink = '#1c1c1c';
 const paper = '#fff';
 
@@ -163,12 +126,6 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     marginBottom: 8,
   },
-  help: {
-    color: ink,
-    fontSize: 16,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
   provider: {
     width: '100%',
     minHeight: 52,
@@ -191,16 +148,6 @@ const styles = StyleSheet.create({
   },
   appleText: {
     color: paper,
-  },
-  input: {
-    width: '100%',
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    fontSize: 17,
-    color: ink,
   },
   notice: {
     color: ink,
