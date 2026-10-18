@@ -10,26 +10,26 @@ function fail(code) {
   throw error;
 }
 
-function bytes(length) {
-  const out = new Uint8Array(length);
-  globalThis.crypto.getRandomValues(out);
-  return out;
-}
-
-function hex(length) {
-  return [...bytes(length)].map((value) => value.toString(16).padStart(2, '0')).join('');
-}
-
-function mintCode(users) {
-  for (let attempt = 0; attempt < 48; attempt += 1) {
-    let code = '';
-    const sample = bytes(CODE_LENGTH);
-    for (let index = 0; index < CODE_LENGTH; index += 1) {
-      code += CODE_ALPHABET[sample[index] % CODE_ALPHABET.length];
+async function defaultBytes(length) {
+  const read = globalThis.crypto?.getRandomValues;
+  if (typeof read === 'function') {
+    try {
+      const out = new Uint8Array(length);
+      read.call(globalThis.crypto, out);
+      return out;
+    } catch {
+      // Hermes can expose crypto without a working getRandomValues.
     }
-    if (!users[code]) return code;
   }
-  fail('code_exhausted');
+  try {
+    const Crypto = await import('expo-crypto');
+    if (typeof Crypto.getRandomBytes === 'function') return Crypto.getRandomBytes(length);
+  } catch {
+    // Node has no native Expo crypto module. The phone does.
+  }
+  const out = new Uint8Array(length);
+  for (let index = 0; index < length; index += 1) out[index] = Math.floor(Math.random() * 256);
+  return out;
 }
 
 function publicUser(user) {
@@ -96,8 +96,30 @@ function findByIdentity(state, provider, subject) {
   return Object.values(state.users).find((user) => user.provider === provider && user.subject === subject) ?? null;
 }
 
-export function createDeviceApi(storage) {
+export function createDeviceApi(storage, randomBytes = defaultBytes) {
   let chain = Promise.resolve();
+
+  async function bytes(length) {
+    const sample = await randomBytes(length);
+    return sample instanceof Uint8Array ? sample : Uint8Array.from(sample);
+  }
+
+  async function hex(length) {
+    const sample = await bytes(length);
+    return [...sample].map((value) => value.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function mintCode(users) {
+    for (let attempt = 0; attempt < 48; attempt += 1) {
+      let code = '';
+      const sample = await bytes(CODE_LENGTH);
+      for (let index = 0; index < CODE_LENGTH; index += 1) {
+        code += CODE_ALPHABET[sample[index] % CODE_ALPHABET.length];
+      }
+      if (!users[code]) return code;
+    }
+    fail('code_exhausted');
+  }
 
   function exclusive(work) {
     const run = chain.then(work, work);
@@ -139,7 +161,7 @@ export function createDeviceApi(storage) {
         existing ??
         {
           ...createState(),
-          id: mintCode(state.users),
+          id: await mintCode(state.users),
           provider,
           subject,
           pushToken: null,
@@ -148,7 +170,7 @@ export function createDeviceApi(storage) {
           pendingEffects: [],
         };
       state.users[user.id] = user;
-      const sessionToken = hex(24);
+      const sessionToken = await hex(24);
       state.sessions[sessionToken] = user.id;
       await save(state);
       return { token: sessionToken, user: publicUser(user) };
@@ -190,7 +212,7 @@ export function createDeviceApi(storage) {
       const recipient = state.users[body?.contactId];
       if (!recipient || !user.contacts.some((item) => item.id === recipient.id)) fail('person_not_found');
       const result = deliverMessage(user, recipient, {
-        id: hex(8),
+        id: await hex(8),
         body: body?.body,
         photo: body?.photo,
         intent: body?.intent,

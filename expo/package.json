@@ -28,7 +28,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "server": "node server/index.js",
-    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js server/deliver.test.js"
+    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js server/deliver.test.js"
   },
   "private": true
 }

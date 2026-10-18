@@ -2,6 +2,24 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDeviceApi, memoryStorage } from './deviceApi.js';
 
+test('an Apple credential opens a session when the phone has no Web Crypto', async () => {
+  const api = createDeviceApi(memoryStorage(), (length) => new Uint8Array(length).fill(4));
+  const previous = globalThis.crypto;
+  Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+  try {
+    const session = await api('/v1/session', {
+      method: 'POST',
+      body: { provider: 'apple', subject: 'apple-user-001' },
+    });
+    assert.equal(session.token, '04'.repeat(24));
+    assert.equal(session.user.id, '555');
+    const inbox = await api('/v1/inbox?offset=0', { token: session.token });
+    assert.equal(inbox.user.id, '555');
+  } finally {
+    Object.defineProperty(globalThis, 'crypto', { value: previous, configurable: true });
+  }
+});
+
 test('an Apple credential opens a session on the device', async () => {
   const api = createDeviceApi(memoryStorage());
   const session = await api('/v1/session', {

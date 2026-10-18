@@ -33,6 +33,7 @@ import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
+import { acceptAppleCredential } from './src/signIn';
 
 function scheduleLabel(state) {
   const relaxed = state?.mode === 'relaxed';
@@ -155,22 +156,25 @@ function Root() {
       setNotice(MISSING[result.missing] || 'Sign-in is not available on this device.');
       return;
     }
-    setNotice('');
-    try {
-      const session = await api('/v1/session', {
-        method: 'POST',
-        body: { provider: result.provider, subject: result.subject },
-      });
-      if (!session?.token) throw new Error('session_missing');
-      tokenRef.current = session.token;
-      setToken(session.token);
-      setUser(session.user);
-      await saveSession(session.token);
-      await refresh();
-    } catch {
+    const outcome = await acceptAppleCredential(
+      { user: result.subject },
+      {
+        request: api,
+        saveSession,
+        loadSession,
+        refresh: async (session) => {
+          tokenRef.current = session.token;
+          setToken(session.token);
+          setUser(session.user);
+          await refresh();
+        },
+      }
+    );
+    setNotice(outcome.notice);
+    if (!outcome.token) {
       tokenRef.current = null;
       setToken(null);
-      setNotice('Could not finish sign-in.');
+      setUser(null);
     }
   }
 
