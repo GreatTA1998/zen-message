@@ -11,10 +11,11 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR, LOGO } from './src/contacts';
-import { INTENTS, SCHEDULES, scheduleById, threadMessages } from './src/delivery';
+import { INTENTS, SCHEDULES, messagePhoto, scheduleById, threadMessages } from './src/delivery';
 import { LoginView } from './src/LoginView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
@@ -188,6 +189,7 @@ function Root() {
 
 function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const [draft, setDraft] = useState('');
+  const [photo, setPhoto] = useState(null);
   const [intent, setIntent] = useState('anytime');
   const [menuOpen, setMenuOpen] = useState(false);
   const threadRef = useRef(null);
@@ -201,7 +203,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const schedule = scheduleById(state?.scheduleId);
   const relaxed = state?.mode === 'relaxed';
   const label = scheduleLabel(schedule.id, relaxed);
-  const canSend = Boolean(contact) && draft.trim().length > 0;
+  const canSend = Boolean(contact) && (draft.trim().length > 0 || Boolean(photo));
 
   const syncTail = useCallback(() => {
     const avatar = avatarRefs.current[contact?.id];
@@ -231,16 +233,37 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
 
   function send(text = draft) {
     const body = text.trim();
-    if (!body || !contact) return;
+    if ((!body && !photo) || !contact) return;
+    const attached = photo;
     setDraft('');
-    mutate('/v1/messages', { contactId: contact.id, body, intent }).catch(() => {});
+    setPhoto(null);
+    mutate('/v1/messages', { contactId: contact.id, body, photo: attached, intent }).catch(() => {});
+  }
+
+  async function attach(source) {
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    const options = { mediaTypes: ['images'], quality: 0.4, base64: true, exif: false };
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+    const asset = result.canceled ? null : result.assets?.[0];
+    if (!asset || asset.type === 'video' || String(asset.mimeType || '').startsWith('video/')) return;
+    const mime = String(asset.mimeType || 'image/jpeg');
+    const subtype = mime.slice('image/'.length).split(';')[0] || 'jpeg';
+    const next = asset.base64 ? messagePhoto(`data:image/${subtype};base64,${asset.base64}`) : null;
+    if (next) setPhoto(next);
   }
 
   function onChangeDraft(value) {
     if (Platform.OS === 'web' && value.endsWith('\n')) {
       const next = value.replace(/\n+$/, '');
       setDraft(next);
-      if (next.trim()) send(next);
+      if (next.trim() || photo) send(next);
       return;
     }
     setDraft(value);
@@ -386,7 +409,38 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               );
             })}
           </View>
+          {photo ? (
+            <View style={styles.previewRow}>
+              <Image testID="photo-preview" source={{ uri: photo }} style={styles.preview} />
+              <Pressable
+                testID="photo-clear"
+                accessibilityRole="button"
+                accessibilityLabel="Remove photo"
+                onPress={() => setPhoto(null)}
+              >
+                <Text style={styles.previewClear}>Remove</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.composer}>
+            <Pressable
+              testID="attach-library"
+              accessibilityRole="button"
+              accessibilityLabel="Camera roll"
+              onPress={() => attach('library')}
+              style={styles.attach}
+            >
+              <Text style={styles.attachText}>Roll</Text>
+            </Pressable>
+            <Pressable
+              testID="attach-camera"
+              accessibilityRole="button"
+              accessibilityLabel="Camera"
+              onPress={() => attach('camera')}
+              style={styles.attach}
+            >
+              <Text style={styles.attachText}>Camera</Text>
+            </Pressable>
             <TextInput
               testID="composer"
               value={draft}
@@ -419,7 +473,7 @@ function Bubble({ message, tailX }) {
   if (!incoming) {
     return (
       <View style={styles.bubble}>
-        <Text style={styles.bubbleText}>{message.body}</Text>
+        <BubbleBody message={message} />
         <View testID="tail-own" style={styles.ownTail}>
           <View style={styles.ownTailInk} />
           <View style={styles.ownTailPaper} />
@@ -441,8 +495,19 @@ function Bubble({ message, tailX }) {
         <View style={styles.theirTailPaper} />
         <View style={styles.theirTailJoin} />
       </View>
-      <Text style={styles.bubbleText}>{message.body}</Text>
+      <BubbleBody message={message} />
     </View>
+  );
+}
+
+function BubbleBody({ message }) {
+  return (
+    <>
+      {message.photo ? (
+        <Image testID="bubble-photo" source={{ uri: message.photo }} resizeMode="cover" style={styles.bubblePhoto} />
+      ) : null}
+      {message.body ? <Text style={styles.bubbleText}>{message.body}</Text> : null}
+    </>
   );
 }
 
@@ -586,7 +651,27 @@ const styles = StyleSheet.create({
   intentBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: ink },
   intentText: { color: ink, fontSize: 14, textAlign: 'center', lineHeight: 18 },
   intentTextSelected: { fontWeight: '700' },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: ink,
+  },
+  preview: { width: 48, height: 48, borderWidth: 1, borderColor: ink },
+  previewClear: { color: ink, fontSize: 15 },
   composer: { flexDirection: 'row', alignItems: 'stretch', minHeight: 76 },
+  attach: {
+    width: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: ink,
+  },
+  attachText: { color: ink, fontSize: 13 },
+  bubblePhoto: { width: 180, height: 140, borderRadius: 10, marginBottom: 6 },
   input: {
     flex: 1,
     minHeight: 76,

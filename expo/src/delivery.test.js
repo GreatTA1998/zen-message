@@ -21,6 +21,7 @@ function send(state, fields, now) {
     contactId: fields.contactId ?? 'wren',
     contactName: fields.contactName ?? 'Wren',
     body: fields.body,
+    photo: fields.photo,
     intent: fields.intent,
     now: now.getTime(),
   });
@@ -193,6 +194,31 @@ test('digest copy stays a single notice for many contacts', () => {
   assert.equal(plan.body, '4 messages · Wren, Pip +2');
   assert.equal(JSON.stringify(plan).includes('relax'), false);
   assert.equal(JSON.stringify(plan).includes('batched'), false);
+});
+
+test('a photo uses the same delivery as text and is not a video', () => {
+  const photo = 'data:image/png;base64,aaaa';
+  const batched = send(createState(), { id: 'p', body: '', photo, intent: 'anytime' }, at(10, 15));
+  assert.equal(batched.state.messages[0].visible, false);
+  assert.equal(batched.state.messages[0].photo, photo);
+  assert.equal(batched.effects[0].plan.body, 'Wren: Photo');
+  assert.equal(JSON.stringify(batched.effects).includes('base64'), false);
+
+  const relaxed = reduce(createState(), { type: 'set-mode', mode: 'relaxed' });
+  const shown = send(relaxed.state, { id: 'p2', body: '', photo, intent: 'anytime' }, at(10, 15));
+  assert.equal(shown.state.messages[0].visible, true);
+  assert.deepEqual(shown.effects, []);
+
+  const timely = send(createState(), { id: 'p3', body: 'Look', photo, intent: 'timely' }, at(10, 15));
+  assert.equal(timely.state.messages[0].visible, true);
+  assert.equal(timely.effects[0].plan.body, 'Look');
+  assert.equal(timely.effects[0].plan.quiet, true);
+
+  const state = createState();
+  assert.equal(
+    send(state, { id: 'v', body: '', photo: 'data:video/mp4;base64,aaaa', intent: 'realtime' }, at(10, 0)).state,
+    state
+  );
 });
 
 test('blank sends and unknown intents do nothing', () => {

@@ -15,7 +15,15 @@
         }
       ],
       "expo-web-browser",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Zen Message uses photos you choose to send.",
+          "cameraPermission": "Zen Message uses the camera to take a photo to send.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "ios": {
       "bundleIdentifier": "com.greatta1998.zenmessage",

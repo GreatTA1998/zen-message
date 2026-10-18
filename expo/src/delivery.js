@@ -88,11 +88,36 @@ export function threadMessages(messages, contactId) {
   return messages.filter((item) => item.contactId === contactId && item.visible);
 }
 
+export function messagePhoto(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([a-z0-9+/=\s]+)$/i.exec(value.trim());
+  if (!match) return null;
+  const payload = match[2].replace(/\s+/g, '');
+  if (!payload || payload.length > 900000) return null;
+  const type = match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase();
+  return `data:image/${type};base64,${payload}`;
+}
+
+function messageBody(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function noticeText(body, photo) {
+  return body || (photo ? 'Photo' : '');
+}
+
+function readContent(action) {
+  const body = messageBody(action.body);
+  const photo = messagePhoto(action.photo);
+  if ((!body && !photo) || !INTENT_IDS.has(action.intent)) return null;
+  return { body, photo };
+}
+
 export function immediatePlan(message) {
   const quiet = message.intent === 'timely';
   return {
     title: message.contactName,
-    body: message.body,
+    body: noticeText(message.body, message.photo),
     quiet,
     data: {
       kind: quiet ? 'timely' : 'realtime',
@@ -110,7 +135,7 @@ export function digestPlan(messages) {
   }
   const body =
     ordered.length === 1
-      ? `${ordered[0].contactName}: ${ordered[0].body}`
+      ? `${ordered[0].contactName}: ${noticeText(ordered[0].body, ordered[0].photo)}`
       : `${ordered.length} messages · ${
           names.length <= 3 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`
         }`;
@@ -198,13 +223,14 @@ function setSchedule(state, scheduleId, now, offsetMinutes) {
 }
 
 function outgoing(state, action, now) {
-  const body = typeof action.body === 'string' ? action.body.trim() : '';
-  if (!body || !INTENT_IDS.has(action.intent)) return { state, effects: [] };
+  const content = readContent(action);
+  if (!content) return { state, effects: [] };
   const message = {
     id: action.id,
     contactId: action.contactId,
     contactName: action.contactName,
-    body,
+    body: content.body,
+    photo: content.photo,
     intent: action.intent,
     createdAt: now,
     visible: true,
@@ -215,13 +241,14 @@ function outgoing(state, action, now) {
 }
 
 function send(state, action, now) {
-  const body = typeof action.body === 'string' ? action.body.trim() : '';
-  if (!body || !INTENT_IDS.has(action.intent)) return { state, effects: [] };
+  const content = readContent(action);
+  if (!content) return { state, effects: [] };
   const message = {
     id: action.id,
     contactId: action.contactId,
     contactName: action.contactName,
-    body,
+    body: content.body,
+    photo: content.photo,
     intent: action.intent,
     createdAt: now,
     visible: false,
@@ -292,12 +319,15 @@ function finishDigest(state, effects) {
 }
 
 function isMessage(value) {
+  const photo = value?.photo == null || value.photo === '' ? null : messagePhoto(value.photo);
   return (
     value &&
     typeof value.id === 'string' &&
     typeof value.contactId === 'string' &&
     typeof value.contactName === 'string' &&
     typeof value.body === 'string' &&
+    (value.photo == null || value.photo === '' || Boolean(photo)) &&
+    (value.body.trim() || photo) &&
     INTENT_IDS.has(value.intent) &&
     typeof value.createdAt === 'number' &&
     typeof value.visible === 'boolean'

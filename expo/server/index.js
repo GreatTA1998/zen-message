@@ -213,6 +213,7 @@ const server = createServer(async (request, response) => {
       const result = deliverMessage(user, recipient, {
         id: randomBytes(8).toString('hex'),
         body: body.body,
+        photo: body.photo,
         intent: body.intent,
         now: Date.now(),
       });
