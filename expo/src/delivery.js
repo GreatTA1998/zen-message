@@ -17,7 +17,7 @@ export function createState() {
   return {
     mode: 'batched',
     scheduleId: 'daily-1-7',
-    contactId: 'wren',
+    contactId: null,
     messages: [],
     digest: null,
   };
@@ -27,21 +27,48 @@ export function scheduleById(id) {
   return SCHEDULES.find((item) => item.id === id) ?? SCHEDULES[0];
 }
 
-export function nextWindow(now, scheduleId) {
+export function nextWindow(now, scheduleId, offsetMinutes) {
   const date = now instanceof Date ? now : new Date(now);
+  if (offsetMinutes == null) {
+    return nextWindowLocal(date, scheduleId);
+  }
+  return nextWindowZoned(date.getTime(), scheduleId, offsetMinutes);
+}
+
+function scheduleHours(scheduleId) {
+  if (scheduleId === 'hourly') return null;
+  if (scheduleId === 'daily-8') return [8];
+  if (scheduleId === 'every-3-hours') return [0, 3, 6, 9, 12, 15, 18, 21];
+  return [13, 19];
+}
+
+function nextWindowLocal(date, scheduleId) {
   if (scheduleId === 'hourly') {
     const next = new Date(date);
     next.setMinutes(0, 0, 0);
     next.setHours(next.getHours() + 1);
     return next;
   }
-  if (scheduleId === 'daily-8') {
-    return nextClockTime(date, [8]);
+  return nextClockTime(date, scheduleHours(scheduleId));
+}
+
+function nextWindowZoned(nowMs, scheduleId, offsetMinutes) {
+  const local = new Date(nowMs - offsetMinutes * 60000);
+  const year = local.getUTCFullYear();
+  const month = local.getUTCMonth();
+  const day = local.getUTCDate();
+  const current = local.getUTCHours() * 60 + local.getUTCMinutes() + local.getUTCSeconds() / 60;
+  if (scheduleId === 'hourly') {
+    const nextHour = local.getUTCHours() + 1;
+    return new Date(Date.UTC(year, month, day, nextHour, 0, 0) + offsetMinutes * 60000);
   }
-  if (scheduleId === 'every-3-hours') {
-    return nextClockTime(date, [0, 3, 6, 9, 12, 15, 18, 21]);
+  const hours = scheduleHours(scheduleId);
+  for (const hour of hours) {
+    if (hour * 60 > current) {
+      return new Date(Date.UTC(year, month, day, hour, 0, 0) + offsetMinutes * 60000);
+    }
   }
-  return nextClockTime(date, [13, 19]);
+  return new Date(Date.UTC(year, month, day + 1, hours[0], 0, 0) + offsetMinutes * 60000);
 }
 
 function nextClockTime(now, hours) {
@@ -117,9 +144,11 @@ export function reduce(state, action) {
     case 'set-mode':
       return setMode(state, action.mode);
     case 'set-schedule':
-      return setSchedule(state, action.scheduleId, now);
+      return setSchedule(state, action.scheduleId, now, action.offsetMinutes);
     case 'send':
       return send(state, action, now);
+    case 'outgoing':
+      return outgoing(state, action, now);
     case 'release':
       return release(state, now);
     case 'shown':
@@ -145,13 +174,13 @@ function setMode(state, mode) {
   };
 }
 
-function setSchedule(state, scheduleId, now) {
+function setSchedule(state, scheduleId, now, offsetMinutes) {
   if (!SCHEDULES.some((item) => item.id === scheduleId)) return { state, effects: [] };
   if (scheduleId === state.scheduleId) return { state, effects: [] };
   if (!state.digest || state.digest.presented) {
     return { state: { ...state, scheduleId }, effects: [] };
   }
-  const at = nextWindow(new Date(now), scheduleId).getTime();
+  const at = nextWindow(new Date(now), scheduleId, offsetMinutes).getTime();
   const ids = new Set(state.digest.messageIds);
   const messages = state.messages.map((item) =>
     ids.has(item.id) && !item.visible ? { ...item, releaseAt: at } : item
@@ -168,6 +197,23 @@ function setSchedule(state, scheduleId, now) {
   };
 }
 
+function outgoing(state, action, now) {
+  const body = typeof action.body === 'string' ? action.body.trim() : '';
+  if (!body || !INTENT_IDS.has(action.intent)) return { state, effects: [] };
+  const message = {
+    id: action.id,
+    contactId: action.contactId,
+    contactName: action.contactName,
+    body,
+    intent: action.intent,
+    createdAt: now,
+    visible: true,
+    releaseAt: null,
+    direction: 'out',
+  };
+  return { state: { ...state, messages: [...state.messages, message] }, effects: [] };
+}
+
 function send(state, action, now) {
   const body = typeof action.body === 'string' ? action.body.trim() : '';
   if (!body || !INTENT_IDS.has(action.intent)) return { state, effects: [] };
@@ -180,6 +226,7 @@ function send(state, action, now) {
     createdAt: now,
     visible: false,
     releaseAt: null,
+    direction: 'in',
   };
 
   if (message.intent === 'timely' || message.intent === 'realtime') {
@@ -197,7 +244,7 @@ function send(state, action, now) {
     };
   }
 
-  const at = nextWindow(new Date(now), state.scheduleId).getTime();
+  const at = nextWindow(new Date(now), state.scheduleId, action.offsetMinutes).getTime();
   const messages = [...state.messages, { ...message, releaseAt: at }].map((item) =>
     item.intent === 'anytime' && !item.visible ? { ...item, releaseAt: at } : item
   );

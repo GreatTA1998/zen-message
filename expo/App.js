@@ -12,23 +12,14 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { CONTACTS, LOGO } from './src/contacts';
-import {
-  INTENTS,
-  SCHEDULES,
-  createState,
-  digestPlan,
-  reduce,
-  sanitize,
-  scheduleById,
-  threadMessages,
-} from './src/delivery';
+import { api, inboxPath } from './src/api';
+import { PERSON_AVATAR, LOGO } from './src/contacts';
+import { INTENTS, SCHEDULES, scheduleById, threadMessages } from './src/delivery';
+import { LoginView, UsernameView } from './src/LoginView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
-import { loadState, saveState } from './src/storage';
-
-function uid() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import { readExpoPushToken } from './src/push';
+import { SearchView } from './src/SearchView';
+import { loadSession, saveSession } from './src/session';
 
 function scheduleLines(scheduleId) {
   if (scheduleId === 'daily-1-7') return ['Batched daily', '1pm, 7pm'];
@@ -37,73 +28,67 @@ function scheduleLines(scheduleId) {
   return ['Every 3 hours'];
 }
 
+const MISSING = {
+  google_oauth_client: 'Google sign-in needs a Google OAuth client.',
+  apple_capability: 'Apple sign-in needs the Apple capability on this device.',
+};
+
 export default function App() {
   return (
     <SafeAreaProvider style={styles.provider}>
       <StatusBar style="dark" />
-      <ChatScreen />
+      <Root />
     </SafeAreaProvider>
   );
 }
 
-function ChatScreen() {
-  const [state, setState] = useState(createState);
+function Root() {
   const [ready, setReady] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [intent, setIntent] = useState('anytime');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const stateRef = useRef(state);
-  const threadRef = useRef(null);
-  const queue = useRef(Promise.resolve());
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [inbox, setInbox] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [searching, setSearching] = useState(false);
+  const tokenRef = useRef(null);
 
-  const commit = useCallback((next) => {
-    stateRef.current = next;
-    setState(next);
-    return saveState(next);
+  const applyInbox = useCallback((next) => {
+    setInbox(next);
+    if (next?.user) setUser(next.user);
   }, []);
 
-  const apply = useCallback(
-    async (action) => {
-      const run = queue.current.then(async () => {
-        const current = stateRef.current;
-        const { state: next, effects } = reduce(current, { ...action, now: Date.now() });
-        await commit(next);
-        const { scheduled } = await runNotificationEffects(effects);
-        if (!scheduled) return;
-        const latest = stateRef.current;
-        if (!latest.digest || latest.digest.presented || latest.digest.at !== next.digest?.at) return;
-        await commit({
-          ...latest,
-          digest: { ...latest.digest, platformScheduled: true },
-        });
-      });
-      queue.current = run.catch(() => {});
-      return run;
-    },
-    [commit]
-  );
+  const refresh = useCallback(async () => {
+    const current = tokenRef.current;
+    if (!current) return null;
+    const next = await api(inboxPath(), { token: current });
+    applyInbox(next);
+    if (next.effects?.length) {
+      await runNotificationEffects(next.effects);
+      await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
+    }
+    return next;
+  }, [applyInbox]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       await prepareNotifications();
-      const loaded = sanitize(await loadState());
-      if (!CONTACTS.some((contact) => contact.id === loaded.contactId)) {
-        loaded.contactId = CONTACTS[0].id;
-      }
-      const { state: released, effects } = reduce(loaded, { type: 'release', now: Date.now() });
-      const extra = [];
-      if (released.digest && !released.digest.presented && !released.digest.platformScheduled) {
-        const held = released.messages.filter((item) => released.digest.messageIds.includes(item.id));
-        if (held.length) extra.push({ type: 'schedule-digest', at: released.digest.at, plan: digestPlan(held) });
-      }
+      const saved = await loadSession();
       if (!alive) return;
-      await commit(released);
-      const { scheduled } = await runNotificationEffects([...effects, ...extra]);
-      if (scheduled && alive) {
-        const latest = stateRef.current;
-        if (latest.digest && !latest.digest.presented) {
-          await commit({ ...latest, digest: { ...latest.digest, platformScheduled: true } });
+      if (!saved) {
+        setReady(true);
+        return;
+      }
+      tokenRef.current = saved;
+      setToken(saved);
+      try {
+        await refresh();
+      } catch (error) {
+        if (error.code === 'username_required') {
+          setUser({ username: '' });
+        } else {
+          tokenRef.current = null;
+          setToken(null);
+          await saveSession(null);
         }
       }
       if (alive) setReady(true);
@@ -111,43 +96,139 @@ function ChatScreen() {
     return () => {
       alive = false;
     };
-  }, [commit]);
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!token || !user?.username) return undefined;
+    const handle = setInterval(() => {
+      refresh().catch(() => {});
+    }, 4000);
+    return () => clearInterval(handle);
+  }, [refresh, token, user?.username]);
+
+  useEffect(() => {
+    if (!token || !user?.username) return undefined;
+    let alive = true;
+    (async () => {
+      const pushToken = await readExpoPushToken();
+      if (!alive || !pushToken) return;
+      await api('/v1/push-token', { token, method: 'POST', body: { token: pushToken } });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [token, user?.username]);
 
   useEffect(() => {
     const subscription = listenForDigest(() => {
-      apply({ type: 'shown' });
+      const current = tokenRef.current;
+      if (!current) return;
+      api('/v1/shown', { token: current, method: 'POST', body: {} })
+        .then(applyInbox)
+        .catch(() => {});
     });
     return () => subscription.remove();
-  }, [apply]);
+  }, [applyInbox]);
 
-  useEffect(() => {
-    if (!state.digest || state.digest.presented) return undefined;
-    const delay = Math.max(0, state.digest.at - Date.now());
-    const handle = setTimeout(() => {
-      apply({ type: 'release' });
-    }, delay);
-    return () => clearTimeout(handle);
-  }, [apply, state.digest]);
+  async function onSubject(result) {
+    if (result.missing) {
+      setNotice(MISSING[result.missing] || 'Sign-in is not available on this device.');
+      return;
+    }
+    setNotice('');
+    const session = await api('/v1/session', {
+      method: 'POST',
+      body: { provider: result.provider, subject: result.subject },
+    });
+    tokenRef.current = session.token;
+    setToken(session.token);
+    setUser(session.user);
+    await saveSession(session.token);
+    if (session.user.username) await refresh();
+  }
 
-  const contact = CONTACTS.find((item) => item.id === state.contactId) ?? CONTACTS[0];
-  const messages = threadMessages(state.messages, contact.id);
-  const schedule = scheduleById(state.scheduleId);
-  const relaxed = state.mode === 'relaxed';
+  async function onUsername(value) {
+    try {
+      const result = await api('/v1/username', { token, method: 'POST', body: { username: value } });
+      setUser(result.user);
+      await refresh();
+      return '';
+    } catch (error) {
+      if (error.code === 'username_taken') return 'That username is taken.';
+      return 'Use 3–20 letters, numbers, or underscores.';
+    }
+  }
+
+  const onSearch = useCallback(
+    async (query) => {
+      if (!query.trim()) return [];
+      const result = await api(`/v1/users?q=${encodeURIComponent(query)}`, { token });
+      return result.people;
+    },
+    [token]
+  );
+
+  async function onAdd(username) {
+    const next = await api('/v1/contacts', { token, method: 'POST', body: { username } });
+    applyInbox(next);
+    setSearching(false);
+  }
+
+  if (!ready) return <View style={styles.boot} />;
+
+  let body = null;
+  if (!token) {
+    body = <LoginView onSubject={onSubject} notice={notice} />;
+  } else if (!user?.username) {
+    body = <UsernameView onSubmit={onUsername} />;
+  } else if (searching) {
+    body = <SearchView onClose={() => setSearching(false)} onSearch={onSearch} onAdd={onAdd} />;
+  } else {
+    body = (
+      <ChatScreen
+        token={token}
+        inbox={inbox}
+        onInbox={applyInbox}
+        onSearch={() => setSearching(true)}
+      />
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.frame} edges={['top', 'bottom']}>
+      {body}
+    </SafeAreaView>
+  );
+}
+
+function ChatScreen({ token, inbox, onInbox, onSearch }) {
+  const [draft, setDraft] = useState('');
+  const [intent, setIntent] = useState('anytime');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const threadRef = useRef(null);
+  const state = inbox?.state;
+  const contacts = inbox?.contacts ?? [];
+  const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
+  const messages = contact && state ? threadMessages(state.messages, contact.id) : [];
+  const schedule = scheduleById(state?.scheduleId);
+  const relaxed = state?.mode === 'relaxed';
   const lines = scheduleLines(schedule.id);
-  const canSend = draft.trim().length > 0;
+  const canSend = Boolean(contact) && draft.trim().length > 0;
+
+  async function mutate(path, body) {
+    const next = await api(path, { token, method: 'POST', body });
+    onInbox(next);
+    if (next.effects?.length) {
+      await runNotificationEffects(next.effects);
+      await api('/v1/effects/ack', { token, method: 'POST', body: {} });
+    }
+  }
 
   function send(text = draft) {
     const body = text.trim();
-    if (!body) return;
+    if (!body || !contact) return;
     setDraft('');
-    apply({
-      type: 'send',
-      id: uid(),
-      body,
-      intent,
-      contactId: contact.id,
-      contactName: contact.name,
-    });
+    mutate('/v1/messages', { contactId: contact.id, body, intent }).catch(() => {});
   }
 
   function onChangeDraft(value) {
@@ -160,16 +241,9 @@ function ChatScreen() {
     setDraft(value);
   }
 
-  if (!ready) {
-    return <View style={styles.boot} />;
-  }
-
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <SafeAreaView style={styles.phone} edges={['top', 'bottom']}>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.phone}>
         <View style={styles.top}>
           <View style={styles.header}>
             <Pressable
@@ -177,7 +251,7 @@ function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel={relaxed ? 'Relaxed' : 'Batched'}
               hitSlop={6}
-              onPress={() => apply({ type: 'set-mode', mode: relaxed ? 'batched' : 'relaxed' })}
+              onPress={() => mutate('/v1/mode', { mode: relaxed ? 'batched' : 'relaxed' })}
               style={styles.toggle}
             >
               <View style={[styles.toggleRing, relaxed && styles.toggleRingOn]}>
@@ -208,7 +282,7 @@ function ChatScreen() {
           {menuOpen ? (
             <View testID="schedule-menu" style={styles.menu}>
               {SCHEDULES.map((option) => {
-                const selected = option.id === state.scheduleId;
+                const selected = option.id === state?.scheduleId;
                 return (
                   <Pressable
                     key={option.id}
@@ -216,7 +290,7 @@ function ChatScreen() {
                     accessibilityRole="button"
                     onPress={() => {
                       setMenuOpen(false);
-                      apply({ type: 'set-schedule', scheduleId: option.id });
+                      mutate('/v1/schedule', { scheduleId: option.id });
                     }}
                     style={[styles.menuRow, selected && styles.menuRowSelected]}
                   >
@@ -237,24 +311,37 @@ function ChatScreen() {
           contentContainerStyle={styles.contacts}
           style={styles.contactStrip}
         >
-          {CONTACTS.map((item) => {
-            const selected = item.id === contact.id;
+          {contacts.map((item) => {
+            const selected = item.id === contact?.id;
             return (
               <Pressable
                 key={item.id}
-                testID={`contact-${item.id}`}
+                testID={`contact-${item.username}`}
                 accessibilityRole="button"
-                accessibilityLabel={item.name}
+                accessibilityLabel={item.username}
                 accessibilityState={{ selected }}
-                onPress={() => apply({ type: 'select-contact', contactId: item.id })}
+                onPress={() => mutate('/v1/open', { contactId: item.id })}
                 style={styles.contact}
               >
-                <Image source={item.avatar} resizeMode="cover" style={styles.avatar} />
+                <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatar} />
                 <View style={[styles.contactMark, selected && styles.contactMarkOn]} />
-                <Text style={[styles.contactName, selected && styles.contactNameSelected]}>{item.name}</Text>
+                <Text style={[styles.contactName, selected && styles.contactNameSelected]}>{item.username}</Text>
               </Pressable>
             );
           })}
+          <Pressable
+            testID="add-person"
+            accessibilityRole="button"
+            accessibilityLabel="Add a person"
+            onPress={onSearch}
+            style={styles.contact}
+          >
+            <View style={styles.plus}>
+              <Text style={styles.plusMark}>+</Text>
+            </View>
+            <View style={styles.contactMark} />
+            <Text style={styles.contactName}>Add</Text>
+          </Pressable>
         </ScrollView>
 
         <ScrollView
@@ -265,7 +352,7 @@ function ChatScreen() {
           onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
         >
           {messages.map((message) => (
-            <View key={message.id} style={styles.bubble}>
+            <View key={message.id} style={[styles.bubble, message.direction === 'in' && styles.bubbleIn]}>
               <Text style={styles.bubbleText}>{message.body}</Text>
             </View>
           ))}
@@ -313,7 +400,7 @@ function ChatScreen() {
             </Pressable>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -322,29 +409,12 @@ const ink = '#1c1c1c';
 const paper = '#fff';
 
 const styles = StyleSheet.create({
-  boot: {
-    flex: 1,
-    backgroundColor: paper,
-  },
-  provider: {
-    flex: 1,
-    backgroundColor: paper,
-  },
-  root: {
-    flex: 1,
-    backgroundColor: paper,
-    alignItems: 'center',
-  },
-  phone: {
-    flex: 1,
-    width: '100%',
-    maxWidth: 480,
-    backgroundColor: paper,
-  },
-  top: {
-    zIndex: 2,
-    backgroundColor: paper,
-  },
+  boot: { flex: 1, backgroundColor: paper },
+  provider: { flex: 1, backgroundColor: paper },
+  frame: { flex: 1, backgroundColor: paper },
+  root: { flex: 1, backgroundColor: paper, alignItems: 'center' },
+  phone: { flex: 1, width: '100%', maxWidth: 480, backgroundColor: paper },
+  top: { zIndex: 2, backgroundColor: paper },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -355,143 +425,43 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 14,
   },
-  toggle: {
-    width: 72,
-    alignItems: 'center',
-    gap: 5,
-  },
-  toggleRing: {
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 22,
-    padding: 2,
-    backgroundColor: paper,
-  },
-  toggleRingOn: {
-    borderWidth: 2,
-    backgroundColor: '#eadcc4',
-  },
-  toggleImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  toggleLabel: {
-    fontSize: 12,
-    color: ink,
-    letterSpacing: 0.2,
-  },
-  toggleLabelOn: {
-    fontWeight: '700',
-  },
-  headerRule: {
-    width: 1,
-    alignSelf: 'stretch',
-    backgroundColor: ink,
-  },
-  schedule: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minHeight: 48,
-  },
-  scheduleCopy: {
-    flex: 1,
-    gap: 1,
-  },
-  scheduleLine: {
-    color: ink,
-    fontSize: 17,
-    lineHeight: 21,
-  },
-  chevron: {
-    color: ink,
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  menu: {
-    borderBottomWidth: 1,
-    borderBottomColor: ink,
-    backgroundColor: paper,
-  },
-  menuRow: {
-    paddingVertical: 13,
-    paddingHorizontal: 18,
-    borderTopWidth: 1,
-    borderTopColor: ink,
-  },
-  menuRowSelected: {
-    backgroundColor: '#f6f3ee',
-  },
-  menuText: {
-    color: ink,
-    fontSize: 16,
-    lineHeight: 21,
-  },
-  menuTextSelected: {
-    fontWeight: '700',
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 1,
-  },
-  contactStrip: {
-    flexGrow: 0,
-    flexShrink: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: ink,
-    zIndex: 0,
-  },
-  contacts: {
-    paddingHorizontal: 12,
-    paddingTop: 14,
-    paddingBottom: 10,
-    gap: 18,
-  },
-  contact: {
-    width: 68,
-    alignItems: 'center',
-  },
-  avatar: {
+  toggle: { width: 72, alignItems: 'center', gap: 5 },
+  toggleRing: { borderWidth: 1, borderColor: ink, borderRadius: 22, padding: 2, backgroundColor: paper },
+  toggleRingOn: { borderWidth: 2, backgroundColor: '#eadcc4' },
+  toggleImage: { width: 36, height: 36, borderRadius: 18 },
+  toggleLabel: { fontSize: 12, color: ink, letterSpacing: 0.2 },
+  toggleLabelOn: { fontWeight: '700' },
+  headerRule: { width: 1, alignSelf: 'stretch', backgroundColor: ink },
+  schedule: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 },
+  scheduleCopy: { flex: 1, gap: 1 },
+  scheduleLine: { color: ink, fontSize: 17, lineHeight: 21 },
+  chevron: { color: ink, fontSize: 16, lineHeight: 20 },
+  menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
+  menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
+  menuRowSelected: { backgroundColor: '#f6f3ee' },
+  menuText: { color: ink, fontSize: 16, lineHeight: 21 },
+  menuTextSelected: { fontWeight: '700' },
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1 },
+  contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
+  contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 18 },
+  contact: { width: 68, alignItems: 'center' },
+  avatar: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, backgroundColor: paper },
+  plus: {
     width: 54,
     height: 54,
     borderRadius: 27,
     borderWidth: 1,
     borderColor: ink,
-    backgroundColor: paper,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  contactMark: {
-    marginTop: 7,
-    width: 44,
-    height: 3,
-    backgroundColor: 'transparent',
-  },
-  contactMarkOn: {
-    backgroundColor: ink,
-  },
-  contactName: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 15,
-    color: ink,
-  },
-  contactNameSelected: {
-    fontWeight: '700',
-  },
-  thread: {
-    flex: 1,
-  },
-  threadContent: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 20,
-    gap: 12,
-  },
+  plusMark: { color: ink, fontSize: 32, lineHeight: 34 },
+  contactMark: { marginTop: 7, width: 44, height: 3, backgroundColor: 'transparent' },
+  contactMarkOn: { backgroundColor: ink },
+  contactName: { marginTop: 4, fontSize: 12, lineHeight: 15, color: ink },
+  contactNameSelected: { fontWeight: '700' },
+  thread: { flex: 1 },
+  threadContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 20, gap: 12 },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
@@ -503,21 +473,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: paper,
   },
-  bubbleText: {
-    color: ink,
-    fontSize: 17,
-    lineHeight: 22,
-  },
-  footer: {
-    borderTopWidth: 1,
-    borderTopColor: ink,
-    backgroundColor: paper,
-  },
-  intents: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: ink,
-  },
+  bubbleIn: { alignSelf: 'flex-start', borderBottomRightRadius: 18, borderBottomLeftRadius: 5 },
+  bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
+  footer: { borderTopWidth: 1, borderTopColor: ink, backgroundColor: paper },
+  intents: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: ink },
   intent: {
     flex: 1,
     minHeight: 54,
@@ -528,31 +487,11 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: ink,
   },
-  intentLast: {
-    borderRightWidth: 0,
-  },
-  intentBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 3,
-    backgroundColor: ink,
-  },
-  intentText: {
-    color: ink,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  intentTextSelected: {
-    fontWeight: '700',
-  },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    minHeight: 76,
-  },
+  intentLast: { borderRightWidth: 0 },
+  intentBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: ink },
+  intentText: { color: ink, fontSize: 14, textAlign: 'center', lineHeight: 18 },
+  intentTextSelected: { fontWeight: '700' },
+  composer: { flexDirection: 'row', alignItems: 'stretch', minHeight: 76 },
   input: {
     flex: 1,
     minHeight: 76,
@@ -566,21 +505,8 @@ const styles = StyleSheet.create({
     color: ink,
     outlineStyle: 'none',
   },
-  send: {
-    width: 76,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: ink,
-  },
-  sendReady: {
-    backgroundColor: ink,
-  },
-  sendText: {
-    color: '#9a9a9a',
-    fontSize: 15,
-  },
-  sendTextReady: {
-    color: paper,
-  },
+  send: { width: 76, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: ink },
+  sendReady: { backgroundColor: ink },
+  sendText: { color: '#9a9a9a', fontSize: 15 },
+  sendTextReady: { color: paper },
 });

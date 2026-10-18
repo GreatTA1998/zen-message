@@ -201,6 +201,28 @@ test('blank sends and unknown intents do nothing', () => {
   assert.equal(send(state, { id: 'a', body: 'Hi', intent: 'later' }, at(10, 0)).state, state);
 });
 
+test('a window can use the recipient clock', () => {
+  const now = Date.UTC(2026, 9, 17, 17, 15);
+  assert.equal(nextWindow(now, 'daily-1-7', 420).getTime(), Date.UTC(2026, 9, 17, 20, 0));
+  assert.equal(nextWindow(now, 'hourly', 0).getTime(), Date.UTC(2026, 9, 17, 18, 0));
+});
+
+test('an outgoing message is visible and tells the sender nothing', () => {
+  const result = reduce(createState(), {
+    type: 'outgoing',
+    id: 'a',
+    contactId: 'ada',
+    contactName: 'ada',
+    body: 'Hello',
+    intent: 'anytime',
+    now: at(10, 15).getTime(),
+  });
+  assert.equal(result.state.messages[0].visible, true);
+  assert.equal(result.state.messages[0].direction, 'out');
+  assert.deepEqual(result.effects, []);
+  assert.equal(JSON.stringify(result).includes('relax'), false);
+});
+
 test('sanitize drops broken saved data', () => {
   const clean = sanitize({
     mode: 'relaxed',
