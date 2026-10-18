@@ -15,8 +15,16 @@ const HOP_BY_HOP = [
   'content-encoding',
 ];
 
+const OAUTH_STATE_SESSION = 'Jm={name:"oauthHelperState",P:"session"}';
+const OAUTH_STATE_LOCAL = 'Jm={name:"oauthHelperState",P:"local"}';
+
 export function isFirebaseAuthPath(pathname) {
   return pathname === '/__/auth' || pathname.startsWith('/__/auth/');
+}
+
+export function rewriteAuthHandlerScript(source) {
+  if (!source.includes(OAUTH_STATE_SESSION)) return source;
+  return source.replaceAll(OAUTH_STATE_SESSION, OAUTH_STATE_LOCAL);
 }
 
 export async function proxyFirebaseAuth(request) {
@@ -43,7 +51,14 @@ export async function proxyFirebaseAuth(request) {
   for (const name of HOP_BY_HOP) responseHeaders.delete(name);
   rewriteLocation(responseHeaders, incoming);
   rewriteSetCookie(responseHeaders);
-  return new Response(request.method === 'HEAD' ? null : upstream.body, {
+  if (request.method === 'HEAD') {
+    return new Response(null, { status: upstream.status, headers: responseHeaders });
+  }
+  const raw = await upstream.arrayBuffer();
+  const body = incoming.pathname.endsWith('/handler.js')
+    ? new TextEncoder().encode(rewriteAuthHandlerScript(new TextDecoder().decode(raw)))
+    : raw;
+  return new Response(body, {
     status: upstream.status,
     headers: responseHeaders,
   });

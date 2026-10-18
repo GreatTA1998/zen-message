@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isFirebaseAuthPath, proxyFirebaseAuth } from './firebaseAuthProxy.js';
+import { isFirebaseAuthPath, proxyFirebaseAuth, rewriteAuthHandlerScript } from './firebaseAuthProxy.js';
 
 test('only the auth helper path is proxied', () => {
   assert.equal(isFirebaseAuthPath('/__/auth/handler'), true);
@@ -24,4 +24,15 @@ test('auth handler script is proxied as javascript', async () => {
   assert.match(response.headers.get('content-type') ?? '', /javascript/);
   const body = await response.text();
   assert.match(body, /missing initial state/);
+  assert.match(body, /oauthHelperState",P:"local"/);
+  assert.doesNotMatch(body, /oauthHelperState",P:"session"/);
+  assert.doesNotMatch(body, /project-z-e00fd\.firebaseapp\.com/);
+});
+
+test('handler state is stored where a new browser context can read it', () => {
+  const source = 'before Jm={name:"oauthHelperState",P:"session"} after';
+  assert.equal(
+    rewriteAuthHandlerScript(source),
+    'before Jm={name:"oauthHelperState",P:"local"} after',
+  );
 });
