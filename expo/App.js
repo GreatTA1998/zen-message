@@ -23,12 +23,13 @@ import {
   WEEK_HOURS,
   clockLabel,
   messagePhoto,
+  nextWindow,
   receiptPhrase,
   threadMessages,
   weeklyWhen,
 } from './src/delivery';
 import { LoginView } from './src/LoginView';
-import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
+import { listenForDigest, prepareNotifications } from './src/notify';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -81,7 +82,6 @@ function Root() {
     const next = await api(inboxPath(), { token: current });
     applyInbox(next);
     if (next.effects?.length) {
-      await runNotificationEffects(next.effects);
       await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
     }
     return next;
@@ -259,7 +259,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
     const next = await api(path, { token, method: 'POST', body });
     onInbox(next);
     if (next.effects?.length) {
-      await runNotificationEffects(next.effects);
       await api('/v1/effects/ack', { token, method: 'POST', body: {} });
     }
   }
@@ -268,10 +267,21 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
     const body = text.trim();
     if ((!body && !photo) || !contact) return;
     const attached = photo;
+    const sentIntent = intent;
+    const sentContact = contact;
     setDraft('');
     setPhoto(null);
     setInputHeight(44);
-    mutate('/v1/messages', { contactId: contact.id, body, photo: attached, intent }).catch(() => {});
+    mutate('/v1/messages', { contactId: sentContact.id, body, photo: attached, intent: sentIntent }).catch(() => {});
+    if (sentIntent !== 'realtime') {
+      const at = nextWindow(new Date(), sentContact.scheduleId, sentContact.offsetMinutes, sentContact).getTime();
+      const delay = at - Date.now() + 1000;
+      if (delay > 0 && delay < 8 * 24 * 60 * 60 * 1000) {
+        setTimeout(() => {
+          api(inboxPath(), { token }).catch(() => {});
+        }, delay);
+      }
+    }
   }
 
   async function attach(source) {

@@ -1,4 +1,12 @@
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+export function expoPushEndpoint() {
+  const origin = typeof location !== 'undefined' ? location.origin : '';
+  if (typeof document !== 'undefined' && /^https?:\/\//.test(origin)) {
+    return `${origin}/api/push`;
+  }
+  return EXPO_PUSH_URL;
+}
 
 export function pushMessage(token, plan) {
   return {
@@ -22,7 +30,7 @@ export function pushesFor(effects, token) {
 
 export async function sendExpoPushes(messages, fetchImpl = fetch) {
   if (!messages.length) return { ok: true, sent: 0 };
-  const response = await fetchImpl(EXPO_PUSH_URL, {
+  const response = await fetchImpl(expoPushEndpoint(), {
     method: 'POST',
     headers: {
       Accept: 'application/json',

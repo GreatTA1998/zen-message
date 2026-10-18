@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createState } from '../src/delivery.js';
 import { deliverMessage, changeMode, releaseDue } from './deliver.js';
-import { pushMessage, pushesFor } from './push.js';
+import { expoPushEndpoint, pushMessage, pushesFor } from './push.js';
 
 function person(fields) {
   return {
@@ -111,4 +111,20 @@ test('a push payload does not mention relax or batched', () => {
   const encoded = JSON.stringify(message);
   assert.equal(encoded.includes('relax'), false);
   assert.equal(encoded.includes('batched'), false);
+});
+
+test('the browser posts pushes to this site and the phone posts them to Expo', () => {
+  const previousDocument = globalThis.document;
+  const previousLocation = globalThis.location;
+  try {
+    assert.equal(expoPushEndpoint(), 'https://exp.host/--/api/v2/push/send');
+    globalThis.document = {};
+    globalThis.location = { origin: 'https://zen-messenger.vercel.app' };
+    assert.equal(expoPushEndpoint(), 'https://zen-messenger.vercel.app/api/push');
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+    if (previousLocation === undefined) delete globalThis.location;
+    else globalThis.location = previousLocation;
+  }
 });

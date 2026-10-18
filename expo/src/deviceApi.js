@@ -36,6 +36,12 @@ function publicUser(user) {
   return { id: user.id, provider: user.provider, firstName: user.firstName || '' };
 }
 
+function expoPushToken(value) {
+  if (typeof value !== 'string') return null;
+  const token = value.trim();
+  return /^ExponentPushToken\[[A-Za-z0-9_-]{8,160}\]$/.test(token) ? token : null;
+}
+
 function contactCard(users, contact) {
   const person = users[contact.id];
   return {
@@ -154,6 +160,26 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     await store.setItem(STORE_KEY, JSON.stringify(state));
   }
 
+  function releaseDueAlerts(state, now) {
+    const queued = [];
+    for (const person of Object.values(state.users)) {
+      const released = releaseDue(person, now);
+      if (!released.effects.length) continue;
+      adopt(person, released.state);
+      person.pendingEffects = released.effects;
+      queued.push({ recipient: person, effects: released.effects });
+    }
+    return queued;
+  }
+
+  async function commit(store, state) {
+    const due = releaseDueAlerts(state, Date.now());
+    await save(store, state);
+    if (typeof store.onDeliver === 'function') {
+      for (const item of due) store.onDeliver(item.recipient, item.effects);
+    }
+  }
+
   return function request(path, { token, method = 'GET', body } = {}) {
     const options = { token, method, body };
     return exclusive(() =>
@@ -190,7 +216,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       state.users[user.id] = user;
       const sessionToken = await hex(24);
       state.sessions[sessionToken] = user.id;
-      await save(store, state);
+      await commit(store, state);
       return { token: sessionToken, user: publicUser(user) };
     }
 
@@ -200,11 +226,8 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     applyClock(user, offset);
 
     if (method === 'GET' && url.pathname === '/v1/inbox') {
-      const released = releaseDue(user, Date.now());
-      adopt(user, released.state);
-      if (released.effects.length) user.pendingEffects = released.effects;
       linkIncomingContacts(state, user);
-      await save(store, state);
+      await commit(store, state);
       return inbox(state, user);
     }
 
@@ -217,13 +240,13 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
         user.contacts = [...user.contacts, { id: found.id }];
       }
       if (!user.contactId) user.contactId = found.id;
-      await save(store, state);
+      await commit(store, state);
       return inbox(state, user);
     }
 
     if (method === 'POST' && url.pathname === '/v1/open') {
       if (user.contacts.some((item) => item.id === body?.contactId)) user.contactId = body.contactId;
-      await save(store, state);
+      await commit(store, state);
       return inbox(state, user);
     }
 
@@ -241,7 +264,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       adopt(recipient, result.recipient);
       linkIncomingContacts(state, recipient);
       if (result.recipientEffects.length) recipient.pendingEffects = result.recipientEffects;
-      await save(store, state);
+      await commit(store, state);
       if (typeof store.onDeliver === 'function') store.onDeliver(recipient, result.recipientEffects);
       return inbox(state, user);
     }
@@ -250,7 +273,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       const result = changeMode(user, body?.mode);
       adopt(user, result.state);
       if (result.effects.length) user.pendingEffects = result.effects;
-      await save(store, state);
+      await commit(store, state);
       return inbox(state, user);
     }
 
@@ -261,19 +284,19 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       });
       adopt(user, result.state);
       if (result.effects.length) user.pendingEffects = result.effects;
-      await save(store, state);
+      await commit(store, state);
       return inbox(state, user);
     }
 
     if (method === 'POST' && url.pathname === '/v1/push-token') {
-      user.pushToken = typeof body?.token === 'string' ? body.token : null;
-      await save(store, state);
+      user.pushToken = expoPushToken(body?.token);
+      await commit(store, state);
       return { ok: true };
     }
 
     if (method === 'POST' && url.pathname === '/v1/effects/ack') {
       user.pendingEffects = [];
-      await save(store, state);
+      await commit(store, state);
       return { ok: true };
     }
 
@@ -281,7 +304,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       const result = reduce(user, { type: 'shown', now: Date.now() });
       adopt(user, result.state);
       user.pendingEffects = [];
-      await save(store, state);
+      await commit(store, state);
       return inbox(state, user);
     }
 
