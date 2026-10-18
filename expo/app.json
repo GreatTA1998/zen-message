@@ -44,6 +44,11 @@
     },
     "web": {
       "favicon": "./assets/three-pebbles-no-bg.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e3fc4578-dcc0-44a6-a242-23af1e9e637f"
+      }
     }
   }
 }
