@@ -45,8 +45,6 @@ export function PlusView({ code, onAdd }) {
             setValue(code);
             setError(hasConfusingCharacter(code) ? '1, I, and L are not used.' : '');
           }}
-          placeholder="Paste their ID"
-          placeholderTextColor="#8a8a8a"
           style={styles.input}
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
