@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { CODE_LENGTH, hasConfusingCharacter, isCode, normalizeCode } from './people';
 
-export function PlusView({ code, onClose, onAdd }) {
+export function PlusView({ code, onAdd }) {
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -17,12 +17,6 @@ export function PlusView({ code, onClose, onAdd }) {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.bar}>
-        <Pressable testID="plus-back" accessibilityRole="button" accessibilityLabel="Back" onPress={onClose}>
-          <Text style={styles.back}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Add a person</Text>
-      </View>
       <View style={styles.body}>
         <Text style={styles.label}>Your ID</Text>
         <View style={styles.share}>
@@ -81,21 +75,8 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
     backgroundColor: paper,
   },
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: ink,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  back: { color: ink, fontSize: 16 },
-  title: { color: ink, fontSize: 18 },
   body: { padding: 20, gap: 12 },
   label: { color: ink, fontSize: 14 },
   share: { flexDirection: 'row', alignItems: 'center', gap: 12 },

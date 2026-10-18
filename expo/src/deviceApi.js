@@ -130,8 +130,8 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     return run;
   }
 
-  async function load() {
-    const raw = await storage.getItem(STORE_KEY);
+  async function load(store) {
+    const raw = await store.getItem(STORE_KEY);
     if (!raw) return { users: {}, sessions: {} };
     const parsed = JSON.parse(raw);
     return {
@@ -140,16 +140,21 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     };
   }
 
-  async function save(state) {
-    await storage.setItem(STORE_KEY, JSON.stringify(state));
+  async function save(store, state) {
+    await store.setItem(STORE_KEY, JSON.stringify(state));
   }
 
   return function request(path, { token, method = 'GET', body } = {}) {
-    return exclusive(() => handle(path, { token, method, body }));
+    const options = { token, method, body };
+    return exclusive(() =>
+      typeof storage.transact === 'function'
+        ? storage.transact((store) => handle(store, path, options))
+        : handle(storage, path, options)
+    );
   };
 
-  async function handle(path, { token, method, body }) {
-    const state = await load();
+  async function handle(store, path, { token, method, body }) {
+    const state = await load(store);
     const url = new URL(path, 'http://device.local');
 
     if (method === 'POST' && url.pathname === '/v1/session') {
@@ -172,7 +177,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       state.users[user.id] = user;
       const sessionToken = await hex(24);
       state.sessions[sessionToken] = user.id;
-      await save(state);
+      await save(store, state);
       return { token: sessionToken, user: publicUser(user) };
     }
 
@@ -185,7 +190,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       const released = releaseDue(user, Date.now());
       adopt(user, released.state);
       if (released.effects.length) user.pendingEffects = released.effects;
-      await save(state);
+      await save(store, state);
       return inbox(state, user);
     }
 
@@ -198,13 +203,13 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
         user.contacts = [...user.contacts, { id: found.id }];
       }
       if (!user.contactId) user.contactId = found.id;
-      await save(state);
+      await save(store, state);
       return inbox(state, user);
     }
 
     if (method === 'POST' && url.pathname === '/v1/open') {
       if (user.contacts.some((item) => item.id === body?.contactId)) user.contactId = body.contactId;
-      await save(state);
+      await save(store, state);
       return inbox(state, user);
     }
 
@@ -221,7 +226,8 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       adopt(user, result.sender);
       adopt(recipient, result.recipient);
       if (result.recipientEffects.length) recipient.pendingEffects = result.recipientEffects;
-      await save(state);
+      await save(store, state);
+      if (typeof store.onDeliver === 'function') store.onDeliver(recipient, result.recipientEffects);
       return inbox(state, user);
     }
 
@@ -229,7 +235,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       const result = changeMode(user, body?.mode);
       adopt(user, result.state);
       if (result.effects.length) user.pendingEffects = result.effects;
-      await save(state);
+      await save(store, state);
       return inbox(state, user);
     }
 
@@ -240,19 +246,19 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       });
       adopt(user, result.state);
       if (result.effects.length) user.pendingEffects = result.effects;
-      await save(state);
+      await save(store, state);
       return inbox(state, user);
     }
 
     if (method === 'POST' && url.pathname === '/v1/push-token') {
       user.pushToken = typeof body?.token === 'string' ? body.token : null;
-      await save(state);
+      await save(store, state);
       return { ok: true };
     }
 
     if (method === 'POST' && url.pathname === '/v1/effects/ack') {
       user.pendingEffects = [];
-      await save(state);
+      await save(store, state);
       return { ok: true };
     }
 
@@ -260,7 +266,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       const result = reduce(user, { type: 'shown', now: Date.now() });
       adopt(user, result.state);
       user.pendingEffects = [];
-      await save(state);
+      await save(store, state);
       return inbox(state, user);
     }
 

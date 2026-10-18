@@ -1,4 +1,8 @@
-export async function acceptAppleCredential(credential, { request, saveSession, loadSession, refresh }) {
+export async function acceptAppleCredential(credential, deps) {
+  return finishSignIn('apple', credential, deps);
+}
+
+export async function finishSignIn(provider, credential, { request, saveSession, loadSession, refresh }) {
   if (!credential?.user) {
     return {
       screen: 'login',
@@ -10,7 +14,7 @@ export async function acceptAppleCredential(credential, { request, saveSession, 
   try {
     const session = await request('/v1/session', {
       method: 'POST',
-      body: { provider: 'apple', subject: credential.user },
+      body: { provider: provider === 'google' ? 'google' : 'apple', subject: credential.user },
     });
     if (!session?.token) throw new Error('session_missing');
     await saveSession(session.token);

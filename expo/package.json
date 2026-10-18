@@ -16,6 +16,7 @@
     "expo-status-bar": "~58.0.3",
     "expo-updates": "~58.0.17",
     "expo-web-browser": "~58.0.6",
+    "firebase": "^11.10.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
@@ -28,7 +29,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "server": "node server/index.js",
-    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js server/deliver.test.js"
+    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js server/deliver.test.js"
   },
   "private": true
 }

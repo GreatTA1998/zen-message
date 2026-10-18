@@ -1,31 +1,22 @@
-import { Platform } from 'react-native';
-import { createDeviceApi } from './deviceApi.js';
+import { createCloudApi } from './cloudApi.js';
 
 const configured = process.env.EXPO_PUBLIC_API_URL || '';
-let device = null;
+let cloud = null;
 
 function loopback(url) {
   return /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url);
 }
 
-function remoteBase() {
-  if (configured && !loopback(configured)) return configured;
-  if (Platform.OS === 'web') return configured || 'http://127.0.0.1:8787';
+function hostedBase() {
+  if (configured && !loopback(configured) && configured !== 'firestore') return configured;
   return null;
 }
 
-async function deviceRequest(path, options) {
-  if (!device) {
-    const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
-    device = createDeviceApi(AsyncStorage);
-  }
-  return device(path, options);
-}
-
 export async function api(path, options = {}) {
-  const base = remoteBase();
-  if (!base) return deviceRequest(path, options);
-  return remoteApi(base, path, options);
+  const base = hostedBase();
+  if (base) return remoteApi(base, path, options);
+  if (!cloud) cloud = createCloudApi();
+  return cloud(path, options);
 }
 
 async function remoteApi(base, path, { token, method = 'GET', body } = {}) {

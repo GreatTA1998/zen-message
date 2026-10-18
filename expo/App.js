@@ -33,7 +33,7 @@ import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
-import { acceptAppleCredential } from './src/signIn';
+import { finishSignIn } from './src/signIn';
 
 function scheduleLabel(state) {
   const relaxed = state?.mode === 'relaxed';
@@ -50,6 +50,7 @@ function scheduleLabel(state) {
 
 const MISSING = {
   apple_capability: 'Apple sign-in needs the Apple capability on this device.',
+  google_unavailable: 'Google sign-in is not available in this browser.',
 };
 
 export default function App() {
@@ -67,7 +68,6 @@ function Root() {
   const [user, setUser] = useState(null);
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
-  const [searching, setSearching] = useState(false);
   const tokenRef = useRef(null);
 
   const applyInbox = useCallback((next) => {
@@ -156,7 +156,8 @@ function Root() {
       setNotice(MISSING[result.missing] || 'Sign-in is not available on this device.');
       return;
     }
-    const outcome = await acceptAppleCredential(
+    const outcome = await finishSignIn(
+      result.provider === 'google' ? 'google' : 'apple',
       { user: result.subject },
       {
         request: api,
@@ -186,7 +187,6 @@ function Root() {
     try {
       const next = await api('/v1/contacts', { token, method: 'POST', body: { code } });
       applyInbox(next);
-      setSearching(false);
       return '';
     } catch (error) {
       if (error.code === 'code_invalid') return '1, I, and L are not used.';
@@ -200,17 +200,8 @@ function Root() {
   let body = null;
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
-  } else if (searching) {
-    body = <PlusView code={user?.id} onClose={() => setSearching(false)} onAdd={onAdd} />;
   } else {
-    body = (
-      <ChatScreen
-        token={token}
-        inbox={inbox}
-        onInbox={applyInbox}
-        onSearch={() => setSearching(true)}
-      />
-    );
+    body = <ChatScreen token={token} inbox={inbox} onInbox={applyInbox} onAdd={onAdd} />;
   }
 
   return (
@@ -220,12 +211,12 @@ function Root() {
   );
 }
 
-function ChatScreen({ token, inbox, onInbox, onSearch }) {
+function ChatScreen({ token, inbox, onInbox, onAdd }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
   const [inputHeight, setInputHeight] = useState(44);
   const [intent, setIntent] = useState('anytime');
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [panel, setPanel] = useState('chat');
   const threadRef = useRef(null);
   const frameRef = useRef(null);
   const avatarRefs = useRef({});
@@ -337,7 +328,8 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               testID="schedule-button"
               accessibilityRole="button"
               accessibilityLabel={label}
-              onPress={() => setMenuOpen((open) => !open)}
+              accessibilityState={{ selected: panel === 'settings' }}
+              onPress={() => setPanel((current) => (current === 'settings' ? 'chat' : 'settings'))}
               style={styles.schedule}
             >
               <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
@@ -346,83 +338,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               <Feather name="settings" size={22} color={ink} />
             </Pressable>
           </View>
-          {menuOpen ? (
-            <View testID="schedule-menu" style={styles.menu}>
-              {SCHEDULES.filter((option) => option.id !== 'weekly').map((option) => {
-                const selected = option.id === state?.scheduleId;
-                return (
-                  <Pressable
-                    key={option.id}
-                    testID={`schedule-${option.id}`}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setMenuOpen(false);
-                      mutate('/v1/schedule', { scheduleId: option.id });
-                    }}
-                    style={[styles.menuRow, selected && styles.menuRowSelected]}
-                  >
-                    <Text style={[styles.menuText, selected && styles.menuTextSelected]}>{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-              <Pressable
-                testID="schedule-weekly"
-                accessibilityRole="button"
-                onPress={() =>
-                  chooseWeek(
-                    state?.scheduleId === 'weekly' ? state.weekDay : 0,
-                    state?.scheduleId === 'weekly' ? state.weekHour : 17
-                  )
-                }
-                style={[styles.menuRow, state?.scheduleId === 'weekly' && styles.menuRowSelected]}
-              >
-                <Text style={[styles.menuText, state?.scheduleId === 'weekly' && styles.menuTextSelected]}>
-                  {state?.scheduleId === 'weekly'
-                    ? `Weekly, ${weeklyWhen(state.weekDay, state.weekHour)}`
-                    : 'Weekly, Sunday 5pm'}
-                </Text>
-              </Pressable>
-              <View testID="weekly-setting" style={styles.weekBlock}>
-                <View style={styles.weekRow}>
-                  {WEEKDAYS.map((name, day) => {
-                    const selected = state?.scheduleId === 'weekly' && state.weekDay === day;
-                    return (
-                      <Pressable
-                        key={name}
-                        testID={`week-day-${day}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={name}
-                        onPress={() => chooseWeek(day, state?.scheduleId === 'weekly' ? state.weekHour : 17)}
-                        style={[styles.weekChip, selected && styles.weekChipOn]}
-                      >
-                        <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{name.slice(0, 3)}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <View style={styles.weekRow}>
-                  {WEEK_HOURS.map((hour) => {
-                    const selected = state?.scheduleId === 'weekly' && state.weekHour === hour;
-                    return (
-                      <Pressable
-                        key={hour}
-                        testID={`week-hour-${hour}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={clockLabel(hour)}
-                        onPress={() => chooseWeek(state?.scheduleId === 'weekly' ? state.weekDay : 0, hour)}
-                        style={[styles.weekChip, selected && styles.weekChipOn]}
-                      >
-                        <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{clockLabel(hour)}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
-          ) : null}
         </View>
-
-        {menuOpen ? <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)} /> : null}
 
         <ScrollView
           horizontal
@@ -442,8 +358,11 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
                 testID={`contact-${item.id}`}
                 accessibilityRole="button"
                 accessibilityLabel={item.id}
-                accessibilityState={{ selected }}
-                onPress={() => mutate('/v1/open', { contactId: item.id })}
+                accessibilityState={{ selected: panel === 'chat' && selected }}
+                onPress={() => {
+                  setPanel('chat');
+                  mutate('/v1/open', { contactId: item.id });
+                }}
                 style={styles.contact}
               >
                 <Image
@@ -455,7 +374,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
                   resizeMode="cover"
                   style={styles.avatar}
                 />
-                <View style={[styles.contactMark, selected && styles.contactMarkOn]} />
+                <View style={[styles.contactMark, panel === 'chat' && selected && styles.contactMarkOn]} />
               </Pressable>
             );
           })}
@@ -463,16 +382,32 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
             testID="add-person"
             accessibilityRole="button"
             accessibilityLabel="Add a person"
-            onPress={onSearch}
+            accessibilityState={{ selected: panel === 'add' }}
+            onPress={() => setPanel((current) => (current === 'add' ? 'chat' : 'add'))}
             style={styles.contact}
           >
             <View style={styles.plus}>
               <Text style={styles.plusMark}>+</Text>
             </View>
-            <View style={styles.contactMark} />
+            <View style={[styles.contactMark, panel === 'add' && styles.contactMarkOn]} />
           </Pressable>
         </ScrollView>
 
+        {panel === 'settings' ? (
+          <ScheduleSettings state={state} onChoose={(scheduleId) => mutate('/v1/schedule', { scheduleId })} onWeek={chooseWeek} />
+        ) : null}
+        {panel === 'add' ? (
+          <PlusView
+            code={userId(inbox)}
+            onAdd={async (code) => {
+              const result = await onAdd(code);
+              if (!result) setPanel('chat');
+              return result;
+            }}
+          />
+        ) : null}
+        {panel === 'chat' ? (
+        <View style={styles.main}>
         <View ref={frameRef} style={styles.thread} onLayout={syncTail}>
           <ScrollView
             ref={threadRef}
@@ -561,8 +496,83 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
             </View>
           </View>
         </View>
+        </View>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+function userId(inbox) {
+  return inbox?.user?.id;
+}
+
+function ScheduleSettings({ state, onChoose, onWeek }) {
+  return (
+    <ScrollView testID="schedule-menu" style={styles.main} contentContainerStyle={styles.menu} keyboardShouldPersistTaps="handled">
+      {SCHEDULES.filter((option) => option.id !== 'weekly').map((option) => {
+        const selected = option.id === state?.scheduleId;
+        return (
+          <Pressable
+            key={option.id}
+            testID={`schedule-${option.id}`}
+            accessibilityRole="button"
+            onPress={() => onChoose(option.id)}
+            style={[styles.menuRow, selected && styles.menuRowSelected]}
+          >
+            <Text style={[styles.menuText, selected && styles.menuTextSelected]}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+      <Pressable
+        testID="schedule-weekly"
+        accessibilityRole="button"
+        onPress={() =>
+          onWeek(state?.scheduleId === 'weekly' ? state.weekDay : 0, state?.scheduleId === 'weekly' ? state.weekHour : 17)
+        }
+        style={[styles.menuRow, state?.scheduleId === 'weekly' && styles.menuRowSelected]}
+      >
+        <Text style={[styles.menuText, state?.scheduleId === 'weekly' && styles.menuTextSelected]}>
+          {state?.scheduleId === 'weekly' ? `Weekly, ${weeklyWhen(state.weekDay, state.weekHour)}` : 'Weekly, Sunday 5pm'}
+        </Text>
+      </Pressable>
+      <View testID="weekly-setting" style={styles.weekBlock}>
+        <View style={styles.weekRow}>
+          {WEEKDAYS.map((name, day) => {
+            const selected = state?.scheduleId === 'weekly' && state.weekDay === day;
+            return (
+              <Pressable
+                key={name}
+                testID={`week-day-${day}`}
+                accessibilityRole="button"
+                accessibilityLabel={name}
+                onPress={() => onWeek(day, state?.scheduleId === 'weekly' ? state.weekHour : 17)}
+                style={[styles.weekChip, selected && styles.weekChipOn]}
+              >
+                <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{name.slice(0, 3)}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={styles.weekRow}>
+          {WEEK_HOURS.map((hour) => {
+            const selected = state?.scheduleId === 'weekly' && state.weekHour === hour;
+            return (
+              <Pressable
+                key={hour}
+                testID={`week-hour-${hour}`}
+                accessibilityRole="button"
+                accessibilityLabel={clockLabel(hour)}
+                onPress={() => onWeek(state?.scheduleId === 'weekly' ? state.weekDay : 0, hour)}
+                style={[styles.weekChip, selected && styles.weekChipOn]}
+              >
+                <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{clockLabel(hour)}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -665,6 +675,7 @@ const styles = StyleSheet.create({
   plusMark: { color: ink, fontSize: 32, lineHeight: 34 },
   contactMark: { marginTop: 7, width: 44, height: 3, backgroundColor: 'transparent' },
   contactMarkOn: { backgroundColor: ink },
+  main: { flex: 1, backgroundColor: paper },
   thread: { flex: 1 },
   threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 28, gap: 14, overflow: 'visible' },
   bubble: {
