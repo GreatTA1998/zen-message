@@ -1,11 +1,6 @@
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Google from 'expo-auth-session/providers/google';
 import { LOGO } from './contacts';
-
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
-const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
-const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
 
 export function LoginView({ onSubject, notice }) {
   return (
@@ -13,7 +8,6 @@ export function LoginView({ onSubject, notice }) {
       <Image source={LOGO} style={styles.mark} />
       <Text style={styles.title}>Zen Message</Text>
       <AppleButton onSubject={onSubject} />
-      <GoogleButton onSubject={onSubject} />
       {notice ? (
         <Text testID="login-notice" style={styles.notice}>
           {notice}
@@ -33,47 +27,6 @@ function AppleButton({ onSubject }) {
       style={[styles.provider, styles.apple]}
     >
       <Text style={[styles.providerText, styles.appleText]}>Sign in with Apple</Text>
-    </Pressable>
-  );
-}
-
-function GoogleButton({ onSubject }) {
-  if (!GOOGLE_WEB_CLIENT_ID && !GOOGLE_IOS_CLIENT_ID && !GOOGLE_ANDROID_CLIENT_ID) {
-    return (
-      <Pressable
-        testID="google-login"
-        accessibilityRole="button"
-        accessibilityLabel="Sign in with Google"
-        onPress={() => onSubject({ provider: 'google', missing: 'google_oauth_client' })}
-        style={[styles.provider, styles.google]}
-      >
-        <Text style={styles.providerText}>Sign in with Google</Text>
-      </Pressable>
-    );
-  }
-  return <ConfiguredGoogleButton onSubject={onSubject} />;
-}
-
-function ConfiguredGoogleButton({ onSubject }) {
-  const [request, , promptAsync] = Google.useAuthRequest({
-    webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
-    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
-  });
-  return (
-    <Pressable
-      testID="google-login"
-      accessibilityRole="button"
-      accessibilityLabel="Sign in with Google"
-      disabled={!request}
-      onPress={async () => {
-        const result = await promptAsync();
-        const subject = result?.authentication?.idToken || result?.params?.id_token;
-        if (result?.type === 'success' && subject) onSubject({ provider: 'google', subject });
-      }}
-      style={[styles.provider, styles.google]}
-    >
-      <Text style={styles.providerText}>Sign in with Google</Text>
     </Pressable>
   );
 }
@@ -136,10 +89,6 @@ const styles = StyleSheet.create({
   },
   apple: {
     backgroundColor: ink,
-    borderColor: ink,
-  },
-  google: {
-    backgroundColor: paper,
     borderColor: ink,
   },
   providerText: {

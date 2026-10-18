@@ -48,7 +48,6 @@ function scheduleLabel(state) {
 }
 
 const MISSING = {
-  google_oauth_client: 'Google sign-in needs a Google OAuth client.',
   apple_capability: 'Apple sign-in needs the Apple capability on this device.',
 };
 
