@@ -1,12 +1,12 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, getRedirectResult, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
-const APP_HOST = 'zen-messenger.vercel.app';
-export const GOOGLE_REDIRECT_URI = 'https://zen-messenger.vercel.app/__/auth/handler';
+const AUTH_DOMAIN = 'project-z-e00fd.firebaseapp.com';
+export const GOOGLE_REDIRECT_URI = 'https://project-z-e00fd.firebaseapp.com/__/auth/handler';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc',
-  authDomain: APP_HOST,
+  authDomain: AUTH_DOMAIN,
   projectId: 'project-z-e00fd',
   storageBucket: 'project-z-e00fd.appspot.com',
   messagingSenderId: '37588438028',
@@ -17,7 +17,7 @@ function googleAuth() {
   const name = 'zen-google';
   const existing = getApps().find((app) => app.name === name);
   const app = existing ?? initializeApp(firebaseConfig, name);
-  if (app.options.authDomain !== APP_HOST) return null;
+  if (app.options.authDomain !== AUTH_DOMAIN) return null;
   if (`https://${app.options.authDomain}/__/auth/handler` !== GOOGLE_REDIRECT_URI) return null;
   return getAuth(app);
 }
@@ -28,27 +28,24 @@ function subjectFrom(user) {
 }
 
 export async function completeGoogleRedirect() {
-  const auth = googleAuth();
-  if (!auth) return null;
-  try {
-    const result = await getRedirectResult(auth);
-    return subjectFrom(result?.user);
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export async function signInWithGoogle() {
   const auth = googleAuth();
-  if (!auth || window.location.hostname !== APP_HOST) {
-    return { provider: 'google', missing: 'google_unavailable' };
-  }
+  if (!auth) return { provider: 'google', missing: 'google_unavailable' };
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
-    await signInWithRedirect(auth, provider);
-    return { provider: 'google', pending: true };
-  } catch {
+    const result = await signInWithPopup(auth, provider);
+    const subject = subjectFrom(result?.user);
+    if (!subject) return { provider: 'google', missing: 'google_unavailable' };
+    return subject;
+  } catch (error) {
+    const code = error?.code;
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      return { provider: 'google', cancelled: true };
+    }
     return { provider: 'google', missing: 'google_unavailable' };
   }
 }
