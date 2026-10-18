@@ -459,9 +459,10 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
                   accessibilityRole="button"
                   accessibilityLabel="Photo"
                   onPress={() => setPhotoMenu((open) => !open)}
-                  style={styles.photoButton}
-                >
-                  <Feather name="image" size={22} color={ink} />
+                hitSlop={12}
+                style={styles.photoButton}
+              >
+                <Feather name="image" size={22} color={ink} />
                 </Pressable>
               </View>
               <TextInput
@@ -471,6 +472,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
                 placeholder={contact ? `Message ${contact.id}` : 'Message'}
                 placeholderTextColor="#8a8a8a"
                 multiline
+                numberOfLines={1}
                 style={styles.input}
               />
             </View>
@@ -683,10 +685,16 @@ const styles = StyleSheet.create({
   },
   preview: { width: 48, height: 48, borderWidth: 1, borderColor: ink },
   previewClear: { color: ink, fontSize: 15 },
-  composer: { flexDirection: 'row', alignItems: 'stretch', minHeight: 76 },
-  field: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  photoSlot: { width: 44, alignItems: 'center', justifyContent: 'center' },
-  photoButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  composer: { flexDirection: 'row', alignItems: 'stretch' },
+  field: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 16,
+    paddingRight: 16,
+  },
+  photoSlot: { alignItems: 'center', justifyContent: 'center' },
+  photoButton: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   photoMenu: {
     position: 'absolute',
     left: 4,
@@ -700,18 +708,19 @@ const styles = StyleSheet.create({
   bubblePhoto: { width: 180, height: 140, borderRadius: 10, marginBottom: 6 },
   input: {
     flex: 1,
-    minHeight: 76,
     maxHeight: 140,
     borderWidth: 0,
-    paddingLeft: 2,
-    paddingRight: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
+    marginLeft: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingLeft: 0,
+    paddingRight: 0,
     fontSize: 17,
     lineHeight: 22,
     color: ink,
+    textAlignVertical: 'center',
     outlineStyle: 'none',
   },
-  send: { width: 64, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: ink },
+  send: { width: 56, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: ink },
   sendReady: { backgroundColor: ink },
 });
