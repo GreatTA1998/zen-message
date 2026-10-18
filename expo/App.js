@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
@@ -190,6 +191,7 @@ function Root() {
 function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
+  const [photoMenu, setPhotoMenu] = useState(false);
   const [intent, setIntent] = useState('anytime');
   const [menuOpen, setMenuOpen] = useState(false);
   const threadRef = useRef(null);
@@ -273,7 +275,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.phone}>
         <View style={styles.top}>
-          <View style={styles.header}>
+          <View testID="top-bar" style={styles.header}>
             <Pressable
               testID="mode-toggle"
               accessibilityRole="button"
@@ -297,7 +299,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
                 {label}
               </Text>
-              <Text style={styles.chevron}>{menuOpen ? '▴' : '▾'}</Text>
+              <Feather name="settings" size={22} color={ink} />
             </Pressable>
           </View>
           {menuOpen ? (
@@ -422,25 +424,46 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               </Pressable>
             </View>
           ) : null}
-          <View style={styles.composer}>
-            <Pressable
-              testID="attach-library"
-              accessibilityRole="button"
-              accessibilityLabel="Camera roll"
-              onPress={() => attach('library')}
-              style={styles.attach}
-            >
-              <Text style={styles.attachText}>Roll</Text>
-            </Pressable>
-            <Pressable
-              testID="attach-camera"
-              accessibilityRole="button"
-              accessibilityLabel="Camera"
-              onPress={() => attach('camera')}
-              style={styles.attach}
-            >
-              <Text style={styles.attachText}>Camera</Text>
-            </Pressable>
+          <View testID="composer-bar" style={styles.composer}>
+            <View style={styles.attach}>
+              {photoMenu ? (
+                <View testID="photo-menu" style={styles.photoMenu}>
+                  <Pressable
+                    testID="attach-camera"
+                    accessibilityRole="button"
+                    accessibilityLabel="Camera"
+                    onPress={() => {
+                      setPhotoMenu(false);
+                      attach('camera');
+                    }}
+                    style={styles.photoChoice}
+                  >
+                    <Feather name="camera" size={20} color={ink} />
+                  </Pressable>
+                  <Pressable
+                    testID="attach-library"
+                    accessibilityRole="button"
+                    accessibilityLabel="Camera roll"
+                    onPress={() => {
+                      setPhotoMenu(false);
+                      attach('library');
+                    }}
+                    style={styles.photoChoice}
+                  >
+                    <Feather name="image" size={20} color={ink} />
+                  </Pressable>
+                </View>
+              ) : null}
+              <Pressable
+                testID="attach-photo"
+                accessibilityRole="button"
+                accessibilityLabel="Photo"
+                onPress={() => setPhotoMenu((open) => !open)}
+                style={styles.photoButton}
+              >
+                <Feather name="image" size={22} color={ink} />
+              </Pressable>
+            </View>
             <TextInput
               testID="composer"
               value={draft}
@@ -458,7 +481,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               onPress={() => send()}
               style={[styles.send, canSend && styles.sendReady]}
             >
-              <Text style={[styles.sendText, canSend && styles.sendTextReady]}>Send</Text>
+              <Feather name="send" size={22} color={canSend ? paper : '#9a9a9a'} />
             </Pressable>
           </View>
         </View>
@@ -538,7 +561,6 @@ const styles = StyleSheet.create({
   headerRule: { width: 1, alignSelf: 'stretch', backgroundColor: ink },
   schedule: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   scheduleLine: { flex: 1, color: ink, fontSize: 16, lineHeight: 20 },
-  chevron: { color: ink, fontSize: 16, lineHeight: 20 },
   menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
   menuRowSelected: { backgroundColor: '#f6f3ee' },
@@ -664,13 +686,23 @@ const styles = StyleSheet.create({
   previewClear: { color: ink, fontSize: 15 },
   composer: { flexDirection: 'row', alignItems: 'stretch', minHeight: 76 },
   attach: {
-    width: 52,
+    width: 56,
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: 1,
     borderRightColor: ink,
   },
-  attachText: { color: ink, fontSize: 13 },
+  photoButton: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  photoMenu: {
+    position: 'absolute',
+    left: 8,
+    bottom: 70,
+    zIndex: 3,
+    backgroundColor: paper,
+    borderWidth: 1,
+    borderColor: ink,
+  },
+  photoChoice: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   bubblePhoto: { width: 180, height: 140, borderRadius: 10, marginBottom: 6 },
   input: {
     flex: 1,
@@ -685,8 +717,6 @@ const styles = StyleSheet.create({
     color: ink,
     outlineStyle: 'none',
   },
-  send: { width: 76, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: ink },
+  send: { width: 64, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: ink },
   sendReady: { backgroundColor: ink },
-  sendText: { color: '#9a9a9a', fontSize: 15 },
-  sendTextReady: { color: paper },
 });
