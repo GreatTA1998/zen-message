@@ -191,7 +191,7 @@ function Root() {
 function ChatScreen({ token, inbox, onInbox, onSearch }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
-  const [photoMenu, setPhotoMenu] = useState(false);
+  const [inputHeight, setInputHeight] = useState(44);
   const [intent, setIntent] = useState('anytime');
   const [menuOpen, setMenuOpen] = useState(false);
   const threadRef = useRef(null);
@@ -239,6 +239,7 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
     const attached = photo;
     setDraft('');
     setPhoto(null);
+    setInputHeight(44);
     mutate('/v1/messages', { contactId: contact.id, body, photo: attached, intent }).catch(() => {});
   }
 
@@ -262,13 +263,12 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
   }
 
   function onChangeDraft(value) {
-    if (Platform.OS === 'web' && value.endsWith('\n')) {
-      const next = value.replace(/\n+$/, '');
-      setDraft(next);
-      if (next.trim() || photo) send(next);
-      return;
-    }
     setDraft(value);
+  }
+
+  function onInputSize(event) {
+    const measured = event.nativeEvent.contentSize.height;
+    setInputHeight(Math.max(44, Math.min(Math.ceil(measured), 176)));
   }
 
   return (
@@ -410,82 +410,53 @@ function ChatScreen({ token, inbox, onInbox, onSearch }) {
               );
             })}
           </View>
-          {photo ? (
-            <View style={styles.previewRow}>
-              <Image testID="photo-preview" source={{ uri: photo }} style={styles.preview} />
-              <Pressable
-                testID="photo-clear"
-                accessibilityRole="button"
-                accessibilityLabel="Remove photo"
-                onPress={() => setPhoto(null)}
-              >
-                <Text style={styles.previewClear}>Remove</Text>
-              </Pressable>
-            </View>
-          ) : null}
           <View testID="composer-bar" style={styles.composer}>
-            <View testID="message-field" style={styles.field}>
-              <View style={styles.photoSlot}>
-                {photoMenu ? (
-                  <View testID="photo-menu" style={styles.photoMenu}>
-                    <Pressable
-                      testID="attach-camera"
-                      accessibilityRole="button"
-                      accessibilityLabel="Camera"
-                      onPress={() => {
-                        setPhotoMenu(false);
-                        attach('camera');
-                      }}
-                      style={styles.photoChoice}
-                    >
-                      <Feather name="camera" size={20} color={ink} />
-                    </Pressable>
-                    <Pressable
-                      testID="attach-library"
-                      accessibilityRole="button"
-                      accessibilityLabel="Camera roll"
-                      onPress={() => {
-                        setPhotoMenu(false);
-                        attach('library');
-                      }}
-                      style={styles.photoChoice}
-                    >
-                      <Feather name="image" size={20} color={ink} />
-                    </Pressable>
-                  </View>
-                ) : null}
+            {photo ? (
+              <View style={styles.previewWrap}>
+                <Image testID="photo-preview" source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
                 <Pressable
-                  testID="attach-photo"
+                  testID="photo-clear"
                   accessibilityRole="button"
-                  accessibilityLabel="Photo"
-                  onPress={() => setPhotoMenu((open) => !open)}
-                hitSlop={12}
+                  accessibilityLabel="Remove photo"
+                  onPress={() => setPhoto(null)}
+                  style={styles.previewClear}
+                >
+                  <Feather name="x" size={14} color={ink} />
+                </Pressable>
+              </View>
+            ) : null}
+            <TextInput
+              testID="composer"
+              value={draft}
+              onChangeText={onChangeDraft}
+              onContentSizeChange={onInputSize}
+              placeholder={contact ? `Message ${contact.id}` : 'Message'}
+              placeholderTextColor="#8a8a8a"
+              multiline
+              numberOfLines={2}
+              style={[styles.input, { height: inputHeight }]}
+            />
+            <View style={styles.boxTools}>
+              <Pressable
+                testID="attach-photo"
+                accessibilityRole="button"
+                accessibilityLabel="Photo"
+                onPress={() => attach('library')}
                 style={styles.photoButton}
               >
                 <Feather name="image" size={22} color={ink} />
-                </Pressable>
-              </View>
-              <TextInput
-                testID="composer"
-                value={draft}
-                onChangeText={onChangeDraft}
-                placeholder={contact ? `Message ${contact.id}` : 'Message'}
-                placeholderTextColor="#8a8a8a"
-                multiline
-                numberOfLines={1}
-                style={styles.input}
-              />
+              </Pressable>
+              <Pressable
+                testID="send"
+                accessibilityRole="button"
+                accessibilityLabel="Send"
+                disabled={!canSend}
+                onPress={() => send()}
+                style={[styles.send, canSend && styles.sendReady]}
+              >
+                <Feather name="send" size={18} color={canSend ? paper : '#9a9a9a'} />
+              </Pressable>
             </View>
-            <Pressable
-              testID="send"
-              accessibilityRole="button"
-              accessibilityLabel="Send"
-              disabled={!canSend}
-              onPress={() => send()}
-              style={[styles.send, canSend && styles.sendReady]}
-            >
-              <Feather name="send" size={22} color={canSend ? paper : '#9a9a9a'} />
-            </Pressable>
           </View>
         </View>
       </View>
@@ -674,53 +645,58 @@ const styles = StyleSheet.create({
   intentBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: ink },
   intentText: { color: ink, fontSize: 14, textAlign: 'center', lineHeight: 18 },
   intentTextSelected: { fontWeight: '700' },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: ink,
-  },
-  preview: { width: 48, height: 48, borderWidth: 1, borderColor: ink },
-  previewClear: { color: ink, fontSize: 15 },
-  composer: { flexDirection: 'row', alignItems: 'stretch' },
-  field: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 16,
-    paddingRight: 16,
-  },
-  photoSlot: { alignItems: 'center', justifyContent: 'center' },
-  photoButton: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
-  photoMenu: {
-    position: 'absolute',
-    left: 4,
-    bottom: 48,
-    zIndex: 3,
-    backgroundColor: paper,
+  composer: {
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: ink,
+    borderRadius: 22,
+    backgroundColor: paper,
+    overflow: 'hidden',
   },
-  photoChoice: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  bubblePhoto: { width: 180, height: 140, borderRadius: 10, marginBottom: 6 },
+  previewWrap: { paddingTop: 12, paddingHorizontal: 12 },
+  preview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#f3f3f3' },
+  previewClear: {
+    position: 'absolute',
+    top: 18,
+    left: 104,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: ink,
+    backgroundColor: paper,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   input: {
-    flex: 1,
-    maxHeight: 140,
-    borderWidth: 0,
-    marginLeft: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingLeft: 0,
-    paddingRight: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
     fontSize: 17,
     lineHeight: 22,
     color: ink,
-    textAlignVertical: 'center',
+    borderWidth: 0,
     outlineStyle: 'none',
   },
-  send: { width: 56, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: ink },
+  boxTools: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 6,
+    paddingRight: 8,
+    paddingBottom: 8,
+  },
+  photoButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  bubblePhoto: { width: 180, height: 140, borderRadius: 10, marginBottom: 6 },
+  send: {
+    marginLeft: 'auto',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f2f2f2',
+  },
   sendReady: { backgroundColor: ink },
 });
