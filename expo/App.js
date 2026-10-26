@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Easing,
   Image,
   Keyboard,
+  LayoutAnimation,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -37,118 +37,127 @@ import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
 import { finishSignIn } from './src/signIn';
 
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function summaryAt(hour, minute = 0) {
+  const suffix = hour >= 12 ? 'pm' : 'am';
+  const shown = hour % 12 || 12;
+  if (!minute) return `${shown}${suffix}`;
+  return `${shown}:${String(minute).padStart(2, '0')}${suffix}`;
+}
+
 function scheduleLabel(mode, state) {
-  if (mode === 'relaxed') return 'Open';
+  if (mode === 'relaxed') return 'open to all messages';
   const clock = dailyClock(state);
-  return `Daily ${dayPhrase(clock.hour, clock.minute)}`;
+  return `receiving summary at ${summaryAt(clock.hour, clock.minute)}`;
 }
 
-function keyboardEasing(name) {
-  if (name === 'easeIn') return Easing.in(Easing.ease);
-  if (name === 'easeOut') return Easing.out(Easing.ease);
-  if (name === 'linear') return Easing.linear;
-  if (name === 'easeInEaseOut') return Easing.inOut(Easing.ease);
-  // UIKit's keyboard curve. The notification names this easing "keyboard".
-  return Easing.bezier(0.38, 0.7, 0.125, 1);
+function webKeyboardOverlap() {
+  const viewport = window.visualViewport;
+  if (!viewport) return 0;
+  return Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
 }
 
-function useKeyboardLift(hostRef, threadRef) {
-  const lift = useRef(new Animated.Value(0)).current;
+function useConversation(hostRef) {
+  const [frame, setFrame] = useState({ conversation: false, inset: 0 });
+  const conversationRef = useRef(false);
+  const insetRef = useRef(0);
+  const focusedRef = useRef(false);
   const restingBottom = useRef(0);
-  const applied = useRef(0);
-  const offset = useRef(0);
-  const pinned = useRef(true);
-  const pinThisMove = useRef(false);
-  const moving = useRef(false);
+  const lastEvent = useRef(null);
 
   const rememberBottom = useCallback(() => {
-    if (applied.current > 0) return;
+    if (insetRef.current > 0) return;
     hostRef.current?.measureInWindow((_x, y, _width, height) => {
       if (height) restingBottom.current = y + height;
     });
   }, [hostRef]);
 
-  const onThreadScroll = useCallback((event) => {
-    if (moving.current) return;
-    const native = event.nativeEvent;
-    offset.current = native.contentOffset?.y ?? 0;
-    const content = native.contentSize?.height ?? 0;
-    const view = native.layoutMeasurement?.height ?? 0;
-    pinned.current = content - view - offset.current < 24;
+  const overlapFrom = useCallback((event) => {
+    const screenY = event?.endCoordinates?.screenY;
+    if (typeof screenY !== 'number') return 0;
+    const bottom = restingBottom.current;
+    if (!bottom) return Math.max(0, Math.round(event.endCoordinates?.height ?? 0));
+    return Math.max(0, Math.round(bottom - screenY));
   }, []);
 
-  useEffect(() => {
-    const id = lift.addListener(({ value }) => {
-      const delta = value - applied.current;
-      applied.current = value;
-      if (!pinThisMove.current || !threadRef.current) return;
-      offset.current = Math.max(0, offset.current + delta);
-      threadRef.current.scrollTo({ y: offset.current, animated: false });
-    });
-    return () => lift.removeListener(id);
-  }, [lift, threadRef]);
-
-  useEffect(() => {
-    function overlap(event) {
-      const screenY = event?.endCoordinates?.screenY;
-      if (typeof screenY !== 'number') return 0;
-      const bottom = restingBottom.current;
-      if (!bottom) return Math.max(0, event.endCoordinates?.height ?? 0);
-      return Math.max(0, bottom - screenY);
-    }
-
-    function apply(event, next) {
-      const value = Math.round(next);
-      if (value === Math.round(applied.current) && !moving.current) return;
-      pinThisMove.current = pinned.current;
-      const duration = Platform.OS === 'ios' && event?.duration > 0 ? event.duration : 0;
-      lift.stopAnimation();
-      if (duration > 0) {
-        moving.current = true;
-        Animated.timing(lift, {
-          toValue: value,
-          duration,
-          easing: keyboardEasing(event?.easing),
-          useNativeDriver: false,
-        }).start(({ finished }) => {
-          if (finished) moving.current = false;
+  const commit = useCallback((event, show, nextInset) => {
+    const insetValue = show ? nextInset : 0;
+    if (conversationRef.current === show && insetRef.current === insetValue) return;
+    const opening = conversationRef.current !== show;
+    if (opening) {
+      if (Platform.OS === 'ios' && event && Keyboard.scheduleLayoutAnimation) {
+        Keyboard.scheduleLayoutAnimation(event);
+      } else if (typeof LayoutAnimation.configureNext === 'function') {
+        LayoutAnimation.configureNext({
+          duration: event?.duration > 0 ? event.duration : 250,
+          update: { type: LayoutAnimation.Types?.easeInEaseOut ?? 'easeInEaseOut' },
         });
-        return;
       }
-      // Web tracks visualViewport, which already moves with the keyboard.
-      // Setting the inset here does not wait for a did-show event.
-      moving.current = false;
-      lift.setValue(value);
+    }
+    conversationRef.current = show;
+    insetRef.current = insetValue;
+    setFrame({ conversation: show, inset: insetValue });
+  }, []);
+
+  const onComposerFocus = useCallback(() => {
+    focusedRef.current = true;
+    const event = lastEvent.current;
+    const next = event ? overlapFrom(event) : 0;
+    if (next > 0) commit(event, true, next);
+    else if (Platform.OS === 'web') commit(null, true, webKeyboardOverlap());
+  }, [commit, overlapFrom]);
+
+  const onComposerBlur = useCallback(() => {
+    focusedRef.current = false;
+    if (Platform.OS !== 'ios') commit(null, false, 0);
+  }, [commit]);
+
+  useEffect(() => {
+    function onFrame(event) {
+      lastEvent.current = event;
+      const next = overlapFrom(event);
+      if (next > 0 && !focusedRef.current) return;
+      commit(event, next > 0 && focusedRef.current, next);
     }
 
     if (Platform.OS === 'web') {
       const viewport = window.visualViewport;
       if (!viewport) return undefined;
       const onViewport = () => {
-        const next = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-        apply(null, next);
+        if (!focusedRef.current) return;
+        commit(null, true, webKeyboardOverlap());
       };
       viewport.addEventListener('resize', onViewport);
       viewport.addEventListener('scroll', onViewport);
-      onViewport();
       return () => {
         viewport.removeEventListener('resize', onViewport);
         viewport.removeEventListener('scroll', onViewport);
       };
     }
 
-    // iOS: keyboardWillChangeFrame fires when the animation starts and includes its
-    // duration and curve. keyboardDidShow fires after that animation and would
-    // reflow the screen a second time.
     const frameEvent = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
-    const subs = [Keyboard.addListener(frameEvent, (event) => apply(event, overlap(event)))];
+    const subs = [Keyboard.addListener(frameEvent, onFrame)];
     if (Platform.OS !== 'ios') {
-      subs.push(Keyboard.addListener('keyboardDidHide', (event) => apply(event, 0)));
+      subs.push(
+        Keyboard.addListener('keyboardDidHide', () => {
+          lastEvent.current = null;
+          commit(null, false, 0);
+        }),
+      );
     }
     return () => subs.forEach((sub) => sub.remove());
-  }, [lift]);
+  }, [commit, overlapFrom]);
 
-  return { lift, rememberBottom, onThreadScroll, keyboardLift: applied };
+  return {
+    conversation: frame.conversation,
+    inset: frame.inset,
+    rememberBottom,
+    onComposerFocus,
+    onComposerBlur,
+  };
 }
 
 const MISSING = {
@@ -333,12 +342,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const [panel, setPanel] = useState('chat');
   const [pendingMode, setPendingMode] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [footerHeight, setFooterHeight] = useState(0);
   const focusRequest = useRef(0);
   const threadRef = useRef(null);
   const frameRef = useRef(null);
   const phoneRef = useRef(null);
-  const { lift, rememberBottom, onThreadScroll, keyboardLift } = useKeyboardLift(phoneRef, threadRef);
+  const { conversation, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
   const avatarRefs = useRef({});
   const [tailX, setTailX] = useState(null);
   const state = inbox?.state;
@@ -379,6 +387,16 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
     const handle = requestAnimationFrame(syncTail);
     return () => cancelAnimationFrame(handle);
   }, [syncTail, contacts.length, messages.length]);
+
+  useEffect(() => {
+    if (conversation) setScheduleOpen(false);
+  }, [conversation]);
+
+  useEffect(() => {
+    if (!conversation) return undefined;
+    const handle = requestAnimationFrame(() => threadRef.current?.scrollToEnd({ animated: false }));
+    return () => cancelAnimationFrame(handle);
+  }, [conversation, inset, messages.length]);
 
   async function mutate(path, body) {
     const next = await api(path, { token, method: 'POST', body });
@@ -450,7 +468,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   return (
     <View style={styles.root}>
       <View ref={phoneRef} onLayout={rememberBottom} style={styles.phone}>
-        {scheduleOpen ? (
+        {scheduleOpen && !conversation ? (
           <Pressable
             testID="schedule-backdrop"
             accessibilityLabel="Close schedule"
@@ -458,6 +476,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             style={styles.backdrop}
           />
         ) : null}
+        {conversation ? null : (
+        <>
         <View testID="schedule-panel" style={styles.top}>
           <View testID="top-bar" style={styles.header}>
             <Pressable
@@ -469,7 +489,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
               onPress={onToggleFocus}
               style={styles.focus}
             >
-              <Ionicons name={focused ? 'moon' : 'moon-outline'} size={20} color={ink} />
+              <Ionicons name={focused ? 'moon' : 'moon-outline'} size={20} color={focused ? moon : ink} />
               <Text style={styles.focusText}>Focus</Text>
             </Pressable>
             <View style={styles.scheduleWrap}>
@@ -557,8 +577,10 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             </Text>
           </Pressable>
         </ScrollView>
+        </>
+        )}
 
-        {panel === 'add' ? (
+        {panel === 'add' && !conversation ? (
           <PlusView
             code={userId(inbox)}
             onLookup={onLookup}
@@ -570,36 +592,22 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           />
         ) : null}
         {panel === 'chat' ? (
-        <View style={styles.main}>
+        <View style={[styles.main, conversation ? { paddingBottom: inset } : null]}>
         <View ref={frameRef} style={styles.thread} onLayout={syncTail}>
-          <Animated.ScrollView
+          <ScrollView
             ref={threadRef}
             style={styles.thread}
-            contentContainerStyle={[
-              styles.threadContent,
-              { paddingBottom: Animated.add(footerHeight + 28, lift) },
-            ]}
+            contentContainerStyle={styles.threadContent}
             keyboardShouldPersistTaps="handled"
-            scrollEventThrottle={16}
-            onScroll={onThreadScroll}
-            onContentSizeChange={() => {
-              if (keyboardLift.current > 0) return;
-              threadRef.current?.scrollToEnd({ animated: false });
-            }}
+            onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
           >
             {messages.map((message) => (
               <Bubble key={message.id} message={message} tailX={tailX} />
             ))}
-          </Animated.ScrollView>
+          </ScrollView>
         </View>
 
-        <Animated.View
-          onLayout={(event) => {
-            const next = Math.ceil(event.nativeEvent.layout.height);
-            setFooterHeight((current) => (current === next ? current : next));
-          }}
-          style={[styles.footer, styles.footerDock, { bottom: lift }]}
-        >
+        <View style={styles.footer}>
           <View style={styles.intents}>
             {INTENTS.map((item, index) => {
               const selected = item.id === intent;
@@ -687,6 +695,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
               value={draft}
               onChangeText={onChangeDraft}
               onContentSizeChange={onInputSize}
+              onFocus={onComposerFocus}
+              onBlur={onComposerBlur}
               placeholder={contact ? `Message ${contact.id}` : 'Message'}
               placeholderTextColor="#8a8a8a"
               multiline
@@ -715,7 +725,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
               </Pressable>
             </View>
           </View>
-        </Animated.View>
+        </View>
         </View>
         ) : null}
       </View>
@@ -801,6 +811,7 @@ function BubbleBody({ message }) {
 
 const ink = '#1c1c1c';
 const paper = '#fff';
+const moon = '#c47d00';
 
 const styles = StyleSheet.create({
   boot: { flex: 1, backgroundColor: paper },
@@ -947,7 +958,6 @@ const styles = StyleSheet.create({
   theirTailJoin: { position: 'absolute', left: 2, bottom: -2, width: 14, height: 4, backgroundColor: paper },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { borderTopWidth: 1, borderTopColor: ink, backgroundColor: paper },
-  footerDock: { position: 'absolute', left: 0, right: 0 },
   intents: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: ink },
   intent: {
     flex: 1,

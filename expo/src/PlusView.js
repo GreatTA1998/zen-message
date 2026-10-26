@@ -94,17 +94,14 @@ const styles = StyleSheet.create({
   screen: { flex: 1, width: '100%', backgroundColor: paper },
   body: { padding: 20, gap: 12 },
   title: { color: ink, fontSize: 18, lineHeight: 24, fontWeight: '600' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  row: { height: 44, flexDirection: 'row', alignItems: 'stretch', gap: 12 },
   input: {
     flex: 1,
     borderWidth: 1,
     borderColor: ink,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 8,
     fontSize: 24,
-    // The old minHeight of 52 did not follow the font. This line box does.
-    lineHeight: 36,
     letterSpacing: 3,
     color: ink,
   },
