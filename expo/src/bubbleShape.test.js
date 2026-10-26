@@ -20,8 +20,8 @@ test('the outline is a single stroke with no second edge', () => {
   const own = rasterBubble(180, 72, false, 1);
   const middle = inkRuns(own, 30);
   assert.equal(middle.length, 2);
-  middle.forEach((run) => assert.equal(run.width <= 4, true));
-  assert.equal(paperAt(own, 90, 30), true);
+  middle.forEach((run) => assert.equal(run.width <= 6, true));
+  assert.equal(filledAt(own, 90, 30), true);
   const tip = inkRuns(own, 70);
   assert.equal(tip.length, 1);
   assert.equal(tip[0].start > 150, true);
@@ -30,7 +30,8 @@ test('the outline is a single stroke with no second edge', () => {
   const incomingTip = inkRuns(incoming, 1);
   assert.equal(incomingTip.length, 1);
   assert.equal(incomingTip[0].start < 30, true);
-  assert.equal(paperAt(incoming, 90, 40), true);
+  assert.equal(filledAt(incoming, 90, 40), true);
+  assert.equal(filledShare(own) > 0.45, true);
 });
 
 function inkRuns(image, y) {
@@ -50,13 +51,21 @@ function inkRuns(image, y) {
 function inkAlpha(image, x, y) {
   const offset = (y * image.width + x) * 4;
   const alpha = image.rgba[offset + 3];
-  const ink = 255 - image.rgba[offset];
-  return alpha > 20 && ink > 20 ? alpha : 0;
+  return alpha > 80 && image.rgba[offset] < 80 ? alpha : 0;
 }
 
-function paperAt(image, x, y) {
+function filledAt(image, x, y) {
   const offset = (y * image.width + x) * 4;
-  return image.rgba[offset] > 240 && image.rgba[offset + 3] > 240;
+  return image.rgba[offset + 3] > 240 && image.rgba[offset] > 200 && image.rgba[offset] < 245;
+}
+
+function filledShare(image) {
+  let filled = 0;
+  const pixels = image.width * image.height;
+  for (let i = 0; i < pixels; i += 1) {
+    if (image.rgba[i * 4 + 3] > 240 && image.rgba[i * 4] > 200) filled += 1;
+  }
+  return filled / pixels;
 }
 
 test('the png round-trips through zlib', () => {

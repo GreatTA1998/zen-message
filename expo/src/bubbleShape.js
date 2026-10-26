@@ -1,7 +1,7 @@
 const INK = [0x1c, 0x1c, 0x1c];
-const PAPER = [0xff, 0xff, 0xff];
+const FILL = [0xe5, 0xe5, 0xea];
 const TAIL = 12;
-const STROKE = 1.25;
+const STROKE = 2;
 
 const cache = new Map();
 
@@ -43,9 +43,9 @@ export function rasterBubble(width, height, incoming, scale = 1) {
     for (let x = 0; x < w; x += 1) {
       if (insideBody(x + 0.5, y + 0.5, bounds, half)) {
         const offset = (y * w + x) * 4;
-        rgba[offset] = PAPER[0];
-        rgba[offset + 1] = PAPER[1];
-        rgba[offset + 2] = PAPER[2];
+        rgba[offset] = FILL[0];
+        rgba[offset + 1] = FILL[1];
+        rgba[offset + 2] = FILL[2];
         rgba[offset + 3] = 255;
         continue;
       }
@@ -67,9 +67,9 @@ export function rasterBubble(width, height, incoming, scale = 1) {
       const alpha = ink + paper;
       if (alpha <= 0) continue;
       const offset = (y * w + x) * 4;
-      rgba[offset] = Math.round((INK[0] * ink + PAPER[0] * paper) / alpha);
-      rgba[offset + 1] = Math.round((INK[1] * ink + PAPER[1] * paper) / alpha);
-      rgba[offset + 2] = Math.round((INK[2] * ink + PAPER[2] * paper) / alpha);
+      rgba[offset] = Math.round((INK[0] * ink + FILL[0] * paper) / alpha);
+      rgba[offset + 1] = Math.round((INK[1] * ink + FILL[1] * paper) / alpha);
+      rgba[offset + 2] = Math.round((INK[2] * ink + FILL[2] * paper) / alpha);
       rgba[offset + 3] = Math.round(alpha * 255);
     }
   }
