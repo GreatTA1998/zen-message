@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
   Image,
   Keyboard,
   Platform,
@@ -56,7 +55,6 @@ function webKeyboardOverlap() {
 }
 
 function useConversation(hostRef) {
-  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [inset, setInset] = useState(0);
   const openRef = useRef(false);
@@ -87,24 +85,22 @@ function useConversation(hostRef) {
     if (openRef.current === show && insetRef.current === insetValue) return;
     openRef.current = show;
     insetRef.current = insetValue;
-    setMounted(true);
     setOpen(show);
     setInset(insetValue);
   }, []);
 
   const presentWithKeyboard = useCallback((event) => {
-    handoff.current = true;
-    if (event && typeof Keyboard.scheduleLayoutAnimation === 'function') {
-      Keyboard.scheduleLayoutAnimation(event);
+    if (openRef.current) {
+      handoff.current = false;
+      return;
     }
-    commit(true, event ? overlapFrom(event) : Platform.OS === 'web' ? webKeyboardOverlap() : 0);
+    handoff.current = true;
+    const nextInset = event ? overlapFrom(event) : Platform.OS === 'web' ? webKeyboardOverlap() : 0;
+    commit(true, nextInset);
   }, [commit, overlapFrom]);
 
-  const dismissWithKeyboard = useCallback((event) => {
+  const dismissWithKeyboard = useCallback(() => {
     handoff.current = false;
-    if (event && typeof Keyboard.scheduleLayoutAnimation === 'function') {
-      Keyboard.scheduleLayoutAnimation(event);
-    }
     commit(false, 0);
   }, [commit]);
 
@@ -115,7 +111,6 @@ function useConversation(hostRef) {
       blurTimer.current = null;
     }
     if (Platform.OS === 'ios') {
-      setMounted(true);
       if (openRef.current) {
         handoff.current = false;
         return;
@@ -153,21 +148,6 @@ function useConversation(hostRef) {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const viewport = window.visualViewport;
-      if (!viewport) return undefined;
-      const onViewport = () => {
-        if (!openRef.current) return;
-        commit(true, webKeyboardOverlap());
-      };
-      viewport.addEventListener('resize', onViewport);
-      viewport.addEventListener('scroll', onViewport);
-      return () => {
-        viewport.removeEventListener('resize', onViewport);
-        viewport.removeEventListener('scroll', onViewport);
-      };
-    }
-
     if (Platform.OS !== 'ios') return undefined;
 
     function onShow(event) {
@@ -191,7 +171,6 @@ function useConversation(hostRef) {
   }, [commit, dismissWithKeyboard, presentWithKeyboard]);
 
   return {
-    mounted,
     open,
     inset,
     rememberBottom,
@@ -386,8 +365,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const threadRef = useRef(null);
   const frameRef = useRef(null);
   const phoneRef = useRef(null);
-  const { mounted, open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
-  const [phoneHeight, setPhoneHeight] = useState(() => Dimensions.get('window').height);
+  const { open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
   const avatarRefs = useRef({});
   const [tailX, setTailX] = useState(null);
   const state = inbox?.state;
@@ -527,11 +505,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
     <View style={styles.root}>
       <View
         ref={phoneRef}
-        onLayout={(event) => {
-          rememberBottom();
-          const next = Math.round(event.nativeEvent.layout.height);
-          if (next) setPhoneHeight((current) => (current === next ? current : next));
-        }}
+        onLayout={rememberBottom}
         style={styles.phone}
       >
         {scheduleOpen ? (
@@ -661,6 +635,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             style={styles.thread}
             contentContainerStyle={styles.threadContent}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={false}
+            contentInsetAdjustmentBehavior="never"
             onContentSizeChange={() => {
               if (open) return;
               threadRef.current?.scrollToEnd({ animated: false });
@@ -675,14 +651,12 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
         <ComposerFooter testID="composer" {...composerProps} />
         </View>
         ) : null}
-        {panel === 'chat' && mounted ? (
+        {panel === 'chat' && open ? (
           <ConversationSheet
-            open={open}
             inset={inset}
-            hiddenTop={phoneHeight}
             messages={messages}
             tailX={tailX}
-            footer={<ComposerFooter testID="composer-copy" autoFocus={open} {...composerProps} />}
+            footer={<ComposerFooter testID="composer-copy" autoFocus {...composerProps} />}
           />
         ) : null}
       </View>
@@ -872,19 +846,17 @@ function ComposerFooter({
   );
 }
 
-function ConversationSheet({ open, inset, hiddenTop, messages, tailX, footer }) {
+function ConversationSheet({ inset, messages, tailX, footer }) {
   const ordered = messages.slice().reverse();
   return (
-    <View
-      testID="conversation-copy"
-      pointerEvents={open ? 'auto' : 'none'}
-      style={[styles.copy, { top: open ? 0 : hiddenTop, paddingBottom: open ? inset : 0 }]}
-    >
+    <View testID="conversation-copy" style={[styles.copy, { top: 0, paddingBottom: inset }]}>
       <View style={styles.copyColumn}>
         <ScrollView
           style={[styles.thread, styles.flip]}
           contentContainerStyle={styles.threadContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
+          contentInsetAdjustmentBehavior="never"
         >
           {ordered.map((message) => (
             <View key={message.id} style={styles.flip}>
