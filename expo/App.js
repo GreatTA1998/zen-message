@@ -63,9 +63,22 @@ function useConversation(hostRef) {
   const insetRef = useRef(0);
   const focusCount = useRef(0);
   const handoff = useRef(false);
+  // True after a field focuses inside the open sheet. The hide/show pair iOS
+  // emits while moving focus must not arm handoff again once this is set.
+  const landed = useRef(false);
   const blurTimer = useRef(null);
+  const hideFrame = useRef(null);
+  const pendingHide = useRef(null);
   const restingBottom = useRef(0);
   const pendingShow = useRef(null);
+
+  const cancelHide = useCallback(() => {
+    pendingHide.current = null;
+    if (hideFrame.current != null) {
+      cancelAnimationFrame(hideFrame.current);
+      hideFrame.current = null;
+    }
+  }, []);
 
   const rememberBottom = useCallback(() => {
     if (insetRef.current > 0) return;
@@ -93,7 +106,7 @@ function useConversation(hostRef) {
   }, []);
 
   const presentWithKeyboard = useCallback((event) => {
-    handoff.current = true;
+    handoff.current = !landed.current;
     if (event && typeof Keyboard.scheduleLayoutAnimation === 'function') {
       Keyboard.scheduleLayoutAnimation(event);
     }
@@ -102,6 +115,7 @@ function useConversation(hostRef) {
 
   const dismissWithKeyboard = useCallback((event) => {
     handoff.current = false;
+    if (focusCount.current === 0) landed.current = false;
     if (event && typeof Keyboard.scheduleLayoutAnimation === 'function') {
       Keyboard.scheduleLayoutAnimation(event);
     }
@@ -114,10 +128,12 @@ function useConversation(hostRef) {
       clearTimeout(blurTimer.current);
       blurTimer.current = null;
     }
+    cancelHide();
     if (Platform.OS === 'ios') {
       setMounted(true);
       if (openRef.current) {
         handoff.current = false;
+        landed.current = true;
         return;
       }
       const event = pendingShow.current;
@@ -127,10 +143,11 @@ function useConversation(hostRef) {
       return;
     }
     presentWithKeyboard(null);
-  }, [presentWithKeyboard]);
+  }, [cancelHide, presentWithKeyboard]);
 
   const onComposerBlur = useCallback(() => {
     focusCount.current = Math.max(0, focusCount.current - 1);
+    if (focusCount.current === 0) landed.current = false;
     if (focusCount.current > 0) return;
     if (Platform.OS === 'ios') {
       if (handoff.current) return;
@@ -149,6 +166,7 @@ function useConversation(hostRef) {
   useEffect(() => {
     return () => {
       if (blurTimer.current) clearTimeout(blurTimer.current);
+      if (hideFrame.current != null) cancelAnimationFrame(hideFrame.current);
     };
   }, []);
 
@@ -171,6 +189,7 @@ function useConversation(hostRef) {
     if (Platform.OS !== 'ios') return undefined;
 
     function onShow(event) {
+      cancelHide();
       pendingShow.current = event;
       if (focusCount.current === 0) return;
       pendingShow.current = null;
@@ -180,15 +199,43 @@ function useConversation(hostRef) {
     function onHide(event) {
       pendingShow.current = null;
       if (handoff.current || !openRef.current) return;
+      // Focus still held: this may be the hide half of a focus move. A show
+      // or another focus cancels it; a swipe has neither and closes next frame.
+      if (focusCount.current > 0) {
+        pendingHide.current = event;
+        if (hideFrame.current != null) cancelAnimationFrame(hideFrame.current);
+        hideFrame.current = requestAnimationFrame(() => {
+          hideFrame.current = null;
+          const pending = pendingHide.current;
+          pendingHide.current = null;
+          if (!pending || handoff.current || !openRef.current) return;
+          dismissWithKeyboard(pending);
+        });
+        return;
+      }
       dismissWithKeyboard(event);
+    }
+
+    // Emoji, dictation, and QuickType resize an already-visible keyboard
+    // with willChangeFrame and no second willShow. A frame that leaves the
+    // screen is a hide; onHide owns that so the handoff latch still applies.
+    function onFrame(event) {
+      if (!openRef.current) return;
+      const next = overlapFrom(event);
+      if (next <= 0 || next === insetRef.current) return;
+      if (typeof Keyboard.scheduleLayoutAnimation === 'function') {
+        Keyboard.scheduleLayoutAnimation(event);
+      }
+      commit(true, next);
     }
 
     const subs = [
       Keyboard.addListener('keyboardWillShow', onShow),
       Keyboard.addListener('keyboardWillHide', onHide),
+      Keyboard.addListener('keyboardWillChangeFrame', onFrame),
     ];
     return () => subs.forEach((sub) => sub.remove());
-  }, [commit, dismissWithKeyboard, presentWithKeyboard]);
+  }, [cancelHide, commit, dismissWithKeyboard, overlapFrom, presentWithKeyboard]);
 
   return {
     mounted,
