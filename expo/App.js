@@ -52,6 +52,15 @@ function keyboardEasing(name) {
   return Easing.bezier(0.38, 0.7, 0.125, 1);
 }
 
+// Padding from the keyboard inset changes content size by the lift itself.
+// A sent bubble, an incoming message, or a taller footer does not.
+function contentBeyondInset(growth, liftGrowth) {
+  if (Math.abs(liftGrowth) < 1) return Math.abs(growth) > 1;
+  if (liftGrowth > 0) return growth - liftGrowth > 1;
+  if (growth > 1) return true;
+  return growth - liftGrowth < -1;
+}
+
 function useKeyboardLift(hostRef, threadRef) {
   const lift = useRef(new Animated.Value(0)).current;
   const restingBottom = useRef(0);
@@ -60,6 +69,27 @@ function useKeyboardLift(hostRef, threadRef) {
   const pinned = useRef(true);
   const pinThisMove = useRef(false);
   const moving = useRef(false);
+  const extent = useRef({ height: 0, lift: 0 });
+
+  const onThreadContentSize = useCallback((_width, height) => {
+    const nextHeight = height ?? 0;
+    const growth = nextHeight - extent.current.height;
+    const liftNow = applied.current;
+    const liftGrowth = liftNow - extent.current.lift;
+    extent.current.height = nextHeight;
+    if (!contentBeyondInset(growth, liftGrowth)) {
+      // Stay on the inset this layout applied. An in-flight lift is ahead of
+      // that, and catching the baseline up to it would look like a new bubble.
+      const behind =
+        (liftGrowth > 1 && growth < liftGrowth - 1) || (liftGrowth < -1 && growth > liftGrowth + 1);
+      extent.current.lift = behind ? extent.current.lift + growth : liftNow;
+      return;
+    }
+    extent.current.lift = liftNow;
+    // The lift listener owns the scroll while the inset animates.
+    if (moving.current) return;
+    threadRef.current?.scrollToEnd({ animated: false });
+  }, [threadRef]);
 
   const rememberBottom = useCallback(() => {
     if (applied.current > 0) return;
@@ -148,7 +178,7 @@ function useKeyboardLift(hostRef, threadRef) {
     return () => subs.forEach((sub) => sub.remove());
   }, [lift]);
 
-  return { lift, rememberBottom, onThreadScroll, keyboardLift: applied };
+  return { lift, rememberBottom, onThreadScroll, onThreadContentSize };
 }
 
 const MISSING = {
@@ -338,7 +368,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const threadRef = useRef(null);
   const frameRef = useRef(null);
   const phoneRef = useRef(null);
-  const { lift, rememberBottom, onThreadScroll, keyboardLift } = useKeyboardLift(phoneRef, threadRef);
+  const { lift, rememberBottom, onThreadScroll, onThreadContentSize } = useKeyboardLift(phoneRef, threadRef);
   const avatarRefs = useRef({});
   const [tailX, setTailX] = useState(null);
   const state = inbox?.state;
@@ -582,10 +612,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             keyboardShouldPersistTaps="handled"
             scrollEventThrottle={16}
             onScroll={onThreadScroll}
-            onContentSizeChange={() => {
-              if (keyboardLift.current > 0) return;
-              threadRef.current?.scrollToEnd({ animated: false });
-            }}
+            onContentSizeChange={onThreadContentSize}
           >
             {messages.map((message) => (
               <Bubble key={message.id} message={message} tailX={tailX} />
