@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   Keyboard,
+  PixelRatio,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
+import { bubbleDataUri } from './src/bubbleShape';
 import { PERSON_AVATAR } from './src/contacts';
 import {
   DAY_HOURS,
@@ -363,11 +365,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const focusRequest = useRef(0);
   const threadRef = useRef(null);
-  const frameRef = useRef(null);
   const phoneRef = useRef(null);
   const { open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
-  const avatarRefs = useRef({});
-  const [tailX, setTailX] = useState(null);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
   const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
@@ -389,23 +388,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
       if (focusRequest.current === request) setPendingMode(null);
     });
   }
-
-  const syncTail = useCallback(() => {
-    const avatar = avatarRefs.current[contact?.id];
-    const frame = frameRef.current;
-    if (!avatar?.measureInWindow || !frame?.measureInWindow) return;
-    avatar.measureInWindow((x, _y, width) => {
-      frame.measureInWindow((frameX, _frameY, frameWidth) => {
-        const center = x + width / 2 - frameX;
-        setTailX(Math.max(20, Math.min(center, frameWidth - 20)));
-      });
-    });
-  }, [contact?.id]);
-
-  useEffect(() => {
-    const handle = requestAnimationFrame(syncTail);
-    return () => cancelAnimationFrame(handle);
-  }, [syncTail, contacts.length, messages.length]);
 
   useEffect(() => {
     if (open) setScheduleOpen(false);
@@ -567,7 +549,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           testID="contact-strip"
           style={styles.contactStrip}
           scrollEventThrottle={16}
-          onScroll={syncTail}
         >
           {contacts.map((item) => {
             const selected = item.id === contact?.id;
@@ -585,10 +566,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
                 style={styles.contact}
               >
                 <Image
-                  ref={(node) => {
-                    avatarRefs.current[item.id] = node;
-                  }}
-                  onLayout={syncTail}
                   source={PERSON_AVATAR}
                   resizeMode="cover"
                   style={[styles.avatar, panel === 'chat' && selected ? styles.circleOn : styles.circleDim]}
@@ -629,7 +606,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
         ) : null}
         {panel === 'chat' ? (
         <View style={styles.main}>
-        <View ref={frameRef} style={styles.thread} onLayout={syncTail}>
+        <View style={styles.thread}>
           <ScrollView
             ref={threadRef}
             style={styles.thread}
@@ -643,7 +620,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             }}
           >
             {messages.map((message) => (
-              <Bubble key={message.id} message={message} tailX={tailX} />
+              <Bubble key={message.id} message={message} />
             ))}
           </ScrollView>
         </View>
@@ -655,7 +632,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           <ConversationSheet
             inset={inset}
             messages={messages}
-            tailX={tailX}
             footer={<ComposerFooter testID="composer-copy" autoFocus {...composerProps} />}
           />
         ) : null}
@@ -846,7 +822,7 @@ function ComposerFooter({
   );
 }
 
-function ConversationSheet({ inset, messages, tailX, footer }) {
+function ConversationSheet({ inset, messages, footer }) {
   const ordered = messages.slice().reverse();
   return (
     <View testID="conversation-copy" style={[styles.copy, { top: 0, paddingBottom: inset }]}>
@@ -860,7 +836,7 @@ function ConversationSheet({ inset, messages, tailX, footer }) {
         >
           {ordered.map((message) => (
             <View key={message.id} style={styles.flip}>
-              <Bubble message={message} tailX={tailX} />
+              <Bubble message={message} />
             </View>
           ))}
         </ScrollView>
@@ -893,35 +869,29 @@ function ScheduleSettings({ state, onChoose }) {
   );
 }
 
-function Bubble({ message, tailX }) {
+const bubbleScale = PixelRatio.get() >= 3 ? 3 : 2;
+
+function Bubble({ message }) {
   const incoming = message.direction === 'in';
-  const [width, setWidth] = useState(0);
-  if (!incoming) {
-    return (
-      <View style={styles.bubble}>
-        <BubbleBody message={message} />
-        <View testID="tail-own" style={styles.ownTail}>
-          <View style={styles.ownTailInk} />
-          <View style={styles.ownTailPaper} />
-          <View style={styles.ownTailJoin} />
-        </View>
-      </View>
-    );
-  }
-  const tailLeft = Math.max(8, (tailX ?? 34) - 16 - 9);
-  const minWidth = Math.max(72, tailLeft + 30);
+  const [box, setBox] = useState(null);
+  const uri = box ? bubbleDataUri(box.w, box.h, incoming, bubbleScale) : null;
   return (
     <View
-      testID="bubble-in"
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-      style={[styles.bubble, styles.bubbleIn, { minWidth: Math.min(minWidth, Math.max(width, minWidth)) }]}
+      testID={incoming ? 'bubble-in' : 'bubble-out'}
+      onLayout={(event) => {
+        const w = Math.round(event.nativeEvent.layout.width);
+        const h = Math.round(event.nativeEvent.layout.height);
+        if (!w || !h) return;
+        setBox((current) => (current && current.w === w && current.h === h ? current : { w, h }));
+      }}
+      style={[styles.bubble, incoming && styles.bubbleIn]}
     >
-      <View testID="tail-in" style={[styles.theirTail, { left: Math.min(tailLeft, Math.max(minWidth, width) - 26) }]}>
-        <View style={styles.theirTailInk} />
-        <View style={styles.theirTailPaper} />
-        <View style={styles.theirTailJoin} />
+      {uri ? (
+        <Image pointerEvents="none" source={{ uri }} resizeMode="stretch" style={[styles.bubbleOutline, { width: box.w, height: box.h }]} />
+      ) : null}
+      <View style={incoming ? styles.bubblePadIn : styles.bubblePadOut}>
+        <BubbleBody message={message} />
       </View>
-      <BubbleBody message={message} />
     </View>
   );
 }
@@ -1029,72 +999,12 @@ const styles = StyleSheet.create({
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: paper,
-    overflow: 'visible',
     marginBottom: 6,
   },
-  bubbleIn: { alignSelf: 'flex-start', maxWidth: '100%', marginTop: 8, marginBottom: 0 },
-  ownTail: { position: 'absolute', right: 6, bottom: -11, width: 18, height: 12 },
-  ownTailInk: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 16,
-    borderRightWidth: 2,
-    borderTopWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: ink,
-  },
-  ownTailPaper: {
-    position: 'absolute',
-    right: 1,
-    bottom: 2,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 12,
-    borderRightWidth: 1,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: paper,
-  },
-  ownTailJoin: { position: 'absolute', right: 2, top: -1, width: 12, height: 3, backgroundColor: paper },
-  theirTail: { position: 'absolute', top: -11, width: 18, height: 12, zIndex: 1 },
-  theirTailInk: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 9,
-    borderRightWidth: 9,
-    borderBottomWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: ink,
-  },
-  theirTailPaper: {
-    position: 'absolute',
-    left: 2,
-    top: 3,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 7,
-    borderRightWidth: 7,
-    borderBottomWidth: 9,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: paper,
-  },
-  theirTailJoin: { position: 'absolute', left: 2, bottom: -2, width: 14, height: 4, backgroundColor: paper },
+  bubbleIn: { alignSelf: 'flex-start', maxWidth: '78%', marginTop: 8, marginBottom: 0 },
+  bubbleOutline: { position: 'absolute', left: 0, top: 0 },
+  bubblePadOut: { paddingTop: 10, paddingBottom: 22, paddingHorizontal: 14 },
+  bubblePadIn: { paddingTop: 22, paddingBottom: 10, paddingHorizontal: 14 },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { backgroundColor: paper },
   composerWrap: { position: 'relative', zIndex: 2 },
