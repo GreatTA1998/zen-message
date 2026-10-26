@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated,
   Dimensions,
-  Easing,
   Image,
   Keyboard,
   Platform,
@@ -38,8 +36,6 @@ import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
 import { finishSignIn } from './src/signIn';
 
-const MOVE_MS = 250;
-
 function summaryAt(hour, minute = 0) {
   const suffix = hour >= 12 ? 'pm' : 'am';
   const shown = hour % 12 || 12;
@@ -60,13 +56,16 @@ function webKeyboardOverlap() {
 }
 
 function useConversation(hostRef) {
-  const [frame, setFrame] = useState({ conversation: false, inset: 0 });
-  const conversationRef = useRef(false);
+  const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [inset, setInset] = useState(0);
+  const openRef = useRef(false);
   const insetRef = useRef(0);
   const focusCount = useRef(0);
+  const handoff = useRef(false);
   const blurTimer = useRef(null);
   const restingBottom = useRef(0);
-  const lastEvent = useRef(null);
+  const pendingShow = useRef(null);
 
   const rememberBottom = useCallback(() => {
     if (insetRef.current > 0) return;
@@ -85,11 +84,29 @@ function useConversation(hostRef) {
 
   const commit = useCallback((show, nextInset) => {
     const insetValue = show ? nextInset : 0;
-    if (conversationRef.current === show && insetRef.current === insetValue) return;
-    conversationRef.current = show;
+    if (openRef.current === show && insetRef.current === insetValue) return;
+    openRef.current = show;
     insetRef.current = insetValue;
-    setFrame({ conversation: show, inset: insetValue });
+    setMounted(true);
+    setOpen(show);
+    setInset(insetValue);
   }, []);
+
+  const presentWithKeyboard = useCallback((event) => {
+    handoff.current = true;
+    if (event && typeof Keyboard.scheduleLayoutAnimation === 'function') {
+      Keyboard.scheduleLayoutAnimation(event);
+    }
+    commit(true, event ? overlapFrom(event) : Platform.OS === 'web' ? webKeyboardOverlap() : 0);
+  }, [commit, overlapFrom]);
+
+  const dismissWithKeyboard = useCallback((event) => {
+    handoff.current = false;
+    if (event && typeof Keyboard.scheduleLayoutAnimation === 'function') {
+      Keyboard.scheduleLayoutAnimation(event);
+    }
+    commit(false, 0);
+  }, [commit]);
 
   const onComposerFocus = useCallback(() => {
     focusCount.current += 1;
@@ -97,14 +114,30 @@ function useConversation(hostRef) {
       clearTimeout(blurTimer.current);
       blurTimer.current = null;
     }
-    const event = lastEvent.current;
-    const next = event ? overlapFrom(event) : Platform.OS === 'web' ? webKeyboardOverlap() : insetRef.current;
-    commit(true, next);
-  }, [commit, overlapFrom]);
+    if (Platform.OS === 'ios') {
+      setMounted(true);
+      if (openRef.current) {
+        handoff.current = false;
+        return;
+      }
+      const event = pendingShow.current;
+      if (!event) return;
+      pendingShow.current = null;
+      presentWithKeyboard(event);
+      return;
+    }
+    presentWithKeyboard(null);
+  }, [presentWithKeyboard]);
 
   const onComposerBlur = useCallback(() => {
     focusCount.current = Math.max(0, focusCount.current - 1);
     if (focusCount.current > 0) return;
+    if (Platform.OS === 'ios') {
+      if (handoff.current) return;
+      if (typeof Keyboard.isVisible === 'function' && Keyboard.isVisible()) return;
+      commit(false, 0);
+      return;
+    }
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = setTimeout(() => {
       blurTimer.current = null;
@@ -120,17 +153,11 @@ function useConversation(hostRef) {
   }, []);
 
   useEffect(() => {
-    function onFrame(event) {
-      lastEvent.current = event;
-      if (!conversationRef.current) return;
-      commit(true, overlapFrom(event));
-    }
-
     if (Platform.OS === 'web') {
       const viewport = window.visualViewport;
       if (!viewport) return undefined;
       const onViewport = () => {
-        if (!conversationRef.current) return;
+        if (!openRef.current) return;
         commit(true, webKeyboardOverlap());
       };
       viewport.addEventListener('resize', onViewport);
@@ -141,22 +168,32 @@ function useConversation(hostRef) {
       };
     }
 
-    const frameEvent = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
-    const subs = [Keyboard.addListener(frameEvent, onFrame)];
-    if (Platform.OS !== 'ios') {
-      subs.push(
-        Keyboard.addListener('keyboardDidHide', () => {
-          lastEvent.current = null;
-          if (conversationRef.current) commit(true, 0);
-        }),
-      );
+    if (Platform.OS !== 'ios') return undefined;
+
+    function onShow(event) {
+      pendingShow.current = event;
+      if (focusCount.current === 0) return;
+      pendingShow.current = null;
+      presentWithKeyboard(event);
     }
+
+    function onHide(event) {
+      pendingShow.current = null;
+      if (handoff.current || !openRef.current) return;
+      dismissWithKeyboard(event);
+    }
+
+    const subs = [
+      Keyboard.addListener('keyboardWillShow', onShow),
+      Keyboard.addListener('keyboardWillHide', onHide),
+    ];
     return () => subs.forEach((sub) => sub.remove());
-  }, [commit, overlapFrom]);
+  }, [commit, dismissWithKeyboard, presentWithKeyboard]);
 
   return {
-    conversation: frame.conversation,
-    inset: frame.inset,
+    mounted,
+    open,
+    inset,
     rememberBottom,
     onComposerFocus,
     onComposerBlur,
@@ -349,9 +386,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const threadRef = useRef(null);
   const frameRef = useRef(null);
   const phoneRef = useRef(null);
-  const { conversation, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
-  const [copyMounted, setCopyMounted] = useState(false);
-  const [copyLeaving, setCopyLeaving] = useState(false);
+  const { mounted, open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
+  const [phoneHeight, setPhoneHeight] = useState(() => Dimensions.get('window').height);
   const avatarRefs = useRef({});
   const [tailX, setTailX] = useState(null);
   const state = inbox?.state;
@@ -394,25 +430,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   }, [syncTail, contacts.length, messages.length]);
 
   useEffect(() => {
-    if (conversation) setScheduleOpen(false);
-  }, [conversation]);
-
-  useEffect(() => {
-    if (conversation) {
-      setCopyMounted(true);
-      setCopyLeaving(false);
-      return;
-    }
-    setCopyLeaving(true);
-  }, [conversation]);
-
-  const copyLeavingRef = useRef(false);
-  copyLeavingRef.current = copyLeaving;
-
-  const onCopyExited = useCallback(() => {
-    if (!copyLeavingRef.current) return;
-    setCopyMounted(false);
-  }, []);
+    if (open) setScheduleOpen(false);
+  }, [open]);
 
   async function mutate(path, body) {
     const next = await api(path, { token, method: 'POST', body });
@@ -506,7 +525,15 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
 
   return (
     <View style={styles.root}>
-      <View ref={phoneRef} onLayout={rememberBottom} style={styles.phone}>
+      <View
+        ref={phoneRef}
+        onLayout={(event) => {
+          rememberBottom();
+          const next = Math.round(event.nativeEvent.layout.height);
+          if (next) setPhoneHeight((current) => (current === next ? current : next));
+        }}
+        style={styles.phone}
+      >
         {scheduleOpen ? (
           <Pressable
             testID="schedule-backdrop"
@@ -635,7 +662,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             contentContainerStyle={styles.threadContent}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => {
-              if (conversation) return;
+              if (open) return;
               threadRef.current?.scrollToEnd({ animated: false });
             }}
           >
@@ -648,14 +675,14 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
         <ComposerFooter testID="composer" {...composerProps} />
         </View>
         ) : null}
-        {panel === 'chat' && copyMounted ? (
+        {panel === 'chat' && mounted ? (
           <ConversationSheet
+            open={open}
             inset={inset}
-            leaving={copyLeaving}
+            hiddenTop={phoneHeight}
             messages={messages}
             tailX={tailX}
-            onExited={onCopyExited}
-            footer={<ComposerFooter testID="composer-copy" autoFocus {...composerProps} />}
+            footer={<ComposerFooter testID="composer-copy" autoFocus={open} {...composerProps} />}
           />
         ) : null}
       </View>
@@ -700,191 +727,174 @@ function ComposerFooter({
   onComposerFocus,
   onComposerBlur,
 }) {
+  const inputRef = useRef(null);
+  const [timesOpen, setTimesOpen] = useState(false);
+  const showIds = testID === 'composer';
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
+  useEffect(() => {
+    if (intent !== 'scheduled') setTimesOpen(false);
+  }, [intent]);
+
+  function chooseIntent(id) {
+    onIntent(id);
+    setTimesOpen(id === 'scheduled');
+  }
+
   return (
     <View style={styles.footer}>
-      <View style={styles.intents}>
-        {INTENTS.map((item, index) => {
-          const selected = item.id === intent;
-          return (
+      <View style={styles.composerWrap}>
+        {timesOpen ? (
+          <View testID={showIds ? 'scheduled-choices' : undefined} style={styles.choicePopover}>
+            {choices.map((at, index) => {
+              const selected = choice === index;
+              return (
+                <Pressable
+                  key={at.getTime()}
+                  testID={showIds ? `choice-${index}` : undefined}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => onChoice(index)}
+                  style={[styles.choiceRow, index === 0 && styles.choiceRowFirst, selected && styles.choiceRowOn]}
+                >
+                  <Text numberOfLines={1} style={[styles.choiceText, selected && styles.choiceTextOn]}>
+                    {choiceLabel(at, now)}
+                  </Text>
+                </Pressable>
+              );
+            })}
             <Pressable
-              key={item.id}
-              testID={testID === 'composer' ? `intent-${item.id}` : undefined}
+              testID={showIds ? 'choice-custom' : undefined}
               accessibilityRole="button"
-              accessibilityState={{ selected }}
-              onPress={() => onIntent(item.id)}
-              style={[styles.intent, index === INTENTS.length - 1 && styles.intentLast]}
+              accessibilityState={{ selected: choice === 'custom' }}
+              onPress={() => onChoice('custom')}
+              style={[styles.choiceRow, choice === 'custom' && styles.choiceRowOn]}
             >
-              <Text style={[styles.intentText, selected && styles.intentTextSelected]}>{item.label}</Text>
-              {selected ? <View style={styles.intentBar} /> : null}
+              <Text numberOfLines={1} style={[styles.choiceText, choice === 'custom' && styles.choiceTextOn]}>
+                custom
+              </Text>
             </Pressable>
-          );
-        })}
-      </View>
-      {intent === 'scheduled' ? (
-        <View testID={testID === 'composer' ? 'scheduled-choices' : undefined} style={styles.choices}>
-          {choices.map((at, index) => {
-            const selected = choice === index;
-            return (
-              <Pressable
-                key={at.getTime()}
-                testID={testID === 'composer' ? `choice-${index}` : undefined}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() => onChoice(index)}
-                style={[styles.choice, selected && styles.choiceOn]}
-              >
-                <Text numberOfLines={1} style={[styles.choiceText, selected && styles.choiceTextOn]}>
-                  {choiceLabel(at, now)}
-                </Text>
-              </Pressable>
-            );
-          })}
-          <Pressable
-            testID={testID === 'composer' ? 'choice-custom' : undefined}
-            accessibilityRole="button"
-            accessibilityState={{ selected: choice === 'custom' }}
-            onPress={() => onChoice('custom')}
-            style={[styles.choice, choice === 'custom' && styles.choiceOn]}
-          >
-            <Text numberOfLines={1} style={[styles.choiceText, choice === 'custom' && styles.choiceTextOn]}>
-              custom
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {intent === 'scheduled' && choice === 'custom' ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hours}>
-          {DAY_HOURS.map((hour) => {
-            const selected = hour === customHour;
-            return (
-              <Pressable
-                key={hour}
-                testID={testID === 'composer' ? `custom-hour-${hour}` : undefined}
-                accessibilityRole="button"
-                accessibilityLabel={dayPhrase(hour)}
-                onPress={() => onCustomHour(hour)}
-                style={[styles.hourChip, selected && styles.hourChipOn]}
-              >
-                <Text style={[styles.hourChipText, selected && styles.hourChipTextOn]}>{dayPhrase(hour)}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      ) : null}
-      <View testID={testID === 'composer' ? 'composer-bar' : undefined} style={styles.composer}>
-        {photo ? (
-          <View style={styles.previewWrap}>
-            <Image testID={testID === 'composer' ? 'photo-preview' : undefined} source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
-            <Pressable
-              testID={testID === 'composer' ? 'photo-clear' : undefined}
-              accessibilityRole="button"
-              accessibilityLabel="Remove photo"
-              onPress={onClearPhoto}
-              style={styles.previewClear}
-            >
-              <Feather name="x" size={14} color={ink} />
-            </Pressable>
+            {choice === 'custom' ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hours}>
+                {DAY_HOURS.map((hour) => {
+                  const selected = hour === customHour;
+                  return (
+                    <Pressable
+                      key={hour}
+                      testID={showIds ? `custom-hour-${hour}` : undefined}
+                      accessibilityRole="button"
+                      accessibilityLabel={dayPhrase(hour)}
+                      onPress={() => onCustomHour(hour)}
+                      style={[styles.hourChip, selected && styles.hourChipOn]}
+                    >
+                      <Text style={[styles.hourChipText, selected && styles.hourChipTextOn]}>{dayPhrase(hour)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
           </View>
         ) : null}
-        <TextInput
-          testID={testID}
-          value={draft}
-          autoFocus={autoFocus}
-          onChangeText={onChangeDraft}
-          onContentSizeChange={onInputSize}
-          onFocus={onComposerFocus}
-          onBlur={onComposerBlur}
-          placeholder={contactId ? `Message ${contactId}` : 'Message'}
-          placeholderTextColor="#8a8a8a"
-          multiline
-          numberOfLines={2}
-          style={[styles.input, { height: inputHeight }]}
-        />
-        <View style={styles.boxTools}>
-          <Pressable
-            testID={testID === 'composer' ? 'attach-photo' : undefined}
-            accessibilityRole="button"
-            accessibilityLabel="Photo"
-            onPress={onAttach}
-            style={styles.photoButton}
-          >
-            <Feather name="image" size={22} color={ink} />
-          </Pressable>
-          <Pressable
-            testID={testID === 'composer' ? 'send' : undefined}
-            accessibilityRole="button"
-            accessibilityLabel="Send"
-            disabled={!canSend}
-            onPress={onSend}
-            style={[styles.send, canSend && styles.sendReady]}
-          >
-            <Feather name="send" size={18} color={canSend ? paper : '#9a9a9a'} />
-          </Pressable>
+        <View testID={showIds ? 'composer-bar' : undefined} style={styles.composer}>
+          {photo ? (
+            <View style={styles.previewWrap}>
+              <Image testID={showIds ? 'photo-preview' : undefined} source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
+              <Pressable
+                testID={showIds ? 'photo-clear' : undefined}
+                accessibilityRole="button"
+                accessibilityLabel="Remove photo"
+                onPress={onClearPhoto}
+                style={styles.previewClear}
+              >
+                <Feather name="x" size={14} color={ink} />
+              </Pressable>
+            </View>
+          ) : null}
+          <TextInput
+            ref={inputRef}
+            testID={testID}
+            value={draft}
+            autoFocus={autoFocus}
+            onChangeText={onChangeDraft}
+            onContentSizeChange={onInputSize}
+            onFocus={onComposerFocus}
+            onBlur={onComposerBlur}
+            placeholder={contactId ? `Message ${contactId}` : 'Message'}
+            placeholderTextColor="#8a8a8a"
+            multiline
+            numberOfLines={2}
+            style={[styles.input, { height: inputHeight }]}
+          />
+          <View style={styles.boxTools}>
+            <Pressable
+              testID={showIds ? 'attach-photo' : undefined}
+              accessibilityRole="button"
+              accessibilityLabel="Photo"
+              onPress={onAttach}
+              style={styles.photoButton}
+            >
+              <Feather name="image" size={22} color={ink} />
+            </Pressable>
+            <View style={styles.intentSlot}>
+              {INTENTS.map((item) => {
+                const selected = item.id === intent;
+                return (
+                  <Pressable
+                    key={item.id}
+                    testID={showIds ? `intent-${item.id}` : undefined}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected, expanded: item.id === 'scheduled' ? timesOpen : undefined }}
+                    onPress={() => chooseIntent(item.id)}
+                    style={styles.intentWord}
+                  >
+                    <Text numberOfLines={1} style={[styles.intentText, selected && styles.intentTextSelected]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              testID={showIds ? 'send' : undefined}
+              accessibilityRole="button"
+              accessibilityLabel="Send"
+              disabled={!canSend}
+              onPress={onSend}
+              style={[styles.send, canSend && styles.sendReady]}
+            >
+              <Feather name="send" size={18} color={canSend ? paper : '#9a9a9a'} />
+            </Pressable>
+          </View>
         </View>
       </View>
     </View>
   );
 }
 
-function ConversationSheet({ inset, leaving, messages, tailX, footer, onExited }) {
-  const travel = Dimensions.get('window').height;
-  const shift = useRef(new Animated.Value(travel)).current;
-  const copyRef = useRef(null);
-  const [placed, setPlaced] = useState(false);
-  const exited = useRef(false);
-  const run = useRef(0);
-
-  const pin = useCallback(() => {
-    copyRef.current?.scrollToEnd({ animated: false });
-  }, []);
-
-  const place = useCallback(() => {
-    copyRef.current?.scrollToEnd({ animated: false });
-    requestAnimationFrame(() => {
-      copyRef.current?.scrollToEnd({ animated: false });
-      setPlaced(true);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!placed) return undefined;
-    const id = run.current + 1;
-    run.current = id;
-    const animation = Animated.timing(shift, {
-      toValue: leaving ? travel : 0,
-      duration: MOVE_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    });
-    animation.start(({ finished }) => {
-      if (!finished || run.current !== id || !leaving || exited.current) return;
-      exited.current = true;
-      onExited();
-    });
-    return () => {
-      run.current += 1;
-      animation.stop();
-    };
-  }, [placed, leaving, shift, travel, onExited]);
-
+function ConversationSheet({ open, inset, hiddenTop, messages, tailX, footer }) {
+  const ordered = messages.slice().reverse();
   return (
-    <Animated.View testID="conversation-copy" style={[styles.copy, { transform: [{ translateY: shift }] }]}>
-      <View style={[styles.copyColumn, { paddingBottom: inset }]}>
+    <View
+      testID="conversation-copy"
+      pointerEvents={open ? 'auto' : 'none'}
+      style={[styles.copy, { top: open ? 0 : hiddenTop, paddingBottom: open ? inset : 0 }]}
+    >
+      <View style={styles.copyColumn}>
         <ScrollView
-          ref={copyRef}
-          style={styles.thread}
+          style={[styles.thread, styles.flip]}
           contentContainerStyle={styles.threadContent}
           keyboardShouldPersistTaps="handled"
-          onLayout={pin}
-          onContentSizeChange={place}
         >
-          {messages.map((message) => (
-            <Bubble key={message.id} message={message} tailX={tailX} />
+          {ordered.map((message) => (
+            <View key={message.id} style={styles.flip}>
+              <Bubble message={message} tailX={tailX} />
+            </View>
           ))}
         </ScrollView>
         {footer}
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -1033,14 +1043,15 @@ const styles = StyleSheet.create({
   main: { flex: 1, backgroundColor: paper },
   copy: {
     position: 'absolute',
-    top: 0,
     right: 0,
     bottom: 0,
     left: 0,
     zIndex: 8,
+    overflow: 'hidden',
     backgroundColor: paper,
   },
   copyColumn: { flex: 1, backgroundColor: paper },
+  flip: { transform: [{ scaleY: -1 }] },
   thread: { flex: 1 },
   threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 28, gap: 14, overflow: 'visible' },
   bubble: {
@@ -1114,35 +1125,34 @@ const styles = StyleSheet.create({
   theirTailJoin: { position: 'absolute', left: 2, bottom: -2, width: 14, height: 4, backgroundColor: paper },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { borderTopWidth: 1, borderTopColor: ink, backgroundColor: paper },
-  intents: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: ink },
-  intent: {
+  composerWrap: { position: 'relative', zIndex: 2 },
+  intentSlot: {
     flex: 1,
-    minHeight: 36,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 0,
-    paddingHorizontal: 4,
-    borderRightWidth: 1,
-    borderRightColor: ink,
+    gap: 14,
   },
-  intentLast: { borderRightWidth: 0 },
-  intentBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: ink },
-  intentText: { color: ink, fontSize: 14, textAlign: 'center', lineHeight: 18 },
+  intentWord: { paddingVertical: 6, paddingHorizontal: 2 },
+  intentText: { color: ink, fontSize: 14, lineHeight: 18 },
   intentTextSelected: { fontWeight: '700' },
-  choices: { flexDirection: 'row', flexWrap: 'nowrap', gap: 6, paddingHorizontal: 10, paddingTop: 8 },
-  choice: {
-    flex: 1,
-    alignItems: 'center',
+  choicePopover: {
+    position: 'absolute',
+    left: 56,
+    right: 56,
+    bottom: '100%',
+    marginBottom: 6,
+    backgroundColor: paper,
     borderWidth: 1,
     borderColor: ink,
-    borderRadius: 14,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
+    zIndex: 6,
   },
-  choiceOn: { backgroundColor: ink },
-  choiceText: { color: ink, fontSize: 12, lineHeight: 16, textAlign: 'center' },
-  choiceTextOn: { color: paper },
-  hours: { paddingHorizontal: 12, paddingTop: 8, gap: 6 },
+  choiceRow: { paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: ink },
+  choiceRowFirst: { borderTopWidth: 0 },
+  choiceRowOn: { backgroundColor: '#f6f3ee' },
+  choiceText: { color: ink, fontSize: 15, lineHeight: 20 },
+  choiceTextOn: { fontWeight: '700' },
+  hours: { paddingHorizontal: 10, paddingBottom: 10, gap: 6 },
   hourChip: { borderWidth: 1, borderColor: ink, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 },
   hourChipOn: { backgroundColor: ink },
   hourChipText: { color: ink, fontSize: 12, lineHeight: 16 },
@@ -1192,7 +1202,6 @@ const styles = StyleSheet.create({
   photoButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   bubblePhoto: { width: 180, height: 140, borderRadius: 10, marginBottom: 6 },
   send: {
-    marginLeft: 'auto',
     width: 36,
     height: 36,
     borderRadius: 18,
