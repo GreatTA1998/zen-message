@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   Keyboard,
-  PixelRatio,
   Platform,
   Pressable,
   ScrollView,
@@ -16,7 +15,6 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
-import { bubbleDataUri } from './src/bubbleShape';
 import { PERSON_AVATAR } from './src/contacts';
 import {
   DAY_HOURS,
@@ -869,29 +867,19 @@ function ScheduleSettings({ state, onChoose }) {
   );
 }
 
-const bubbleScale = PixelRatio.get() >= 3 ? 3 : 2;
-
 function Bubble({ message }) {
   const incoming = message.direction === 'in';
-  const [box, setBox] = useState(null);
-  const uri = box ? bubbleDataUri(box.w, box.h, incoming, bubbleScale) : null;
   return (
-    <View
-      testID={incoming ? 'bubble-in' : 'bubble-out'}
-      onLayout={(event) => {
-        const w = Math.round(event.nativeEvent.layout.width);
-        const h = Math.round(event.nativeEvent.layout.height);
-        if (!w || !h) return;
-        setBox((current) => (current && current.w === w && current.h === h ? current : { w, h }));
-      }}
-      style={[styles.bubble, incoming && styles.bubbleIn]}
-    >
-      {uri ? (
-        <Image pointerEvents="none" source={{ uri }} resizeMode="stretch" style={[styles.bubbleOutline, { width: box.w, height: box.h }]} />
-      ) : null}
-      <View style={incoming ? styles.bubblePadIn : styles.bubblePadOut}>
-        <BubbleBody message={message} />
+    <View testID={incoming ? 'bubble-in' : 'bubble-out'} style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut]}>
+      <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut]}>
+        <View style={styles.tailStem} />
+        <View style={styles.tailFill} />
+        <View style={styles.tailJoin} />
+        <View style={styles.tailClip}>
+          <View style={styles.tailEdge} />
+        </View>
       </View>
+      <BubbleBody message={message} />
     </View>
   );
 }
@@ -995,16 +983,53 @@ const styles = StyleSheet.create({
   copyColumn: { flex: 1, backgroundColor: paper },
   flip: { transform: [{ scaleY: -1 }] },
   thread: { flex: 1 },
-  threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 8, gap: 14, overflow: 'visible' },
+  threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 16, gap: 14, overflow: 'visible' },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
-    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: ink,
+    borderRadius: 18,
+    backgroundColor: paper,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 4,
   },
-  bubbleIn: { alignSelf: 'flex-start', maxWidth: '78%', marginTop: 8, marginBottom: 0 },
-  bubbleOutline: { position: 'absolute', left: 0, top: 0, zIndex: 0 },
-  bubblePadOut: { paddingTop: 10, paddingBottom: 22, paddingHorizontal: 14, zIndex: 1 },
-  bubblePadIn: { paddingTop: 22, paddingBottom: 10, paddingHorizontal: 14, zIndex: 1 },
+  bubbleOut: { borderBottomRightRadius: 2 },
+  bubbleIn: {
+    alignSelf: 'flex-start',
+    maxWidth: '78%',
+    marginTop: 10,
+    marginBottom: 0,
+    borderTopLeftRadius: 2,
+  },
+  tail: { position: 'absolute', width: 24, height: 20 },
+  tailIn: { left: -1, top: -12 },
+  tailOut: { right: -1, bottom: -12, transform: [{ rotate: '180deg' }] },
+  tailStem: { position: 'absolute', left: 0, top: 0, width: 1, height: 14, backgroundColor: ink },
+  tailFill: {
+    position: 'absolute',
+    left: 1,
+    top: 0,
+    width: 0,
+    height: 0,
+    borderRightWidth: 16,
+    borderBottomWidth: 13,
+    borderRightColor: 'transparent',
+    borderBottomColor: paper,
+  },
+  tailJoin: { position: 'absolute', left: 1, top: 11, width: 16, height: 8, backgroundColor: paper },
+  tailClip: { position: 'absolute', left: 0, top: 0, width: 24, height: 12, overflow: 'hidden' },
+  tailEdge: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 28,
+    height: 1,
+    backgroundColor: ink,
+    transformOrigin: 'left center',
+    transform: [{ rotate: '36deg' }],
+  },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { backgroundColor: paper },
   composerWrap: { position: 'relative', zIndex: 2 },
