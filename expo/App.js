@@ -554,7 +554,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
               style={styles.focus}
             >
               <Ionicons name={focused ? 'moon' : 'moon-outline'} size={20} color={focused ? moon : ink} />
-              <Text style={styles.focusText}>Focus</Text>
+              {focused ? <Text style={styles.focusText}>Focus</Text> : null}
             </Pressable>
             <View style={styles.scheduleWrap}>
               <Pressable
@@ -1053,7 +1053,7 @@ const styles = StyleSheet.create({
   copyColumn: { flex: 1, backgroundColor: paper },
   flip: { transform: [{ scaleY: -1 }] },
   thread: { flex: 1 },
-  threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 28, gap: 14, overflow: 'visible' },
+  threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 8, gap: 14, overflow: 'visible' },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
@@ -1124,7 +1124,7 @@ const styles = StyleSheet.create({
   },
   theirTailJoin: { position: 'absolute', left: 2, bottom: -2, width: 14, height: 4, backgroundColor: paper },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
-  footer: { borderTopWidth: 1, borderTopColor: ink, backgroundColor: paper },
+  footer: { backgroundColor: paper },
   composerWrap: { position: 'relative', zIndex: 2 },
   intentSlot: {
     flex: 1,
