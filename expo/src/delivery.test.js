@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createState,
+  dailyClock,
   digestPlan,
-  immediatePlan,
-  nextWindow,
+  nextDaily,
   receiptPhrase,
   reduce,
   sanitize,
+  scheduledChoices,
   threadMessages,
 } from './delivery.js';
 
@@ -28,31 +29,32 @@ function send(state, fields, now) {
   });
 }
 
-test('next window is strictly after now', () => {
-  assert.equal(nextWindow(at(10, 15), 'daily-1-7').getTime(), at(13, 0).getTime());
-  assert.equal(nextWindow(at(12, 59), 'daily-1-7').getTime(), at(13, 0).getTime());
-  assert.equal(nextWindow(at(13, 0), 'daily-1-7').getTime(), at(19, 0).getTime());
-  assert.equal(nextWindow(at(13, 1), 'daily-1-7').getTime(), at(19, 0).getTime());
-  assert.equal(nextWindow(at(19, 0), 'daily-1-7').getTime(), at(13, 0, 18).getTime());
-  assert.equal(nextWindow(at(20, 0), 'daily-1-7').getTime(), at(13, 0, 18).getTime());
+test('the daily summary is 7:00 pm and is strictly after now', () => {
+  assert.equal(dailyClock(createState()).hour, 19);
+  assert.equal(nextDaily(at(10, 15)).getTime(), at(19, 0).getTime());
+  assert.equal(nextDaily(at(19, 0)).getTime(), at(19, 0, 18).getTime());
+  assert.equal(nextDaily(at(20, 0), 8, 0).getTime(), at(8, 0, 18).getTime());
+});
 
-  assert.equal(nextWindow(at(10, 15), 'hourly').getTime(), at(11, 0).getTime());
-  assert.equal(nextWindow(at(11, 0), 'hourly').getTime(), at(12, 0).getTime());
-
-  assert.equal(nextWindow(at(7, 59), 'daily-8').getTime(), at(8, 0).getTime());
-  assert.equal(nextWindow(at(8, 0), 'daily-8').getTime(), at(8, 0, 18).getTime());
-
-  assert.equal(nextWindow(at(10, 0), 'every-3-hours').getTime(), at(12, 0).getTime());
-  assert.equal(nextWindow(at(23, 30), 'every-3-hours').getTime(), at(0, 0, 18).getTime());
+test('scheduled checkpoints are the next 12:00 pm and 7:00 pm, soonest first', () => {
+  const morning = scheduledChoices(at(10, 0));
+  assert.equal(morning[0].getTime(), at(12, 0).getTime());
+  assert.equal(morning[1].getTime(), at(19, 0).getTime());
+  const afternoon = scheduledChoices(at(16, 0));
+  assert.equal(afternoon[0].getTime(), at(19, 0).getTime());
+  assert.equal(afternoon[1].getTime(), at(12, 0, 18).getTime());
+  const evening = scheduledChoices(at(19, 0));
+  assert.equal(evening[0].getTime(), at(12, 0, 18).getTime());
+  assert.equal(evening[1].getTime(), at(19, 0, 18).getTime());
 });
 
 test('anytime batched stays hidden and joins one digest', () => {
   const first = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
   assert.equal(first.state.messages[0].visible, false);
-  assert.equal(first.state.messages[0].releaseAt, at(13, 0).getTime());
+  assert.equal(first.state.messages[0].releaseAt, at(19, 0).getTime());
   assert.equal(first.effects.length, 1);
   assert.equal(first.effects[0].type, 'schedule-digest');
-  assert.equal(first.effects[0].at, at(13, 0).getTime());
+  assert.equal(first.effects[0].at, at(19, 0).getTime());
   assert.equal(first.effects[0].plan.quiet, false);
   assert.deepEqual(first.effects[0].plan.data, {
     kind: 'digest',
@@ -105,16 +107,36 @@ test('batched does not hide a message that was already visible', () => {
   assert.equal(batched.effects.length, 0);
 });
 
-test('timely waits for the next batch and does not notify early', () => {
+test('scheduled waits for the chosen time and does not notify early', () => {
+  const noon = at(12, 0).getTime();
   const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
-  const result = send(held.state, { id: 'c', body: 'Today', intent: 'timely' }, at(10, 20));
-  assert.equal(result.state.messages.find((item) => item.id === 'c').visible, false);
-  assert.deepEqual(result.state.digest.messageIds, ['a', 'c']);
-  assert.equal(result.effects.length, 1);
+  const result = reduce(held.state, {
+    type: 'send',
+    id: 'c',
+    contactId: 'wren',
+    contactName: 'Wren',
+    body: 'Today',
+    intent: 'scheduled',
+    releaseAt: noon,
+    now: at(10, 20).getTime(),
+  });
+  const scheduled = result.state.messages.find((item) => item.id === 'c');
+  assert.equal(scheduled.visible, false);
+  assert.equal(scheduled.releaseAt, noon);
+  assert.equal(result.state.messages.find((item) => item.id === 'a').releaseAt, at(19, 0).getTime());
+  assert.deepEqual(result.state.digest.messageIds, ['c']);
+  assert.equal(result.state.digest.at, noon);
   assert.equal(result.effects[0].type, 'schedule-digest');
-  assert.equal(result.effects[0].plan.data.kind, 'digest');
   assert.equal(JSON.stringify(result.effects).includes('relax'), false);
-  assert.equal(immediatePlan({ ...result.state.messages[1], intent: 'timely' }).data.kind, 'timely');
+  const early = reduce(result.state, { type: 'release', now: at(11, 0).getTime() });
+  assert.equal(early.state.messages.find((item) => item.id === 'c').visible, false);
+  assert.equal(early.effects.length, 0);
+  const due = reduce(result.state, { type: 'release', now: noon });
+  assert.equal(due.state.messages.find((item) => item.id === 'c').visible, true);
+  assert.equal(due.state.messages.find((item) => item.id === 'a').visible, false);
+  assert.equal(due.effects.length, 1);
+  assert.equal(due.effects[0].type, 'present');
+  assert.deepEqual(due.effects[0].plan.data.messageIds, ['c']);
 });
 
 test('realtime is one normal notification', () => {
@@ -133,29 +155,46 @@ test('realtime is one normal notification', () => {
   ]);
 });
 
-test('relaxed timely is readable sooner and stays private', () => {
+test('relaxed scheduled is readable sooner and stays private', () => {
   const relaxed = reduce(createState(), { type: 'set-mode', mode: 'relaxed' }).state;
-  const timely = send(relaxed, { id: 't', body: 'Soon', intent: 'timely' }, at(10, 15));
+  const scheduled = reduce(relaxed, {
+    type: 'send',
+    id: 't',
+    contactId: 'wren',
+    contactName: 'Wren',
+    body: 'Soon',
+    intent: 'scheduled',
+    releaseAt: at(19, 0).getTime(),
+    now: at(10, 15).getTime(),
+  });
   const realtime = send(relaxed, { id: 'r', body: 'Now', intent: 'realtime' }, at(10, 16));
-  assert.equal(timely.state.messages[0].visible, true);
-  assert.deepEqual(timely.effects, []);
-  assert.equal(JSON.stringify({ effects: timely.effects, message: timely.state.messages[0] }).includes('relax'), false);
+  assert.equal(scheduled.state.messages[0].visible, true);
+  assert.deepEqual(scheduled.effects, []);
+  assert.equal(JSON.stringify({ effects: scheduled.effects, message: scheduled.state.messages[0] }).includes('relax'), false);
   assert.equal(realtime.effects[0].plan.quiet, false);
-  assert.equal(
-    receiptPhrase(at(10, 15), { scheduleId: 'daily-1-7', offsetMinutes: 0, mode: 'relaxed' }).includes('relax'),
-    false
-  );
+  assert.equal(receiptPhrase(at(19, 0), at(10, 15), 0).includes('relax'), false);
+  assert.equal(receiptPhrase(at(19, 0), at(16, 0)), 'Received at 7:00 pm today');
+  assert.equal(receiptPhrase(at(12, 0, 18), at(16, 0)), 'Received at 12:00 pm tomorrow');
 });
 
-test('a schedule change moves the one pending digest', () => {
+test('a daily time change moves anytime and leaves a scheduled message', () => {
   const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
-  const moved = reduce(held.state, { type: 'set-schedule', scheduleId: 'hourly', now: at(10, 40).getTime() });
-  assert.equal(moved.state.scheduleId, 'hourly');
-  assert.equal(moved.state.digest.at, at(11, 0).getTime());
-  assert.equal(moved.state.messages[0].releaseAt, at(11, 0).getTime());
-  assert.equal(moved.effects.length, 1);
+  const scheduled = reduce(held.state, {
+    type: 'send',
+    id: 'c',
+    contactId: 'wren',
+    contactName: 'Wren',
+    body: 'Noon',
+    intent: 'scheduled',
+    releaseAt: at(12, 0).getTime(),
+    now: at(10, 20).getTime(),
+  });
+  const moved = reduce(scheduled.state, { type: 'set-schedule', dayHour: 8, dayMinute: 0, now: at(10, 40).getTime() });
+  assert.equal(moved.state.dayHour, 8);
+  assert.equal(moved.state.messages.find((item) => item.id === 'a').releaseAt, at(8, 0, 18).getTime());
+  assert.equal(moved.state.messages.find((item) => item.id === 'c').releaseAt, at(12, 0).getTime());
+  assert.equal(moved.state.digest.at, at(12, 0).getTime());
   assert.equal(moved.effects[0].type, 'schedule-digest');
-  assert.equal(moved.state.digest.platformScheduled, false);
 });
 
 test('the window reveals held messages once', () => {
@@ -168,15 +207,15 @@ test('the window reveals held messages once', () => {
   assert.equal(early.state.messages[0].visible, false);
   assert.equal(early.effects.length, 0);
 
-  const due = reduce(scheduled, { type: 'release', now: at(13, 0).getTime() });
+  const due = reduce(scheduled, { type: 'release', now: at(19, 0).getTime() });
   assert.equal(due.state.messages[0].visible, true);
   assert.equal(due.state.digest.presented, true);
   assert.equal(due.effects.length, 0);
 
-  const again = reduce(due.state, { type: 'release', now: at(13, 5).getTime() });
+  const again = reduce(due.state, { type: 'release', now: at(19, 5).getTime() });
   assert.equal(again.effects.length, 0);
 
-  const unscheduled = reduce(held.state, { type: 'release', now: at(13, 0).getTime() });
+  const unscheduled = reduce(held.state, { type: 'release', now: at(19, 0).getTime() });
   assert.equal(unscheduled.effects.length, 1);
   assert.equal(unscheduled.effects[0].type, 'present');
   assert.equal(unscheduled.effects[0].plan.data.kind, 'digest');
@@ -215,11 +254,22 @@ test('a photo uses the same delivery as text and is not a video', () => {
   assert.equal(shown.state.messages[0].visible, true);
   assert.deepEqual(shown.effects, []);
 
-  const timely = send(createState(), { id: 'p3', body: 'Look', photo, intent: 'timely' }, at(10, 15));
-  assert.equal(timely.state.messages[0].visible, false);
-  assert.equal(timely.state.messages[0].photo, photo);
-  assert.equal(timely.effects[0].type, 'schedule-digest');
-  assert.equal(timely.effects[0].plan.body, 'Wren: Look');
+  const scheduled = reduce(createState(), {
+    type: 'send',
+    id: 'p3',
+    contactId: 'wren',
+    contactName: 'Wren',
+    body: 'Look',
+    photo,
+    intent: 'scheduled',
+    releaseAt: at(12, 0).getTime(),
+    now: at(10, 15).getTime(),
+  });
+  assert.equal(scheduled.state.messages[0].visible, false);
+  assert.equal(scheduled.state.messages[0].photo, photo);
+  assert.equal(scheduled.effects[0].type, 'schedule-digest');
+  assert.equal(scheduled.effects[0].plan.body, 'Wren: Look');
+  assert.equal(scheduled.state.digest.at, at(12, 0).getTime());
 
   const state = createState();
   assert.equal(
@@ -236,8 +286,7 @@ test('blank sends and unknown intents do nothing', () => {
 
 test('a window can use the recipient clock', () => {
   const now = Date.UTC(2026, 9, 17, 17, 15);
-  assert.equal(nextWindow(now, 'daily-1-7', 420).getTime(), Date.UTC(2026, 9, 17, 20, 0));
-  assert.equal(nextWindow(now, 'hourly', 0).getTime(), Date.UTC(2026, 9, 17, 18, 0));
+  assert.equal(nextDaily(now, 19, 0, 420).getTime(), Date.UTC(2026, 9, 17, 19, 0) + 420 * 60000);
 });
 
 test('an outgoing message is visible and tells the sender nothing', () => {
@@ -256,67 +305,29 @@ test('an outgoing message is visible and tells the sender nothing', () => {
   assert.equal(JSON.stringify(result).includes('relax'), false);
 });
 
-test('weekly rhythm is one day and one time, default Sunday 5pm', () => {
-  const morning = new Date(2026, 9, 18, 10, 0, 0, 0);
-  while (morning.getDay() !== 0) morning.setDate(morning.getDate() + 1);
-  const today = nextWindow(morning, 'weekly');
-  assert.equal(today.getDay(), 0);
-  assert.equal(today.getHours(), 17);
-  assert.equal(today.getDate(), morning.getDate());
-  const after = nextWindow(new Date(morning.getFullYear(), morning.getMonth(), morning.getDate(), 18, 0), 'weekly');
-  assert.equal(after.getDay(), 0);
-  assert.equal(after.getHours(), 17);
-  assert.ok(after.getTime() - morning.getTime() > 6 * 86400000);
-  const wednesday = nextWindow(morning, 'weekly', undefined, { weekDay: 3, weekHour: 17 });
-  assert.equal(wednesday.getDay(), 3);
-  assert.equal(wednesday.getHours(), 17);
-});
-
-test('receipt phrase names today, tomorrow, or the weekday and ignores relax mode', () => {
-  const morning = new Date(Date.UTC(2026, 9, 18, 10, 0));
-  while (morning.getUTCDay() !== 0) morning.setUTCDate(morning.getUTCDate() + 1);
-  const evening = new Date(morning.getTime() + 10 * 3600000);
-  assert.equal(receiptPhrase(morning, { scheduleId: 'daily-1-7', offsetMinutes: 0 }), 'Received at 1pm today');
-  assert.equal(receiptPhrase(evening, { scheduleId: 'daily-1-7', offsetMinutes: 0 }), 'Received at 1pm tomorrow');
-  assert.equal(
-    receiptPhrase(morning, { scheduleId: 'weekly', weekDay: 0, weekHour: 17, offsetMinutes: 0 }),
-    'Received at 5pm today'
-  );
-  assert.equal(
-    receiptPhrase(morning, { scheduleId: 'weekly', weekDay: 3, weekHour: 17, offsetMinutes: 0, mode: 'relaxed' }),
-    'Received at 5pm Wednesday'
-  );
-});
-
-test('changing the weekly day moves the pending batch', () => {
-  const morning = new Date(2026, 9, 18, 10, 0, 0, 0);
-  while (morning.getDay() !== 0) morning.setDate(morning.getDate() + 1);
-  const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'timely' }, morning);
-  const moved = reduce(held.state, {
-    type: 'set-schedule',
-    scheduleId: 'weekly',
-    weekDay: 3,
-    weekHour: 17,
-    now: morning.getTime(),
-  });
-  assert.equal(moved.state.scheduleId, 'weekly');
-  assert.equal(moved.state.weekDay, 3);
-  assert.equal(moved.state.weekHour, 17);
-  assert.equal(new Date(moved.state.digest.at).getDay(), 3);
-  assert.equal(new Date(moved.state.digest.at).getHours(), 17);
-  assert.equal(moved.state.messages[0].visible, false);
+test('receipt phrase names the chosen time and ignores focus', () => {
+  const morning = at(10, 0);
+  const wednesday = new Date(morning);
+  while (wednesday.getDay() !== 0) wednesday.setDate(wednesday.getDate() + 1);
+  const later = new Date(wednesday);
+  later.setDate(wednesday.getDate() + 3);
+  later.setHours(17, 0, 0, 0);
+  assert.equal(receiptPhrase(at(19, 0), morning), 'Received at 7:00 pm today');
+  assert.equal(receiptPhrase(later, wednesday), 'Received at 5:00 pm Wednesday');
+  assert.equal(receiptPhrase(later, wednesday).includes('relax'), false);
+  assert.equal(receiptPhrase(later, wednesday).includes('batched'), false);
 });
 
 test('sanitize drops broken saved data', () => {
   const clean = sanitize({
     mode: 'relaxed',
-    scheduleId: 'nope',
+    dayHour: 99,
     contactId: 'pip',
     messages: [{ id: 'a', contactId: 'pip', contactName: 'Pip', body: 'Hi', intent: 'anytime', createdAt: 1, visible: true }, { nope: true }],
     digest: { at: 5, messageIds: ['a'], presented: false, platformScheduled: true },
   });
   assert.equal(clean.mode, 'relaxed');
-  assert.equal(clean.scheduleId, 'daily-1-7');
+  assert.equal(clean.dayHour, 19);
   assert.equal(clean.messages.length, 1);
   assert.equal(clean.digest.platformScheduled, true);
   assert.deepEqual(sanitize(null), createState());

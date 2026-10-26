@@ -45,12 +45,13 @@ test('relaxed anytime is silent and private', () => {
   assert.equal(JSON.stringify({ effects: result.senderEffects, message: result.sender.messages[0] }).includes('relax'), false);
 });
 
-test('timely waits for the batch and realtime is one normal push', () => {
+test('scheduled waits for the chosen time and realtime is one normal push', () => {
   const bea = person({ id: 'bea', username: 'bea', pushToken: 'ExponentPushToken[bea]' });
   const timely = deliverMessage(person({ id: 'ada', username: 'ada' }), bea, {
     id: 't',
     body: 'Soon',
-    intent: 'timely',
+    intent: 'scheduled',
+    releaseAt: now + 2 * 60 * 60 * 1000,
     now,
   });
   const realtime = deliverMessage(person({ id: 'ada', username: 'ada' }), bea, {
@@ -72,7 +73,8 @@ test('timely waits for the batch and realtime is one normal push', () => {
   const sooner = deliverMessage(person({ id: 'ada', username: 'ada' }), { ...bea, mode: relaxed.mode }, {
     id: 't2',
     body: 'Soon',
-    intent: 'timely',
+    intent: 'scheduled',
+    releaseAt: now + 2 * 60 * 60 * 1000,
     now,
   });
   assert.equal(sooner.recipient.messages[0].visible, true);

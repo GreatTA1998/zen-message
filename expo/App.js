@@ -15,18 +15,17 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
-import { PERSON_AVATAR, LOGO } from './src/contacts';
+import { PERSON_AVATAR } from './src/contacts';
 import {
+  DAY_HOURS,
   INTENTS,
-  SCHEDULES,
-  WEEKDAYS,
-  WEEK_HOURS,
-  clockLabel,
+  dailyClock,
+  dayPhrase,
   messagePhoto,
-  nextWindow,
+  nextDaily,
   receiptPhrase,
+  scheduledChoices,
   threadMessages,
-  weeklyWhen,
 } from './src/delivery';
 import { LoginView } from './src/LoginView';
 import { listenForDigest, prepareNotifications } from './src/notify';
@@ -37,16 +36,9 @@ import { loadSession, saveSession } from './src/session';
 import { finishSignIn } from './src/signIn';
 
 function scheduleLabel(state) {
-  const relaxed = state?.mode === 'relaxed';
-  const scheduleId = state?.scheduleId;
-  if (scheduleId === 'weekly') {
-    const when = weeklyWhen(state?.weekDay, state?.weekHour);
-    return relaxed ? `Relaxed weekly, ${when}` : `Batched weekly, ${when}`;
-  }
-  if (scheduleId === 'daily-1-7') return relaxed ? 'Relaxed daily, 1pm, 7pm' : 'Batched daily, 1pm, 7pm';
-  if (scheduleId === 'daily-8') return relaxed ? 'Relaxed daily, 8am' : 'Daily, 8am';
-  if (scheduleId === 'hourly') return relaxed ? 'Relaxed hourly' : 'Hourly';
-  return relaxed ? 'Relaxed, every 3 hours' : 'Every 3 hours';
+  if (state?.mode === 'relaxed') return 'Receiving notifications';
+  const clock = dailyClock(state);
+  return `Daily ${dayPhrase(clock.hour, clock.minute)}`;
 }
 
 const MISSING = {
@@ -179,6 +171,16 @@ function Root() {
     }
   }
 
+  const onLookup = useCallback(async (raw) => {
+    const code = normalizeCode(raw);
+    if (!isCode(code) || code === user?.id) return { found: false };
+    try {
+      return await api(`/v1/person?code=${encodeURIComponent(code)}`, { token: tokenRef.current });
+    } catch {
+      return { found: false };
+    }
+  }, [user?.id]);
+
   async function onAdd(raw) {
     const code = normalizeCode(raw);
     if (hasConfusingCharacter(code)) return '1, I, and L are not used.';
@@ -201,7 +203,7 @@ function Root() {
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
   } else {
-    body = <ChatScreen token={token} inbox={inbox} onInbox={applyInbox} onAdd={onAdd} />;
+    body = <ChatScreen token={token} inbox={inbox} onInbox={applyInbox} onAdd={onAdd} onLookup={onLookup} />;
   }
 
   return (
@@ -211,11 +213,13 @@ function Root() {
   );
 }
 
-function ChatScreen({ token, inbox, onInbox, onAdd }) {
+function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
   const [inputHeight, setInputHeight] = useState(44);
   const [intent, setIntent] = useState('anytime');
+  const [choice, setChoice] = useState(0);
+  const [customHour, setCustomHour] = useState(15);
   const [panel, setPanel] = useState('chat');
   const threadRef = useRef(null);
   const frameRef = useRef(null);
@@ -225,17 +229,12 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
   const contacts = inbox?.contacts ?? [];
   const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
   const messages = contact && state ? threadMessages(state.messages, contact.id) : [];
-  const relaxed = state?.mode === 'relaxed';
+  const focused = state?.mode !== 'relaxed';
   const label = scheduleLabel(state);
-  const phrase =
-    intent === 'timely' && contact
-      ? receiptPhrase(new Date(), {
-          scheduleId: contact.scheduleId,
-          weekDay: contact.weekDay,
-          weekHour: contact.weekHour,
-          offsetMinutes: contact.offsetMinutes,
-        })
-      : '';
+  const now = new Date();
+  const choices = scheduledChoices(now);
+  const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
+  const phrase = intent === 'scheduled' && selectedAt ? receiptPhrase(selectedAt, now) : '';
   const canSend = Boolean(contact) && (draft.trim().length > 0 || Boolean(photo));
 
   const syncTail = useCallback(() => {
@@ -269,12 +268,22 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
     const attached = photo;
     const sentIntent = intent;
     const sentContact = contact;
+    const sentAt = selectedAt?.getTime();
     setDraft('');
     setPhoto(null);
     setInputHeight(44);
-    mutate('/v1/messages', { contactId: sentContact.id, body, photo: attached, intent: sentIntent }).catch(() => {});
+    mutate('/v1/messages', {
+      contactId: sentContact.id,
+      body,
+      photo: attached,
+      intent: sentIntent,
+      releaseAt: sentIntent === 'scheduled' ? sentAt : undefined,
+    }).catch(() => {});
     if (sentIntent !== 'realtime') {
-      const at = nextWindow(new Date(), sentContact.scheduleId, sentContact.offsetMinutes, sentContact).getTime();
+      const at =
+        sentIntent === 'scheduled'
+          ? sentAt
+          : nextDaily(new Date(), sentContact.dayHour, sentContact.dayMinute, sentContact.offsetMinutes).getTime();
       const delay = at - Date.now() + 1000;
       if (delay > 0 && delay < 8 * 24 * 60 * 60 * 1000) {
         setTimeout(() => {
@@ -303,10 +312,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
     if (next) setPhoto(next);
   }
 
-  function chooseWeek(weekDay, weekHour) {
-    mutate('/v1/schedule', { scheduleId: 'weekly', weekDay, weekHour });
-  }
-
   function onChangeDraft(value) {
     setDraft(value);
   }
@@ -324,16 +329,15 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
             <Pressable
               testID="mode-toggle"
               accessibilityRole="button"
-              accessibilityLabel={relaxed ? 'Relaxed' : 'Batched'}
+              accessibilityLabel="Focus"
+              accessibilityState={{ selected: focused }}
               hitSlop={6}
-              onPress={() => mutate('/v1/mode', { mode: relaxed ? 'batched' : 'relaxed' })}
-              style={styles.toggle}
+              onPress={() => mutate('/v1/mode', { mode: focused ? 'relaxed' : 'batched' })}
+              style={[styles.focus, focused && styles.focusOn]}
             >
-              <View style={[styles.toggleRing, relaxed && styles.toggleRingOn]}>
-                <Image source={LOGO} resizeMode="cover" style={styles.toggleImage} />
-              </View>
+              <Feather name="moon" size={18} color={focused ? ink : '#8a8a8a'} />
+              <Text style={[styles.focusText, focused && styles.focusTextOn]}>Focus</Text>
             </Pressable>
-            <View style={styles.headerRule} />
             <Pressable
               testID="schedule-button"
               accessibilityRole="button"
@@ -382,37 +386,41 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
                   onLayout={syncTail}
                   source={PERSON_AVATAR}
                   resizeMode="cover"
-                  style={styles.avatar}
+                  style={[styles.avatar, panel === 'chat' && selected ? styles.circleOn : styles.circleDim]}
                 />
                 <Text numberOfLines={1} style={styles.contactLabel}>
                   {item.firstName || item.id}
                 </Text>
-                <View style={[styles.contactMark, panel === 'chat' && selected && styles.contactMarkOn]} />
               </Pressable>
             );
           })}
           <Pressable
             testID="add-person"
             accessibilityRole="button"
-            accessibilityLabel="Add a person"
+            accessibilityLabel="new contact"
             accessibilityState={{ selected: panel === 'add' }}
             onPress={() => setPanel((current) => (current === 'add' ? 'chat' : 'add'))}
             style={styles.contact}
           >
-            <View style={styles.plus}>
+            <View style={[styles.plus, panel === 'add' ? styles.circleOn : styles.circleDim]}>
               <Text style={styles.plusMark}>+</Text>
             </View>
-            <Text style={styles.contactLabel}> </Text>
-            <View style={[styles.contactMark, panel === 'add' && styles.contactMarkOn]} />
+            <Text numberOfLines={1} style={styles.contactLabel}>
+              new contact
+            </Text>
           </Pressable>
         </ScrollView>
 
         {panel === 'settings' ? (
-          <ScheduleSettings state={state} onChoose={(scheduleId) => mutate('/v1/schedule', { scheduleId })} onWeek={chooseWeek} />
+          <ScheduleSettings
+            state={state}
+            onChoose={(dayHour) => mutate('/v1/schedule', { dayHour, dayMinute: 0 })}
+          />
         ) : null}
         {panel === 'add' ? (
           <PlusView
             code={userId(inbox)}
+            onLookup={onLookup}
             onAdd={async (code) => {
               const result = await onAdd(code);
               if (!result) setPanel('chat');
@@ -440,7 +448,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
           <View style={styles.intents}>
             {INTENTS.map((item, index) => {
               const selected = item.id === intent;
-              const label = item.id === 'timely' ? 'timely but\nno rush' : item.label;
               return (
                 <Pressable
                   key={item.id}
@@ -450,12 +457,61 @@ function ChatScreen({ token, inbox, onInbox, onAdd }) {
                   onPress={() => setIntent(item.id)}
                   style={[styles.intent, index === INTENTS.length - 1 && styles.intentLast]}
                 >
-                  <Text style={[styles.intentText, selected && styles.intentTextSelected]}>{label}</Text>
+                  <Text style={[styles.intentText, selected && styles.intentTextSelected]}>{item.label}</Text>
                   {selected ? <View style={styles.intentBar} /> : null}
                 </Pressable>
               );
             })}
           </View>
+          {intent === 'scheduled' ? (
+            <View testID="scheduled-choices" style={styles.choices}>
+              {choices.map((at, index) => {
+                const selected = choice === index;
+                return (
+                  <Pressable
+                    key={at.getTime()}
+                    testID={`choice-${index}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => setChoice(index)}
+                    style={[styles.choice, selected && styles.choiceOn]}
+                  >
+                    <Text style={[styles.choiceText, selected && styles.choiceTextOn]}>{choiceLabel(at, now)}</Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                testID="choice-custom"
+                accessibilityRole="button"
+                accessibilityState={{ selected: choice === 'custom' }}
+                onPress={() => setChoice('custom')}
+                style={[styles.choice, choice === 'custom' && styles.choiceOn]}
+              >
+                <Text style={[styles.choiceText, choice === 'custom' && styles.choiceTextOn]}>
+                  {choice === 'custom' ? choiceLabel(selectedAt, now) : 'Pick a time'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {intent === 'scheduled' && choice === 'custom' ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hours}>
+              {DAY_HOURS.map((hour) => {
+                const selected = hour === customHour;
+                return (
+                  <Pressable
+                    key={hour}
+                    testID={`custom-hour-${hour}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={dayPhrase(hour)}
+                    onPress={() => setCustomHour(hour)}
+                    style={[styles.hourChip, selected && styles.hourChipOn]}
+                  >
+                    <Text style={[styles.hourChipText, selected && styles.hourChipTextOn]}>{dayPhrase(hour)}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : null}
           <View testID="composer-bar" style={styles.composer}>
             {phrase ? (
               <Text testID="receipt-phrase" style={styles.receipt}>
@@ -521,71 +577,30 @@ function userId(inbox) {
   return inbox?.user?.id;
 }
 
-function ScheduleSettings({ state, onChoose, onWeek }) {
+function choiceLabel(at, now) {
+  const phrase = receiptPhrase(at, now);
+  return phrase.replace('Received at ', '');
+}
+
+function ScheduleSettings({ state, onChoose }) {
+  const selected = dailyClock(state).hour;
   return (
     <ScrollView testID="schedule-menu" style={styles.main} contentContainerStyle={styles.menu} keyboardShouldPersistTaps="handled">
-      {SCHEDULES.filter((option) => option.id !== 'weekly').map((option) => {
-        const selected = option.id === state?.scheduleId;
+      {DAY_HOURS.map((hour) => {
+        const on = hour === selected;
         return (
           <Pressable
-            key={option.id}
-            testID={`schedule-${option.id}`}
+            key={hour}
+            testID={`schedule-hour-${hour}`}
             accessibilityRole="button"
-            onPress={() => onChoose(option.id)}
-            style={[styles.menuRow, selected && styles.menuRowSelected]}
+            accessibilityState={{ selected: on }}
+            onPress={() => onChoose(hour)}
+            style={[styles.menuRow, on && styles.menuRowSelected]}
           >
-            <Text style={[styles.menuText, selected && styles.menuTextSelected]}>{option.label}</Text>
+            <Text style={[styles.menuText, on && styles.menuTextSelected]}>{dayPhrase(hour)}</Text>
           </Pressable>
         );
       })}
-      <Pressable
-        testID="schedule-weekly"
-        accessibilityRole="button"
-        onPress={() =>
-          onWeek(state?.scheduleId === 'weekly' ? state.weekDay : 0, state?.scheduleId === 'weekly' ? state.weekHour : 17)
-        }
-        style={[styles.menuRow, state?.scheduleId === 'weekly' && styles.menuRowSelected]}
-      >
-        <Text style={[styles.menuText, state?.scheduleId === 'weekly' && styles.menuTextSelected]}>
-          {state?.scheduleId === 'weekly' ? `Weekly, ${weeklyWhen(state.weekDay, state.weekHour)}` : 'Weekly, Sunday 5pm'}
-        </Text>
-      </Pressable>
-      <View testID="weekly-setting" style={styles.weekBlock}>
-        <View style={styles.weekRow}>
-          {WEEKDAYS.map((name, day) => {
-            const selected = state?.scheduleId === 'weekly' && state.weekDay === day;
-            return (
-              <Pressable
-                key={name}
-                testID={`week-day-${day}`}
-                accessibilityRole="button"
-                accessibilityLabel={name}
-                onPress={() => onWeek(day, state?.scheduleId === 'weekly' ? state.weekHour : 17)}
-                style={[styles.weekChip, selected && styles.weekChipOn]}
-              >
-                <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{name.slice(0, 3)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View style={styles.weekRow}>
-          {WEEK_HOURS.map((hour) => {
-            const selected = state?.scheduleId === 'weekly' && state.weekHour === hour;
-            return (
-              <Pressable
-                key={hour}
-                testID={`week-hour-${hour}`}
-                accessibilityRole="button"
-                accessibilityLabel={clockLabel(hour)}
-                onPress={() => onWeek(state?.scheduleId === 'weekly' ? state.weekDay : 0, hour)}
-                style={[styles.weekChip, selected && styles.weekChipOn]}
-              >
-                <Text style={[styles.weekChipText, selected && styles.weekChipTextOn]}>{clockLabel(hour)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -654,11 +669,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 14,
   },
-  toggle: { alignItems: 'center' },
-  toggleRing: { borderWidth: 1, borderColor: ink, borderRadius: 22, padding: 2, backgroundColor: paper },
-  toggleRingOn: { borderWidth: 2, backgroundColor: '#eadcc4' },
-  toggleImage: { width: 36, height: 36, borderRadius: 18 },
-  headerRule: { width: 1, alignSelf: 'stretch', backgroundColor: ink },
+  focus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  focusOn: { backgroundColor: '#ece7df' },
+  focusText: { color: '#8a8a8a', fontSize: 16, lineHeight: 20 },
+  focusTextOn: { color: ink, fontWeight: '600' },
   schedule: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   scheduleLine: { flex: 1, color: ink, fontSize: 16, lineHeight: 20 },
   menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
@@ -675,9 +696,11 @@ const styles = StyleSheet.create({
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1 },
   contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
   contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 18 },
-  contact: { width: 68, alignItems: 'center' },
+  contact: { width: 76, alignItems: 'center' },
   avatar: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, backgroundColor: paper },
-  contactLabel: { marginTop: 4, maxWidth: 64, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
+  circleOn: { opacity: 1, borderWidth: 2, borderColor: ink },
+  circleDim: { opacity: 0.4 },
+  contactLabel: { marginTop: 4, maxWidth: 76, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
   plus: {
     width: 54,
     height: 54,
@@ -688,8 +711,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   plusMark: { color: ink, fontSize: 32, lineHeight: 34 },
-  contactMark: { marginTop: 7, width: 44, height: 3, backgroundColor: 'transparent' },
-  contactMarkOn: { backgroundColor: ink },
   main: { flex: 1, backgroundColor: paper },
   thread: { flex: 1 },
   threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 28, gap: 14, overflow: 'visible' },
@@ -779,6 +800,16 @@ const styles = StyleSheet.create({
   intentBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: ink },
   intentText: { color: ink, fontSize: 14, textAlign: 'center', lineHeight: 18 },
   intentTextSelected: { fontWeight: '700' },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingTop: 10 },
+  choice: { borderWidth: 1, borderColor: ink, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 },
+  choiceOn: { backgroundColor: ink },
+  choiceText: { color: ink, fontSize: 13, lineHeight: 16 },
+  choiceTextOn: { color: paper },
+  hours: { paddingHorizontal: 12, paddingTop: 8, gap: 6 },
+  hourChip: { borderWidth: 1, borderColor: ink, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 },
+  hourChipOn: { backgroundColor: ink },
+  hourChipText: { color: ink, fontSize: 12, lineHeight: 16 },
+  hourChipTextOn: { color: paper },
   receipt: {
     paddingHorizontal: 16,
     paddingTop: 12,

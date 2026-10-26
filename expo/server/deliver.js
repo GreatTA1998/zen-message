@@ -22,6 +22,7 @@ export function deliverMessage(sender, recipient, action) {
     intent: action.intent,
     now: action.now,
     offsetMinutes: recipient.offsetMinutes,
+    releaseAt: action.releaseAt,
   });
   return {
     sender: outgoing.state,
@@ -36,12 +37,11 @@ export function changeMode(user, mode) {
   return reduce(user, { type: 'set-mode', mode });
 }
 
-export function changeSchedule(user, scheduleId, now, weekly) {
+export function changeSchedule(user, hour, minute, now) {
   return reduce(user, {
     type: 'set-schedule',
-    scheduleId,
-    weekDay: weekly?.weekDay,
-    weekHour: weekly?.weekHour,
+    dayHour: hour,
+    dayMinute: minute,
     now,
     offsetMinutes: user.offsetMinutes,
   });

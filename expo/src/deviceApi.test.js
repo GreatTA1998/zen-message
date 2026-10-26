@@ -34,7 +34,8 @@ test('an Apple credential opens a session on the device', async () => {
   const inbox = await api(`/v1/inbox?offset=${new Date().getTimezoneOffset()}`, { token: session.token });
   assert.equal(inbox.user.id, session.user.id);
   assert.equal(inbox.state.mode, 'batched');
-  assert.equal(inbox.state.scheduleId, 'daily-1-7');
+  assert.equal(inbox.state.dayHour, 19);
+  assert.equal(inbox.state.dayMinute, 0);
   assert.deepEqual(inbox.contacts, []);
 });
 
@@ -184,7 +185,7 @@ test('a web realtime message alerts the signed-in phone once', async () => {
   assert.equal(presents(storage.delivered, apple.user.id).length, 1);
 });
 
-test('batched anytime and timely wait for one digest, and relaxed stays private', async () => {
+test('batched anytime waits for one digest, and relaxed stays private', async () => {
   const storage = sharedStore();
   const phone = createDeviceApi(storage, (length) => new Uint8Array(length).fill(6));
   const web = createDeviceApi(storage, (length) => new Uint8Array(length).fill(7));
@@ -210,7 +211,11 @@ test('batched anytime and timely wait for one digest, and relaxed stays private'
   const timely = await web('/v1/messages', {
     token: google.token,
     method: 'POST',
-    body: { contactId: apple.user.id, body: 'no rush', intent: 'timely' },
+    body: {
+      contactId: apple.user.id,
+      body: 'no rush',
+      intent: 'anytime',
+    },
   });
   assert.equal(JSON.stringify(anytime).includes('relax'), false);
   assert.equal(JSON.stringify(timely).includes('relax'), false);
@@ -244,6 +249,26 @@ test('batched anytime and timely wait for one digest, and relaxed stays private'
   assert.equal(presents(storage.delivered, apple.user.id).length, 1);
   const readable = await phone('/v1/inbox?offset=0', { token: apple.token });
   assert.equal(readable.state.messages.some((message) => message.body === 'readable now' && message.visible), true);
+});
+
+test('three characters show a nickname or not found before add', async () => {
+  const api = createDeviceApi(memoryStorage(), (length) => new Uint8Array(length).fill(4));
+  const ada = await api('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-user-ada', firstName: 'Ada' },
+  });
+  const bea = await api('/v1/session', {
+    method: 'POST',
+    body: { provider: 'google', subject: 'google-user-bea' },
+  });
+  const found = await api(`/v1/person?code=${ada.user.id}`, { token: bea.token });
+  assert.equal(found.found, true);
+  assert.equal(found.name, 'Ada');
+  assert.equal(JSON.stringify(found).includes('relax'), false);
+  const missing = await api('/v1/person?code=ZZZ', { token: bea.token });
+  assert.deepEqual(missing, { found: false });
+  const self = await api(`/v1/person?code=${bea.user.id}`, { token: bea.token });
+  assert.deepEqual(self, { found: false });
 });
 
 test('a token from a previous install still opens the inbox', async () => {

@@ -47,9 +47,8 @@ function contactCard(users, contact) {
   return {
     id: contact.id,
     firstName: person?.firstName || '',
-    scheduleId: person?.scheduleId || 'daily-1-7',
-    weekDay: Number.isInteger(person?.weekDay) ? person.weekDay : 0,
-    weekHour: Number.isInteger(person?.weekHour) ? person.weekHour : 17,
+    dayHour: Number.isInteger(person?.dayHour) ? person.dayHour : 19,
+    dayMinute: Number.isInteger(person?.dayMinute) ? person.dayMinute : 0,
     offsetMinutes: Number.isInteger(person?.offsetMinutes) ? person.offsetMinutes : 0,
   };
 }
@@ -61,9 +60,8 @@ function inbox(state, user) {
     effects: user.pendingEffects,
     state: {
       mode: user.mode,
-      scheduleId: user.scheduleId,
-      weekDay: user.weekDay,
-      weekHour: user.weekHour,
+      dayHour: Number.isInteger(user.dayHour) ? user.dayHour : 19,
+      dayMinute: Number.isInteger(user.dayMinute) ? user.dayMinute : 0,
       contactId: user.contactId,
       messages: user.messages,
       digest: user.digest,
@@ -225,6 +223,13 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     const offset = method === 'GET' ? Number(url.searchParams.get('offset')) : body?.offsetMinutes;
     applyClock(user, offset);
 
+    if (method === 'GET' && url.pathname === '/v1/person') {
+      const code = normalizeCode(url.searchParams.get('code'));
+      const found = isCode(code) ? state.users[code] : null;
+      if (!found || found.id === user.id) return { found: false };
+      return { found: true, name: found.firstName || found.id };
+    }
+
     if (method === 'GET' && url.pathname === '/v1/inbox') {
       linkIncomingContacts(state, user);
       await commit(store, state);
@@ -258,6 +263,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
         body: body?.body,
         photo: body?.photo,
         intent: body?.intent,
+        releaseAt: body?.releaseAt,
         now: Date.now(),
       });
       adopt(user, result.sender);
@@ -278,10 +284,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     }
 
     if (method === 'POST' && url.pathname === '/v1/schedule') {
-      const result = changeSchedule(user, body?.scheduleId, Date.now(), {
-        weekDay: body?.weekDay,
-        weekHour: body?.weekHour,
-      });
+      const result = changeSchedule(user, body?.dayHour, body?.dayMinute, Date.now());
       adopt(user, result.state);
       if (result.effects.length) user.pendingEffects = result.effects;
       await commit(store, state);
