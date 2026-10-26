@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -11,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
@@ -35,10 +37,118 @@ import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
 import { finishSignIn } from './src/signIn';
 
-function scheduleLabel(state) {
-  if (state?.mode === 'relaxed') return 'Receiving notifications';
+function scheduleLabel(mode, state) {
+  if (mode === 'relaxed') return 'Open';
   const clock = dailyClock(state);
   return `Daily ${dayPhrase(clock.hour, clock.minute)}`;
+}
+
+function keyboardEasing(name) {
+  if (name === 'easeIn') return Easing.in(Easing.ease);
+  if (name === 'easeOut') return Easing.out(Easing.ease);
+  if (name === 'linear') return Easing.linear;
+  if (name === 'easeInEaseOut') return Easing.inOut(Easing.ease);
+  // UIKit's keyboard curve. The notification names this easing "keyboard".
+  return Easing.bezier(0.38, 0.7, 0.125, 1);
+}
+
+function useKeyboardLift(hostRef, threadRef) {
+  const lift = useRef(new Animated.Value(0)).current;
+  const restingBottom = useRef(0);
+  const applied = useRef(0);
+  const offset = useRef(0);
+  const pinned = useRef(true);
+  const pinThisMove = useRef(false);
+  const moving = useRef(false);
+
+  const rememberBottom = useCallback(() => {
+    if (applied.current > 0) return;
+    hostRef.current?.measureInWindow((_x, y, _width, height) => {
+      if (height) restingBottom.current = y + height;
+    });
+  }, [hostRef]);
+
+  const onThreadScroll = useCallback((event) => {
+    if (moving.current) return;
+    const native = event.nativeEvent;
+    offset.current = native.contentOffset?.y ?? 0;
+    const content = native.contentSize?.height ?? 0;
+    const view = native.layoutMeasurement?.height ?? 0;
+    pinned.current = content - view - offset.current < 24;
+  }, []);
+
+  useEffect(() => {
+    const id = lift.addListener(({ value }) => {
+      const delta = value - applied.current;
+      applied.current = value;
+      if (!pinThisMove.current || !threadRef.current) return;
+      offset.current = Math.max(0, offset.current + delta);
+      threadRef.current.scrollTo({ y: offset.current, animated: false });
+    });
+    return () => lift.removeListener(id);
+  }, [lift, threadRef]);
+
+  useEffect(() => {
+    function overlap(event) {
+      const screenY = event?.endCoordinates?.screenY;
+      if (typeof screenY !== 'number') return 0;
+      const bottom = restingBottom.current;
+      if (!bottom) return Math.max(0, event.endCoordinates?.height ?? 0);
+      return Math.max(0, bottom - screenY);
+    }
+
+    function apply(event, next) {
+      const value = Math.round(next);
+      if (value === Math.round(applied.current) && !moving.current) return;
+      pinThisMove.current = pinned.current;
+      const duration = Platform.OS === 'ios' && event?.duration > 0 ? event.duration : 0;
+      lift.stopAnimation();
+      if (duration > 0) {
+        moving.current = true;
+        Animated.timing(lift, {
+          toValue: value,
+          duration,
+          easing: keyboardEasing(event?.easing),
+          useNativeDriver: false,
+        }).start(({ finished }) => {
+          if (finished) moving.current = false;
+        });
+        return;
+      }
+      // Web tracks visualViewport, which already moves with the keyboard.
+      // Setting the inset here does not wait for a did-show event.
+      moving.current = false;
+      lift.setValue(value);
+    }
+
+    if (Platform.OS === 'web') {
+      const viewport = window.visualViewport;
+      if (!viewport) return undefined;
+      const onViewport = () => {
+        const next = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+        apply(null, next);
+      };
+      viewport.addEventListener('resize', onViewport);
+      viewport.addEventListener('scroll', onViewport);
+      onViewport();
+      return () => {
+        viewport.removeEventListener('resize', onViewport);
+        viewport.removeEventListener('scroll', onViewport);
+      };
+    }
+
+    // iOS: keyboardWillChangeFrame fires when the animation starts and includes its
+    // duration and curve. keyboardDidShow fires after that animation and would
+    // reflow the screen a second time.
+    const frameEvent = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
+    const subs = [Keyboard.addListener(frameEvent, (event) => apply(event, overlap(event)))];
+    if (Platform.OS !== 'ios') {
+      subs.push(Keyboard.addListener('keyboardDidHide', (event) => apply(event, 0)));
+    }
+    return () => subs.forEach((sub) => sub.remove());
+  }, [lift]);
+
+  return { lift, rememberBottom, onThreadScroll, keyboardLift: applied };
 }
 
 const MISSING = {
@@ -221,21 +331,37 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const [choice, setChoice] = useState(0);
   const [customHour, setCustomHour] = useState(15);
   const [panel, setPanel] = useState('chat');
+  const [pendingMode, setPendingMode] = useState(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [footerHeight, setFooterHeight] = useState(0);
+  const focusRequest = useRef(0);
   const threadRef = useRef(null);
   const frameRef = useRef(null);
+  const phoneRef = useRef(null);
+  const { lift, rememberBottom, onThreadScroll, keyboardLift } = useKeyboardLift(phoneRef, threadRef);
   const avatarRefs = useRef({});
   const [tailX, setTailX] = useState(null);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
   const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
   const messages = contact && state ? threadMessages(state.messages, contact.id) : [];
-  const focused = state?.mode !== 'relaxed';
-  const label = scheduleLabel(state);
+  const mode = pendingMode ?? state?.mode ?? 'batched';
+  const focused = mode !== 'relaxed';
+  const label = scheduleLabel(mode, state);
   const now = new Date();
   const choices = scheduledChoices(now);
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
-  const phrase = intent === 'scheduled' && selectedAt ? receiptPhrase(selectedAt, now) : '';
   const canSend = Boolean(contact) && (draft.trim().length > 0 || Boolean(photo));
+
+  function onToggleFocus() {
+    const next = focused ? 'relaxed' : 'batched';
+    const request = focusRequest.current + 1;
+    focusRequest.current = request;
+    setPendingMode(next);
+    mutate('/v1/mode', { mode: next }).finally(() => {
+      if (focusRequest.current === request) setPendingMode(null);
+    });
+  }
 
   const syncTail = useCallback(() => {
     const avatar = avatarRefs.current[contact?.id];
@@ -322,8 +448,16 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.phone}>
+    <View style={styles.root}>
+      <View ref={phoneRef} onLayout={rememberBottom} style={styles.phone}>
+        {scheduleOpen ? (
+          <Pressable
+            testID="schedule-backdrop"
+            accessibilityLabel="Close schedule"
+            onPress={() => setScheduleOpen(false)}
+            style={styles.backdrop}
+          />
+        ) : null}
         <View testID="schedule-panel" style={styles.top}>
           <View testID="top-bar" style={styles.header}>
             <Pressable
@@ -332,25 +466,38 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
               accessibilityLabel="Focus"
               accessibilityState={{ selected: focused }}
               hitSlop={6}
-              onPress={() => mutate('/v1/mode', { mode: focused ? 'relaxed' : 'batched' })}
-              style={[styles.focus, focused && styles.focusOn]}
+              onPress={onToggleFocus}
+              style={styles.focus}
             >
-              <Feather name="moon" size={18} color={focused ? ink : '#8a8a8a'} />
-              <Text style={[styles.focusText, focused && styles.focusTextOn]}>Focus</Text>
+              <Ionicons name={focused ? 'moon' : 'moon-outline'} size={20} color={ink} />
+              <Text style={styles.focusText}>Focus</Text>
             </Pressable>
-            <Pressable
-              testID="schedule-button"
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              accessibilityState={{ selected: panel === 'settings' }}
-              onPress={() => setPanel((current) => (current === 'settings' ? 'chat' : 'settings'))}
-              style={styles.schedule}
-            >
-              <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
-                {label}
-              </Text>
-              <Feather name="settings" size={22} color={ink} />
-            </Pressable>
+            <View style={styles.scheduleWrap}>
+              <Pressable
+                testID="schedule-button"
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityState={{ expanded: scheduleOpen }}
+                onPress={() => setScheduleOpen((current) => !current)}
+                style={styles.schedule}
+              >
+                <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
+                  {label}
+                </Text>
+                <Feather name="settings" size={22} color={ink} />
+              </Pressable>
+              {scheduleOpen ? (
+                <View testID="schedule-popover" style={styles.popover}>
+                  <ScheduleSettings
+                    state={state}
+                    onChoose={(dayHour) => {
+                      setScheduleOpen(false);
+                      mutate('/v1/schedule', { dayHour, dayMinute: 0 });
+                    }}
+                  />
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -411,12 +558,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           </Pressable>
         </ScrollView>
 
-        {panel === 'settings' ? (
-          <ScheduleSettings
-            state={state}
-            onChoose={(dayHour) => mutate('/v1/schedule', { dayHour, dayMinute: 0 })}
-          />
-        ) : null}
         {panel === 'add' ? (
           <PlusView
             code={userId(inbox)}
@@ -431,20 +572,34 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
         {panel === 'chat' ? (
         <View style={styles.main}>
         <View ref={frameRef} style={styles.thread} onLayout={syncTail}>
-          <ScrollView
+          <Animated.ScrollView
             ref={threadRef}
             style={styles.thread}
-            contentContainerStyle={styles.threadContent}
+            contentContainerStyle={[
+              styles.threadContent,
+              { paddingBottom: Animated.add(footerHeight + 28, lift) },
+            ]}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
+            scrollEventThrottle={16}
+            onScroll={onThreadScroll}
+            onContentSizeChange={() => {
+              if (keyboardLift.current > 0) return;
+              threadRef.current?.scrollToEnd({ animated: false });
+            }}
           >
             {messages.map((message) => (
               <Bubble key={message.id} message={message} tailX={tailX} />
             ))}
-          </ScrollView>
+          </Animated.ScrollView>
         </View>
 
-        <View style={styles.footer}>
+        <Animated.View
+          onLayout={(event) => {
+            const next = Math.ceil(event.nativeEvent.layout.height);
+            setFooterHeight((current) => (current === next ? current : next));
+          }}
+          style={[styles.footer, styles.footerDock, { bottom: lift }]}
+        >
           <View style={styles.intents}>
             {INTENTS.map((item, index) => {
               const selected = item.id === intent;
@@ -513,11 +668,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             </ScrollView>
           ) : null}
           <View testID="composer-bar" style={styles.composer}>
-            {phrase ? (
-              <Text testID="receipt-phrase" style={styles.receipt}>
-                {phrase}
-              </Text>
-            ) : null}
             {photo ? (
               <View style={styles.previewWrap}>
                 <Image testID="photo-preview" source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
@@ -565,11 +715,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
               </Pressable>
             </View>
           </View>
-        </View>
+        </Animated.View>
         </View>
         ) : null}
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -585,7 +735,7 @@ function choiceLabel(at, now) {
 function ScheduleSettings({ state, onChoose }) {
   const selected = dailyClock(state).hour;
   return (
-    <ScrollView testID="schedule-menu" style={styles.main} contentContainerStyle={styles.menu} keyboardShouldPersistTaps="handled">
+    <ScrollView testID="schedule-menu" style={styles.popoverList} keyboardShouldPersistTaps="handled">
       {DAY_HOURS.map((hour) => {
         const on = hour === selected;
         return (
@@ -658,7 +808,7 @@ const styles = StyleSheet.create({
   frame: { flex: 1, backgroundColor: paper },
   root: { flex: 1, backgroundColor: paper, alignItems: 'center' },
   phone: { flex: 1, width: '100%', maxWidth: 480, backgroundColor: paper },
-  top: { zIndex: 2, backgroundColor: paper },
+  top: { zIndex: 4, backgroundColor: paper },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -677,10 +827,22 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
   },
-  focusOn: { backgroundColor: '#ece7df' },
-  focusText: { color: '#8a8a8a', fontSize: 16, lineHeight: 20 },
-  focusTextOn: { color: ink, fontWeight: '600' },
-  schedule: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  focusText: { color: ink, fontSize: 16, lineHeight: 20, fontWeight: '600' },
+  scheduleWrap: { flex: 1, position: 'relative', zIndex: 2 },
+  schedule: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  popover: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: 8,
+    width: 168,
+    maxHeight: 280,
+    backgroundColor: paper,
+    borderWidth: 1,
+    borderColor: ink,
+    zIndex: 6,
+  },
+  popoverList: { maxHeight: 280 },
   scheduleLine: { flex: 1, color: ink, fontSize: 16, lineHeight: 20 },
   menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
@@ -693,7 +855,7 @@ const styles = StyleSheet.create({
   menuRowSelected: { backgroundColor: '#f6f3ee' },
   menuText: { color: ink, fontSize: 16, lineHeight: 21 },
   menuTextSelected: { fontWeight: '700' },
-  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1 },
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3 },
   contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
   contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 18 },
   contact: { width: 76, alignItems: 'center' },
@@ -785,6 +947,7 @@ const styles = StyleSheet.create({
   theirTailJoin: { position: 'absolute', left: 2, bottom: -2, width: 14, height: 4, backgroundColor: paper },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { borderTopWidth: 1, borderTopColor: ink, backgroundColor: paper },
+  footerDock: { position: 'absolute', left: 0, right: 0 },
   intents: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: ink },
   intent: {
     flex: 1,
@@ -810,13 +973,6 @@ const styles = StyleSheet.create({
   hourChipOn: { backgroundColor: ink },
   hourChipText: { color: ink, fontSize: 12, lineHeight: 16 },
   hourChipTextOn: { color: paper },
-  receipt: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    color: ink,
-    fontSize: 15,
-    lineHeight: 20,
-  },
   composer: {
     marginHorizontal: 12,
     marginTop: 10,
