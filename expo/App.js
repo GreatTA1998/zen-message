@@ -112,7 +112,12 @@ function useConversation(hostRef) {
 
   const onComposerBlur = useCallback(() => {
     focusedRef.current = false;
-    if (Platform.OS !== 'ios') commit(null, false, 0);
+    // Blur fires before the hide animation on Android and mobile web. The inset
+    // keeps the in-flow composer above the keyboard, so it stays until the
+    // keyboard is gone: iOS from keyboardWillChangeFrame, Android from
+    // keyboardDidHide, and web from visualViewport. No virtual keyboard means
+    // the conversation chrome can close with the field.
+    if (Platform.OS === 'web' && webKeyboardOverlap() === 0) commit(null, false, 0);
   }, [commit]);
 
   useEffect(() => {
@@ -127,8 +132,9 @@ function useConversation(hostRef) {
       const viewport = window.visualViewport;
       if (!viewport) return undefined;
       const onViewport = () => {
-        if (!focusedRef.current) return;
-        commit(null, true, webKeyboardOverlap());
+        const overlap = webKeyboardOverlap();
+        // After blur, follow the keyboard until it has left the screen.
+        commit(null, focusedRef.current || overlap > 0, overlap);
       };
       viewport.addEventListener('resize', onViewport);
       viewport.addEventListener('scroll', onViewport);

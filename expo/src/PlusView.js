@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     color: ink,
   },
-  lookup: { flex: 1, color: ink, fontSize: 18, lineHeight: 24 },
+  lookup: { flex: 1, alignSelf: 'center', color: ink, fontSize: 18, lineHeight: 24 },
   add: {
     minHeight: 48,
     borderWidth: 1,
