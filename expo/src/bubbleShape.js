@@ -37,7 +37,7 @@ export function rasterBubble(width, height, incoming, scale = 1) {
     [0.25, 0.75],
     [0.75, 0.75],
   ];
-  const bounds = bodyBounds(width, height, scale);
+  const bounds = bodyBounds(width, height, scale, incoming);
 
   for (let y = 0; y < h; y += 1) {
     for (let x = 0; x < w; x += 1) {
@@ -116,15 +116,17 @@ function ownPath(width, height) {
   return points;
 }
 
-function bodyBounds(width, height, scale) {
+function bodyBounds(width, height, scale, incoming) {
   const margin = STROKE;
   const tail = Math.min(TAIL, Math.max(8, height * 0.28));
   const radius = Math.max(8, Math.min(16, (width - margin * 2) / 2 - 4, (height - tail - margin * 2) / 2 - 2));
+  const top = incoming ? tail + 2 : margin + 2;
+  const bottom = incoming ? height - margin - 2 : height - tail - 2;
   return {
     left: (margin + radius) * scale,
     right: (width - margin - radius) * scale,
-    top: (margin + 2) * scale,
-    bottom: (height - tail - 2) * scale,
+    top: top * scale,
+    bottom: bottom * scale,
   };
 }
 
