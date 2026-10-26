@@ -883,7 +883,7 @@ function ConversationSheet({ open, inset, hiddenTop, messages, tailX, footer }) 
       <View style={styles.copyColumn}>
         <ScrollView
           style={[styles.thread, styles.flip]}
-          contentContainerStyle={styles.threadContent}
+          contentContainerStyle={[styles.threadContent, styles.flippedThreadContent]}
           keyboardShouldPersistTaps="handled"
         >
           {ordered.map((message) => (
@@ -1054,6 +1054,7 @@ const styles = StyleSheet.create({
   flip: { transform: [{ scaleY: -1 }] },
   thread: { flex: 1 },
   threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 8, gap: 14, overflow: 'visible' },
+  flippedThreadContent: { paddingTop: 8, paddingBottom: 22 },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
