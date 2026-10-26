@@ -39,6 +39,11 @@ import { loadSession, saveSession } from './src/session';
 import { finishSignIn } from './src/signIn';
 
 const MOVE_MS = 250;
+const BLUR_GRACE_MS = 120;
+
+function blurField(field) {
+  if (field && typeof field.blur === 'function') field.blur();
+}
 
 function summaryAt(hour, minute = 0) {
   const suffix = hour >= 12 ? 'pm' : 'am';
@@ -65,6 +70,7 @@ function useConversation(hostRef) {
   const insetRef = useRef(0);
   const focusCount = useRef(0);
   const blurTimer = useRef(null);
+  const holdCount = useRef(0);
   const restingBottom = useRef(0);
   const lastEvent = useRef(null);
 
@@ -91,6 +97,20 @@ function useConversation(hostRef) {
     setFrame({ conversation: show, inset: insetValue });
   }, []);
 
+  const holdComposer = useCallback(() => {
+    holdCount.current += 1;
+    if (blurTimer.current) {
+      clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      holdCount.current = Math.max(0, holdCount.current - 1);
+    };
+  }, []);
+
   const onComposerFocus = useCallback(() => {
     focusCount.current += 1;
     if (blurTimer.current) {
@@ -104,13 +124,13 @@ function useConversation(hostRef) {
 
   const onComposerBlur = useCallback(() => {
     focusCount.current = Math.max(0, focusCount.current - 1);
-    if (focusCount.current > 0) return;
+    if (focusCount.current > 0 || holdCount.current > 0) return;
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = setTimeout(() => {
       blurTimer.current = null;
-      if (focusCount.current > 0) return;
+      if (focusCount.current > 0 || holdCount.current > 0) return;
       commit(false, 0);
-    }, 120);
+    }, BLUR_GRACE_MS);
   }, [commit]);
 
   useEffect(() => {
@@ -123,7 +143,12 @@ function useConversation(hostRef) {
     function onFrame(event) {
       lastEvent.current = event;
       if (!conversationRef.current) return;
-      commit(true, overlapFrom(event));
+      const next = overlapFrom(event);
+      if (Platform.OS === 'ios' && next <= 0) {
+        commit(holdCount.current > 0, 0);
+        return;
+      }
+      commit(true, next);
     }
 
     if (Platform.OS === 'web') {
@@ -147,7 +172,7 @@ function useConversation(hostRef) {
       subs.push(
         Keyboard.addListener('keyboardDidHide', () => {
           lastEvent.current = null;
-          if (conversationRef.current) commit(true, 0);
+          commit(conversationRef.current && holdCount.current > 0, 0);
         }),
       );
     }
@@ -160,6 +185,7 @@ function useConversation(hostRef) {
     rememberBottom,
     onComposerFocus,
     onComposerBlur,
+    holdComposer,
   };
 }
 
@@ -349,7 +375,9 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const threadRef = useRef(null);
   const frameRef = useRef(null);
   const phoneRef = useRef(null);
-  const { conversation, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
+  const baseField = useRef(null);
+  const copyField = useRef(null);
+  const { conversation, inset, rememberBottom, onComposerFocus, onComposerBlur, holdComposer } = useConversation(phoneRef);
   const [copyMounted, setCopyMounted] = useState(false);
   const [copyLeaving, setCopyLeaving] = useState(false);
   const avatarRefs = useRef({});
@@ -395,6 +423,17 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
 
   useEffect(() => {
     if (conversation) setScheduleOpen(false);
+  }, [conversation]);
+
+  const conversationSeen = useRef(false);
+  useEffect(() => {
+    if (conversation) {
+      conversationSeen.current = true;
+      return;
+    }
+    if (!conversationSeen.current) return;
+    blurField(baseField.current);
+    blurField(copyField.current);
   }, [conversation]);
 
   useEffect(() => {
@@ -454,22 +493,30 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   }
 
   async function attach(source) {
-    const permission =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
-    const options = { mediaTypes: ['images'], quality: 0.4, base64: true, exif: false };
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-    const asset = result.canceled ? null : result.assets?.[0];
-    if (!asset || asset.type === 'video' || String(asset.mimeType || '').startsWith('video/')) return;
-    const mime = String(asset.mimeType || 'image/jpeg');
-    const subtype = mime.slice('image/'.length).split(';')[0] || 'jpeg';
-    const next = asset.base64 ? messagePhoto(`data:image/${subtype};base64,${asset.base64}`) : null;
-    if (next) setPhoto(next);
+    const restore = conversation;
+    const field = copyField.current;
+    const release = holdComposer();
+    try {
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) return;
+      const options = { mediaTypes: ['images'], quality: 0.4, base64: true, exif: false };
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync(options)
+          : await ImagePicker.launchImageLibraryAsync(options);
+      const asset = result.canceled ? null : result.assets?.[0];
+      if (!asset || asset.type === 'video' || String(asset.mimeType || '').startsWith('video/')) return;
+      const mime = String(asset.mimeType || 'image/jpeg');
+      const subtype = mime.slice('image/'.length).split(';')[0] || 'jpeg';
+      const next = asset.base64 ? messagePhoto(`data:image/${subtype};base64,${asset.base64}`) : null;
+      if (next) setPhoto(next);
+    } finally {
+      setTimeout(release, BLUR_GRACE_MS);
+      if (restore && field && typeof field.focus === 'function' && !field.isFocused?.()) field.focus();
+    }
   }
 
   function onChangeDraft(value) {
@@ -502,6 +549,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
     onAttach: () => attach('library'),
     onComposerFocus,
     onComposerBlur,
+    holdComposer,
   };
 
   return (
@@ -645,7 +693,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           </ScrollView>
         </View>
 
-        <ComposerFooter testID="composer" {...composerProps} />
+        <ComposerFooter testID="composer" fieldRef={baseField} {...composerProps} />
         </View>
         ) : null}
         {panel === 'chat' && copyMounted ? (
@@ -655,7 +703,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             messages={messages}
             tailX={tailX}
             onExited={onCopyExited}
-            footer={<ComposerFooter testID="composer-copy" autoFocus {...composerProps} />}
+            footer={<ComposerFooter testID="composer-copy" autoFocus fieldRef={copyField} {...composerProps} />}
           />
         ) : null}
       </View>
@@ -679,6 +727,7 @@ function choiceLabel(at, now) {
 function ComposerFooter({
   testID,
   autoFocus = false,
+  fieldRef,
   intent,
   onIntent,
   choice,
@@ -699,9 +748,50 @@ function ComposerFooter({
   onAttach,
   onComposerFocus,
   onComposerBlur,
+  holdComposer,
 }) {
+  const inputRef = useRef(null);
+  const fieldFocused = useRef(false);
+  const setField = useCallback((node) => {
+    inputRef.current = node;
+    if (fieldRef) fieldRef.current = node;
+  }, [fieldRef]);
+
+  function shieldComposer(event) {
+    if (Platform.OS !== 'web') return;
+    const tag = event?.nativeEvent?.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const type = event.type || event?.nativeEvent?.type;
+    if (type === 'mousedown') event.preventDefault?.();
+    const wasFocused = fieldFocused.current;
+    const release = holdComposer();
+    const finish = () => {
+      try {
+        if (wasFocused && !fieldFocused.current) inputRef.current?.focus?.();
+      } finally {
+        release();
+      }
+    };
+    if (type === 'touchstart' && typeof window !== 'undefined') {
+      let settled = false;
+      const end = () => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('touchend', end, true);
+        window.removeEventListener('touchcancel', end, true);
+        clearTimeout(safety);
+        setTimeout(finish, 0);
+      };
+      const safety = setTimeout(end, 4000);
+      window.addEventListener('touchend', end, true);
+      window.addEventListener('touchcancel', end, true);
+      return;
+    }
+    setTimeout(finish, 0);
+  }
+
   return (
-    <View style={styles.footer}>
+    <View style={styles.footer} onMouseDown={shieldComposer} onTouchStart={shieldComposer}>
       <View style={styles.intents}>
         {INTENTS.map((item, index) => {
           const selected = item.id === intent;
@@ -787,13 +877,20 @@ function ComposerFooter({
           </View>
         ) : null}
         <TextInput
+          ref={setField}
           testID={testID}
           value={draft}
           autoFocus={autoFocus}
           onChangeText={onChangeDraft}
           onContentSizeChange={onInputSize}
-          onFocus={onComposerFocus}
-          onBlur={onComposerBlur}
+          onFocus={() => {
+            fieldFocused.current = true;
+            onComposerFocus();
+          }}
+          onBlur={() => {
+            fieldFocused.current = false;
+            onComposerBlur();
+          }}
           placeholder={contactId ? `Message ${contactId}` : 'Message'}
           placeholderTextColor="#8a8a8a"
           multiline
