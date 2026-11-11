@@ -487,7 +487,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
       <View
         ref={phoneRef}
         onLayout={rememberBottom}
-        style={styles.phone}
+        style={[styles.phone, web && styles.webScreen]}
       >
         {scheduleOpen ? (
           <Pressable
@@ -498,7 +498,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           />
         ) : null}
         <View testID="schedule-panel" style={styles.top}>
-          <View testID="top-bar" style={styles.header}>
+          <View testID="top-bar" style={[styles.header, web && styles.webPad]}>
             <Pressable
               testID="mode-toggle"
               accessibilityRole="button"
@@ -544,7 +544,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           horizontal
           showsHorizontalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.contacts}
+          contentContainerStyle={[styles.contacts, web && styles.webPad]}
           testID="contact-strip"
           style={styles.contactStrip}
           scrollEventThrottle={16}
@@ -604,12 +604,12 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
           />
         ) : null}
         {panel === 'chat' ? (
-        <View style={styles.main}>
-        <View style={styles.thread}>
+        <View style={[styles.main, web && styles.webFill]}>
+        <View style={[styles.thread, web && styles.webFill]}>
           <ScrollView
             ref={threadRef}
             style={styles.thread}
-            contentContainerStyle={styles.threadContent}
+            contentContainerStyle={[styles.threadContent, web && styles.webThread]}
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets={false}
             contentInsetAdjustmentBehavior="never"
@@ -695,7 +695,7 @@ function ComposerFooter({
     <View style={styles.footer}>
       <View style={styles.composerWrap}>
         {timesOpen ? (
-          <View testID={showIds ? 'scheduled-choices' : undefined} style={styles.choicePopover}>
+          <View testID={showIds ? 'scheduled-choices' : undefined} style={[styles.choicePopover, web && styles.webChoices]}>
             {choices.map((at, index) => {
               const selected = choice === index;
               return (
@@ -745,7 +745,7 @@ function ComposerFooter({
             ) : null}
           </View>
         ) : null}
-        <View testID={showIds ? 'composer-bar' : undefined} style={styles.composer}>
+        <View testID={showIds ? 'composer-bar' : undefined} style={[styles.composer, web && styles.webComposer]}>
           {photo ? (
             <View style={styles.previewWrap}>
               <Image testID={showIds ? 'photo-preview' : undefined} source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
@@ -871,7 +871,7 @@ function ScheduleSettings({ state, onChoose }) {
 function Bubble({ message }) {
   const incoming = message.direction === 'in';
   return (
-    <View testID={incoming ? 'bubble-in' : 'bubble-out'} style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut]}>
+    <View testID={incoming ? 'bubble-in' : 'bubble-out'} style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, web && styles.bubbleRead]}>
       <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut]}>
         <View style={styles.tailStem} />
         <View style={styles.tailFill} />
@@ -899,13 +899,21 @@ function BubbleBody({ message }) {
 const ink = '#1c1c1c';
 const paper = '#fff';
 const moon = '#5E5CE6';
+const web = Platform.OS === 'web';
+const side = 32;
 
 const styles = StyleSheet.create({
   boot: { flex: 1, backgroundColor: paper },
   provider: { flex: 1, backgroundColor: paper },
   frame: { flex: 1, backgroundColor: paper },
   root: { flex: 1, backgroundColor: paper, alignItems: 'center' },
-  phone: { flex: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 720 : 480, backgroundColor: paper },
+  phone: { flex: 1, width: '100%', maxWidth: 480, backgroundColor: paper },
+  webScreen: { alignSelf: 'stretch', maxWidth: '100%', minHeight: 0 },
+  webPad: { paddingLeft: side, paddingRight: side },
+  webThread: { paddingHorizontal: side },
+  webFill: { minHeight: 0 },
+  webComposer: { marginHorizontal: side },
+  webChoices: { left: side, right: side, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' },
   top: { zIndex: 4, backgroundColor: paper },
   header: {
     flexDirection: 'row',
@@ -1004,6 +1012,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     borderTopLeftRadius: 2,
   },
+  bubbleRead: { maxWidth: 'min(560px, 100%)' },
   tail: { position: 'absolute', width: 24, height: 20 },
   tailIn: { left: -1, top: -12 },
   tailOut: { right: -1, bottom: -12, transform: [{ rotate: '180deg' }] },
