@@ -110,6 +110,7 @@ function useConversation(hostRef) {
       clearTimeout(blurTimer.current);
       blurTimer.current = null;
     }
+    if (Platform.OS === 'web') return;
     if (Platform.OS === 'ios') {
       if (openRef.current) {
         handoff.current = false;
@@ -626,7 +627,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
         <ComposerFooter testID="composer" {...composerProps} />
         </View>
         ) : null}
-        {panel === 'chat' && open ? (
+        {panel === 'chat' && open && Platform.OS !== 'web' ? (
           <ConversationSheet
             inset={inset}
             messages={messages}
@@ -904,7 +905,7 @@ const styles = StyleSheet.create({
   provider: { flex: 1, backgroundColor: paper },
   frame: { flex: 1, backgroundColor: paper },
   root: { flex: 1, backgroundColor: paper, alignItems: 'center' },
-  phone: { flex: 1, width: '100%', maxWidth: 480, backgroundColor: paper },
+  phone: { flex: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 720 : 480, backgroundColor: paper },
   top: { zIndex: 4, backgroundColor: paper },
   header: {
     flexDirection: 'row',
