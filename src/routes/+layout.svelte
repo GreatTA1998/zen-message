@@ -1,5 +1,5 @@
 <!-- TODO: put the logo transition here -->
-{#if !$hasLogoExited}
+{#if !$hasLogoExited && $page.url.pathname !== '/privacy'}
   <div 
     id="loading-screen-logo-start"
     style="opacity: 0; width: 30vw; height: 30vh"
@@ -14,7 +14,7 @@
   </div>
 {/if}
 
-<div class:invisible={!$hasLogoExited}>
+<div class:invisible={!$hasLogoExited && $page.url.pathname !== '/privacy'}>
   <slot>
 
   </slot>
@@ -105,9 +105,11 @@
     })
 
     const Elem = document.getElementById('loading-screen-logo-start')
-    Elem.addEventListener('animationend', (e) => {
-      hasLogoExited.set(true)
-    })
+    if (Elem) {
+      Elem.addEventListener('animationend', () => {
+        hasLogoExited.set(true)
+      })
+    }
   })
 </script>
 
