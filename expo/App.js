@@ -398,7 +398,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
   const summaryTime = mode !== 'relaxed' ? scheduleSummaryTime(state) : '';
-  const userId = inbox?.user?.id ?? '';
+  const accountId = inbox?.user?.id ?? '';
   const now = new Date();
   const choices = scheduledChoices(now);
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
@@ -596,7 +596,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
               {accountOpen ? (
                 <View testID="account-popover" style={styles.popover}>
                   <AccountMenu
-                    userId={userId}
+                    userId={accountId}
                     onLogout={async () => {
                       setAccountOpen(false);
                       await onLogout();
