@@ -715,7 +715,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
               onPress={() => setPhotoViewerUri(null)}
               style={styles.photoViewerBackdrop}
             />
-            <Image testID="photo-viewer-image" source={{ uri: photoViewerUri }} resizeMode="contain" style={styles.photoViewerImage} />
+            <Image pointerEvents="none" testID="photo-viewer-image" source={{ uri: photoViewerUri }} resizeMode="contain" style={styles.photoViewerImage} />
             <Pressable
               testID="photo-viewer-close"
               accessibilityRole="button"
@@ -1034,7 +1034,10 @@ function PhotoBubble({ message, incoming, onOpenPhoto }) {
       testID={incoming ? 'photo-in' : 'photo-out'}
       accessibilityRole="button"
       accessibilityLabel="View photo"
-      onPress={() => onOpenPhoto?.(message.photo)}
+      onPress={() => {
+        Keyboard.dismiss();
+        onOpenPhoto?.(message.photo);
+      }}
       style={[
         styles.photoBubble,
         incoming ? styles.photoBubbleIn : styles.photoBubbleOut,
