@@ -386,6 +386,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const [pendingMode, setPendingMode] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const focusRequest = useRef(0);
   const threadRef = useRef(null);
   const phoneRef = useRef(null);
@@ -398,7 +399,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
   const summaryTime = mode !== 'relaxed' ? scheduleSummaryTime(state) : '';
-  const userId = inbox?.user?.id ?? '';
+  const accountId = inbox?.user?.id ?? '';
   const now = new Date();
   const choices = scheduledChoices(now);
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
@@ -531,80 +532,82 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
         ) : null}
         <View testID="schedule-panel" style={styles.top}>
           <View testID="top-bar" style={[styles.header, web && styles.webPad]}>
-            <Pressable
-              testID="mode-toggle"
-              accessibilityRole="button"
-              accessibilityLabel="Focus"
-              accessibilityState={{ selected: focused }}
-              hitSlop={8}
-              onPress={onToggleFocus}
-              style={styles.focus}
-            >
-              <Ionicons name={focused ? 'moon' : 'moon-outline'} size={26} color={focused ? moon : ink} />
-              {focused ? <Text style={styles.focusText}>Focus</Text> : null}
-            </Pressable>
-            <View style={styles.scheduleWrap}>
-              <View style={styles.schedule}>
+            <View style={styles.headerMain}>
+              <Pressable
+                testID="mode-toggle"
+                accessibilityRole="button"
+                accessibilityLabel="Focus"
+                accessibilityState={{ selected: focused }}
+                hitSlop={8}
+                onPress={onToggleFocus}
+                style={styles.focus}
+              >
+                <Ionicons name={focused ? 'moon' : 'moon-outline'} size={26} color={focused ? moon : ink} />
+                {focused ? <Text style={styles.focusText}>Focus</Text> : null}
+              </Pressable>
+              <View style={styles.scheduleWrap}>
                 {mode === 'relaxed' ? (
                   <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
                     {label}
                   </Text>
                 ) : (
-                  <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
-                    receiving summary at{' '}
-                    <Text
+                  <View style={styles.schedulePhrase}>
+                    <Text testID="schedule-label" numberOfLines={1} style={[styles.scheduleLine, styles.schedulePrefix]}>
+                      receiving summary at{' '}
+                    </Text>
+                    <Pressable
                       testID="schedule-time"
                       accessibilityRole="button"
                       accessibilityLabel={`Change summary time, ${summaryTime}`}
                       accessibilityState={{ expanded: scheduleOpen }}
+                      hitSlop={4}
                       onPress={() => {
                         setAccountOpen(false);
                         setScheduleOpen((current) => !current);
                       }}
-                      style={styles.scheduleTime}
                     >
-                      {summaryTime}
-                    </Text>
-                  </Text>
+                      <Text style={[styles.scheduleLine, styles.scheduleTime]}>{summaryTime}</Text>
+                    </Pressable>
+                  </View>
                 )}
-                <Pressable
-                  testID="account-settings-button"
-                  accessibilityRole="button"
-                  accessibilityLabel="Account settings"
-                  accessibilityState={{ expanded: accountOpen }}
-                  hitSlop={6}
-                  onPress={() => {
-                    setScheduleOpen(false);
-                    setAccountOpen((current) => !current);
-                  }}
-                  style={styles.accountGear}
-                >
-                  <Feather name="settings" size={22} color={ink} />
-                </Pressable>
+                {scheduleOpen ? (
+                  <View testID="schedule-popover" style={styles.popover}>
+                    <ScheduleSettings
+                      state={state}
+                      onChoose={(dayHour) => {
+                        setScheduleOpen(false);
+                        mutate('/v1/schedule', { dayHour, dayMinute: 0 });
+                      }}
+                    />
+                  </View>
+                ) : null}
               </View>
-              {scheduleOpen ? (
-                <View testID="schedule-popover" style={styles.popover}>
-                  <ScheduleSettings
-                    state={state}
-                    onChoose={(dayHour) => {
-                      setScheduleOpen(false);
-                      mutate('/v1/schedule', { dayHour, dayMinute: 0 });
-                    }}
-                  />
-                </View>
-              ) : null}
-              {accountOpen ? (
-                <View testID="account-popover" style={styles.popover}>
-                  <AccountMenu
-                    userId={userId}
-                    onLogout={async () => {
-                      setAccountOpen(false);
-                      await onLogout();
-                    }}
-                  />
-                </View>
-              ) : null}
             </View>
+            <Pressable
+              testID="account-settings-button"
+              accessibilityRole="button"
+              accessibilityLabel="Account settings"
+              accessibilityState={{ expanded: accountOpen }}
+              hitSlop={6}
+              onPress={() => {
+                setScheduleOpen(false);
+                setAccountOpen((current) => !current);
+              }}
+              style={styles.accountGear}
+            >
+              <Feather name="settings" size={22} color={ink} />
+            </Pressable>
+            {accountOpen ? (
+              <View testID="account-popover" style={styles.accountPopover}>
+                <AccountMenu
+                  userId={accountId}
+                  onLogout={async () => {
+                    setAccountOpen(false);
+                    await onLogout();
+                  }}
+                />
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -687,7 +690,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
             }}
           >
             {messages.map((message) => (
-              <ThreadMessage key={message.id} message={message} />
+              <ThreadMessage key={message.id} message={message} onOpenPhoto={setPhotoViewerUri} />
             ))}
           </ScrollView>
         </View>
@@ -700,7 +703,29 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
             inset={inset}
             messages={messages}
             footer={<ComposerFooter testID="composer-copy" autoFocus {...composerProps} />}
+            onOpenPhoto={setPhotoViewerUri}
           />
+        ) : null}
+        {photoViewerUri ? (
+          <View testID="photo-viewer" style={styles.photoViewer}>
+            <Pressable
+              testID="photo-viewer-backdrop"
+              accessibilityRole="button"
+              accessibilityLabel="Close photo"
+              onPress={() => setPhotoViewerUri(null)}
+              style={styles.photoViewerBackdrop}
+            />
+            <Image testID="photo-viewer-image" source={{ uri: photoViewerUri }} resizeMode="contain" style={styles.photoViewerImage} />
+            <Pressable
+              testID="photo-viewer-close"
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              onPress={() => setPhotoViewerUri(null)}
+              style={styles.photoViewerClose}
+            >
+              <Feather name="x" size={28} color={paper} />
+            </Pressable>
+          </View>
         ) : null}
       </View>
     </View>
@@ -889,7 +914,7 @@ function ComposerFooter({
   );
 }
 
-function ConversationSheet({ inset, messages, footer }) {
+function ConversationSheet({ inset, messages, footer, onOpenPhoto }) {
   const ordered = messages.slice().reverse();
   return (
     <View testID="conversation-copy" style={[styles.copy, { top: 0, paddingBottom: inset }]}>
@@ -903,7 +928,7 @@ function ConversationSheet({ inset, messages, footer }) {
         >
           {ordered.map((message) => (
             <View key={message.id} style={styles.flip}>
-              <ThreadMessage message={message} />
+              <ThreadMessage message={message} onOpenPhoto={onOpenPhoto} />
             </View>
           ))}
         </ScrollView>
@@ -959,7 +984,7 @@ function ScheduleSettings({ state, onChoose }) {
 
 const photoMaxWidth = web ? 320 : 280;
 
-function ThreadMessage({ message }) {
+function ThreadMessage({ message, onOpenPhoto }) {
   const incoming = message.direction === 'in';
   const parts = messageBubbleParts(message);
   if (parts.length === 0) return null;
@@ -967,7 +992,7 @@ function ThreadMessage({ message }) {
     <View style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut]}>
       {parts.map((kind) =>
         kind === 'photo' ? (
-          <PhotoBubble key={`${message.id}-photo`} message={message} incoming={incoming} />
+          <PhotoBubble key={`${message.id}-photo`} message={message} incoming={incoming} onOpenPhoto={onOpenPhoto} />
         ) : (
           <TextBubble key={`${message.id}-text`} message={message} incoming={incoming} />
         ),
@@ -992,7 +1017,7 @@ function TextBubble({ message, incoming }) {
   );
 }
 
-function PhotoBubble({ message, incoming }) {
+function PhotoBubble({ message, incoming, onOpenPhoto }) {
   const [aspect, setAspect] = useState(4 / 3);
   useEffect(() => {
     if (!message.photo) return;
@@ -1005,8 +1030,11 @@ function PhotoBubble({ message, incoming }) {
     );
   }, [message.photo]);
   return (
-    <View
+    <Pressable
       testID={incoming ? 'photo-in' : 'photo-out'}
+      accessibilityRole="button"
+      accessibilityLabel="View photo"
+      onPress={() => onOpenPhoto?.(message.photo)}
       style={[
         styles.photoBubble,
         incoming ? styles.photoBubbleIn : styles.photoBubbleOut,
@@ -1015,7 +1043,7 @@ function PhotoBubble({ message, incoming }) {
       ]}
     >
       <Image testID="bubble-photo" source={{ uri: message.photo }} resizeMode="cover" style={styles.photoImage} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -1046,19 +1074,22 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
     paddingRight: 16,
     paddingVertical: 8,
-    gap: 14,
+    gap: 8,
+    position: 'relative',
   },
+  headerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   focus: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 4,
     paddingVertical: 6,
     borderRadius: 16,
+    flexShrink: 0,
   },
   focusText: { color: ink, fontSize: 16, lineHeight: 20, fontWeight: '600' },
-  scheduleWrap: { flex: 1, position: 'relative', zIndex: 2 },
-  schedule: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scheduleWrap: { flex: 1, position: 'relative', zIndex: 2, minWidth: 0 },
+  schedulePhrase: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   popover: {
     position: 'absolute',
     top: '100%',
@@ -1072,9 +1103,40 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   popoverList: { maxHeight: 280 },
-  scheduleLine: { flex: 1, color: ink, fontSize: 16, lineHeight: 20 },
-  scheduleTime: { textDecorationLine: 'underline' },
-  accountGear: { padding: 2 },
+  scheduleLine: { color: ink, fontSize: 16, lineHeight: 20 },
+  schedulePrefix: { flexShrink: 1 },
+  scheduleTime: { flexShrink: 0, textDecorationLine: 'underline' },
+  accountGear: { padding: 2, flexShrink: 0 },
+  accountPopover: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: 8,
+    width: 168,
+    backgroundColor: paper,
+    borderWidth: 1,
+    borderColor: ink,
+    zIndex: 6,
+  },
+  photoViewer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoViewerBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.92)' },
+  photoViewerImage: { width: '100%', height: '100%' },
+  photoViewerClose: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 10,
+    zIndex: 1,
+  },
   menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
   weekBlock: { paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: ink, gap: 8 },
