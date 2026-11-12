@@ -29,6 +29,7 @@ import {
 } from './src/delivery';
 import { LoginView } from './src/LoginView';
 import { listenForDigest, prepareNotifications } from './src/notify';
+import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -46,6 +47,11 @@ function scheduleLabel(mode, state) {
   if (mode === 'relaxed') return 'open to all messages';
   const clock = dailyClock(state);
   return `receiving summary at ${summaryAt(clock.hour, clock.minute)}`;
+}
+
+function scheduleSummaryTime(state) {
+  const clock = dailyClock(state);
+  return summaryAt(clock.hour, clock.minute);
 }
 
 function webKeyboardOverlap() {
@@ -320,6 +326,14 @@ function Root() {
     }
   }, [user?.id]);
 
+  async function onLogout() {
+    await saveSession(null);
+    tokenRef.current = null;
+    setToken(null);
+    setUser(null);
+    setInbox(null);
+  }
+
   async function onAdd(raw) {
     const code = normalizeCode(raw);
     if (hasConfusingCharacter(code)) return '1, I, and L are not used.';
@@ -342,7 +356,16 @@ function Root() {
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
   } else {
-    body = <ChatScreen token={token} inbox={inbox} onInbox={applyInbox} onAdd={onAdd} onLookup={onLookup} />;
+    body = (
+      <ChatScreen
+        token={token}
+        inbox={inbox}
+        onInbox={applyInbox}
+        onAdd={onAdd}
+        onLookup={onLookup}
+        onLogout={onLogout}
+      />
+    );
   }
 
   return (
@@ -352,7 +375,7 @@ function Root() {
   );
 }
 
-function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
+function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
   const [inputHeight, setInputHeight] = useState(44);
@@ -362,6 +385,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const [panel, setPanel] = useState('chat');
   const [pendingMode, setPendingMode] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const focusRequest = useRef(0);
   const threadRef = useRef(null);
   const phoneRef = useRef(null);
@@ -373,6 +397,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
+  const summaryTime = mode !== 'relaxed' ? scheduleSummaryTime(state) : '';
+  const userId = inbox?.user?.id ?? '';
   const now = new Date();
   const choices = scheduledChoices(now);
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
@@ -389,7 +415,10 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
   }
 
   useEffect(() => {
-    if (open) setScheduleOpen(false);
+    if (open) {
+      setScheduleOpen(false);
+      setAccountOpen(false);
+    }
   }, [open]);
 
   async function mutate(path, body) {
@@ -489,11 +518,14 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
         onLayout={rememberBottom}
         style={[styles.phone, web && styles.webScreen]}
       >
-        {scheduleOpen ? (
+        {scheduleOpen || accountOpen ? (
           <Pressable
             testID="schedule-backdrop"
-            accessibilityLabel="Close schedule"
-            onPress={() => setScheduleOpen(false)}
+            accessibilityLabel="Close menu"
+            onPress={() => {
+              setScheduleOpen(false);
+              setAccountOpen(false);
+            }}
             style={styles.backdrop}
           />
         ) : null}
@@ -504,27 +536,52 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
               accessibilityRole="button"
               accessibilityLabel="Focus"
               accessibilityState={{ selected: focused }}
-              hitSlop={6}
+              hitSlop={8}
               onPress={onToggleFocus}
               style={styles.focus}
             >
-              <Ionicons name={focused ? 'moon' : 'moon-outline'} size={20} color={focused ? moon : ink} />
+              <Ionicons name={focused ? 'moon' : 'moon-outline'} size={26} color={focused ? moon : ink} />
               {focused ? <Text style={styles.focusText}>Focus</Text> : null}
             </Pressable>
             <View style={styles.scheduleWrap}>
-              <Pressable
-                testID="schedule-button"
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityState={{ expanded: scheduleOpen }}
-                onPress={() => setScheduleOpen((current) => !current)}
-                style={styles.schedule}
-              >
-                <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
-                  {label}
-                </Text>
-                <Feather name="settings" size={22} color={ink} />
-              </Pressable>
+              <View style={styles.schedule}>
+                {mode === 'relaxed' ? (
+                  <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
+                    {label}
+                  </Text>
+                ) : (
+                  <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
+                    receiving summary at{' '}
+                    <Text
+                      testID="schedule-time"
+                      accessibilityRole="button"
+                      accessibilityLabel={`Change summary time, ${summaryTime}`}
+                      accessibilityState={{ expanded: scheduleOpen }}
+                      onPress={() => {
+                        setAccountOpen(false);
+                        setScheduleOpen((current) => !current);
+                      }}
+                      style={styles.scheduleTime}
+                    >
+                      {summaryTime}
+                    </Text>
+                  </Text>
+                )}
+                <Pressable
+                  testID="account-settings-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Account settings"
+                  accessibilityState={{ expanded: accountOpen }}
+                  hitSlop={6}
+                  onPress={() => {
+                    setScheduleOpen(false);
+                    setAccountOpen((current) => !current);
+                  }}
+                  style={styles.accountGear}
+                >
+                  <Feather name="settings" size={22} color={ink} />
+                </Pressable>
+              </View>
               {scheduleOpen ? (
                 <View testID="schedule-popover" style={styles.popover}>
                   <ScheduleSettings
@@ -532,6 +589,17 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
                     onChoose={(dayHour) => {
                       setScheduleOpen(false);
                       mutate('/v1/schedule', { dayHour, dayMinute: 0 });
+                    }}
+                  />
+                </View>
+              ) : null}
+              {accountOpen ? (
+                <View testID="account-popover" style={styles.popover}>
+                  <AccountMenu
+                    userId={userId}
+                    onLogout={async () => {
+                      setAccountOpen(false);
+                      await onLogout();
                     }}
                   />
                 </View>
@@ -619,7 +687,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup }) {
             }}
           >
             {messages.map((message) => (
-              <Bubble key={message.id} message={message} />
+              <ThreadMessage key={message.id} message={message} />
             ))}
           </ScrollView>
         </View>
@@ -835,12 +903,33 @@ function ConversationSheet({ inset, messages, footer }) {
         >
           {ordered.map((message) => (
             <View key={message.id} style={styles.flip}>
-              <Bubble message={message} />
+              <ThreadMessage message={message} />
             </View>
           ))}
         </ScrollView>
         {footer}
       </View>
+    </View>
+  );
+}
+
+function AccountMenu({ userId, onLogout }) {
+  return (
+    <View testID="account-menu">
+      <View style={styles.menuRow}>
+        <Text testID="account-id" style={styles.menuText}>
+          ID {userId}
+        </Text>
+      </View>
+      <Pressable
+        testID="logout-button"
+        accessibilityRole="button"
+        accessibilityLabel="Log out"
+        onPress={onLogout}
+        style={styles.menuRow}
+      >
+        <Text style={styles.menuText}>Log out</Text>
+      </Pressable>
     </View>
   );
 }
@@ -868,8 +957,26 @@ function ScheduleSettings({ state, onChoose }) {
   );
 }
 
-function Bubble({ message }) {
+const photoMaxWidth = web ? 320 : 280;
+
+function ThreadMessage({ message }) {
   const incoming = message.direction === 'in';
+  const parts = messageBubbleParts(message);
+  if (parts.length === 0) return null;
+  return (
+    <View style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut]}>
+      {parts.map((kind) =>
+        kind === 'photo' ? (
+          <PhotoBubble key={`${message.id}-photo`} message={message} incoming={incoming} />
+        ) : (
+          <TextBubble key={`${message.id}-text`} message={message} incoming={incoming} />
+        ),
+      )}
+    </View>
+  );
+}
+
+function TextBubble({ message, incoming }) {
   return (
     <View testID={incoming ? 'bubble-in' : 'bubble-out'} style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, web && styles.bubbleRead]}>
       <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut]}>
@@ -880,19 +987,35 @@ function Bubble({ message }) {
           <View style={styles.tailEdge} />
         </View>
       </View>
-      <BubbleBody message={message} />
+      <Text style={styles.bubbleText}>{message.body}</Text>
     </View>
   );
 }
 
-function BubbleBody({ message }) {
+function PhotoBubble({ message, incoming }) {
+  const [aspect, setAspect] = useState(4 / 3);
+  useEffect(() => {
+    if (!message.photo) return;
+    Image.getSize(
+      message.photo,
+      (width, height) => {
+        if (width > 0 && height > 0) setAspect(width / height);
+      },
+      () => {},
+    );
+  }, [message.photo]);
   return (
-    <>
-      {message.photo ? (
-        <Image testID="bubble-photo" source={{ uri: message.photo }} resizeMode="cover" style={styles.bubblePhoto} />
-      ) : null}
-      {message.body ? <Text style={styles.bubbleText}>{message.body}</Text> : null}
-    </>
+    <View
+      testID={incoming ? 'photo-in' : 'photo-out'}
+      style={[
+        styles.photoBubble,
+        incoming ? styles.photoBubbleIn : styles.photoBubbleOut,
+        web && styles.photoBubbleWeb,
+        { width: photoMaxWidth, aspectRatio: aspect },
+      ]}
+    >
+      <Image testID="bubble-photo" source={{ uri: message.photo }} resizeMode="cover" style={styles.photoImage} />
+    </View>
   );
 }
 
@@ -950,6 +1073,8 @@ const styles = StyleSheet.create({
   },
   popoverList: { maxHeight: 280 },
   scheduleLine: { flex: 1, color: ink, fontSize: 16, lineHeight: 20 },
+  scheduleTime: { textDecorationLine: 'underline' },
+  accountGear: { padding: 2 },
   menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
   weekBlock: { paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: ink, gap: 8 },
@@ -993,6 +1118,18 @@ const styles = StyleSheet.create({
   flip: { transform: [{ scaleY: -1 }] },
   thread: { flex: 1 },
   threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 16, gap: 14, overflow: 'visible' },
+  messageStack: { gap: 6, maxWidth: '100%' },
+  messageStackIn: { alignSelf: 'flex-start', marginTop: 10 },
+  messageStackOut: { alignSelf: 'flex-end' },
+  photoBubble: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
+  },
+  photoBubbleIn: { alignSelf: 'flex-start' },
+  photoBubbleOut: { alignSelf: 'flex-end' },
+  photoBubbleWeb: { maxWidth: 'min(320px, 84%)' },
+  photoImage: { width: '100%', height: '100%' },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
@@ -1117,7 +1254,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   photoButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  bubblePhoto: { width: 180, height: 140, borderRadius: 10, marginBottom: 6 },
   send: {
     width: 36,
     height: 36,
