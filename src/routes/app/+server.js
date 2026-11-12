@@ -1,9 +1,13 @@
 import raw from '../../../static/app/index.html?raw';
 
-/** Expo export uses root-absolute /_expo paths; static files live under /app/_expo. */
+/**
+ * Export with EXPO_WEB_BASE=/app so chunks and assets are already prefixed.
+ * This only repairs a shell that still has root-absolute Metro URLs.
+ */
 function appHtml() {
   return raw
-    .replaceAll('src="/_expo/', 'src="/app/_expo/')
+    .replaceAll('"/_expo/', '"/app/_expo/')
+    .replaceAll('"/assets/', '"/app/assets/')
     .replaceAll('href="/favicon.ico"', 'href="/app/favicon.ico"');
 }
 
