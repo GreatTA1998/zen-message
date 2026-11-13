@@ -227,6 +227,7 @@ const server = createServer(async (request, response) => {
         id: randomBytes(8).toString('hex'),
         body: body.body,
         photo: body.photo,
+        sticker: body.sticker,
         intent: body.intent,
         now: Date.now(),
       });

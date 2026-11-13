@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
@@ -24,6 +24,7 @@ import {
   dayPhrase,
   nextDaily,
   receiptPhrase,
+  messageSticker,
   scheduledChoices,
   threadMessages,
 } from './src/delivery';
@@ -40,6 +41,8 @@ import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
 import { photoFromPickerAsset, pickLibraryPhoto } from './src/pickPhoto';
+import { loadStickerLibrary, rememberSticker } from './src/stickerLibrary';
+import { StickerDrawModal } from './src/StickerDraw';
 
 function summaryAt(hour, minute = 0) {
   const suffix = hour >= 12 ? 'pm' : 'am';
@@ -418,6 +421,10 @@ function Root() {
 function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDeleteAccount }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
+  const [sticker, setSticker] = useState(null);
+  const [stickerTrayOpen, setStickerTrayOpen] = useState(false);
+  const [stickerLibrary, setStickerLibrary] = useState([]);
+  const [drawStickerOpen, setDrawStickerOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
   const [intent, setIntent] = useState('anytime');
   const [choice, setChoice] = useState(0);
@@ -456,7 +463,12 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   const now = new Date();
   const choices = scheduledChoices(now);
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
-  const canSend = contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo));
+  const canSend =
+    contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
+
+  useEffect(() => {
+    loadStickerLibrary().then(setStickerLibrary).catch(() => {});
+  }, [token]);
 
   function onToggleFocus() {
     const next = focused ? 'relaxed' : 'batched';
@@ -472,6 +484,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     if (open) {
       setScheduleOpen(false);
       setAccountOpen(false);
+      setStickerTrayOpen(false);
     }
   }, [open]);
 
@@ -523,10 +536,23 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     ]);
   }
 
+  async function adoptSticker(dataUri, remember = true) {
+    const next = messageSticker(dataUri);
+    if (!next) return;
+    setPhoto(null);
+    setSticker(next);
+    setStickerTrayOpen(false);
+    if (remember) {
+      const library = await rememberSticker(next);
+      setStickerLibrary(library);
+    }
+  }
+
   function send(text = draft) {
     const body = text.trim();
-    if ((!body && !photo) || !contact) return;
+    if ((!body && !photo && !sticker) || !contact) return;
     const attached = photo;
+    const attachedSticker = sticker;
     const sentIntent = intent;
     const sentContact = contact;
     const sentAt = selectedAt?.getTime();
@@ -534,6 +560,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     const pendingId = `local-${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
     setDraft('');
     setPhoto(null);
+    setSticker(null);
     setInputHeight(44);
     setPendingOutbound((current) => [
       ...current,
@@ -543,6 +570,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
         contactName: sentContact.firstName || sentContact.id,
         body,
         photo: attached,
+        sticker: attachedSticker,
         intent: sentIntent,
         createdAt,
         visible: true,
@@ -554,6 +582,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
       contactId: sentContact.id,
       body,
       photo: attached,
+      sticker: attachedSticker,
       intent: sentIntent,
       releaseAt: sentIntent === 'scheduled' ? sentAt : undefined,
     })
@@ -599,11 +628,28 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
         const asset = result.canceled ? null : result.assets?.[0];
         if (!asset) return;
         const next = photoFromPickerAsset(asset);
-        if (next) setPhoto(next);
+        if (next) {
+          setSticker(null);
+          setPhoto(next);
+        }
         return;
       }
       const next = await pickLibraryPhoto();
-      if (next) setPhoto(next);
+      if (next) {
+        setSticker(null);
+        setPhoto(next);
+      }
+    } finally {
+      attachBusy.current = false;
+    }
+  }
+
+  async function attachStickerFromPhoto() {
+    if (attachBusy.current) return;
+    attachBusy.current = true;
+    try {
+      const next = await pickLibraryPhoto();
+      if (next) await adoptSticker(next);
     } finally {
       attachBusy.current = false;
     }
@@ -629,6 +675,17 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     onCustomHour: setCustomHour,
     photo,
     onClearPhoto: () => setPhoto(null),
+    sticker,
+    onClearSticker: () => setSticker(null),
+    stickerTrayOpen,
+    onToggleStickerTray: () => setStickerTrayOpen((current) => !current),
+    stickerLibrary,
+    onPickLibrarySticker: (dataUri) => adoptSticker(dataUri, false),
+    onDrawSticker: () => {
+      setStickerTrayOpen(false);
+      setDrawStickerOpen(true);
+    },
+    onPhotoSticker: () => attachStickerFromPhoto(),
     draft,
     onChangeDraft,
     onInputSize,
@@ -920,6 +977,16 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
             }}
           />
         ) : null}
+        {drawStickerOpen ? (
+          <StickerDrawModal
+            visible={drawStickerOpen}
+            onCancel={() => setDrawStickerOpen(false)}
+            onDone={async (dataUri) => {
+              setDrawStickerOpen(false);
+              await adoptSticker(dataUri);
+            }}
+          />
+        ) : null}
         {photoViewerUri ? (
           <View testID="photo-viewer" style={styles.photoViewer}>
             <Pressable
@@ -977,6 +1044,14 @@ function ComposerFooter({
   onCustomHour,
   photo,
   onClearPhoto,
+  sticker,
+  onClearSticker,
+  stickerTrayOpen,
+  onToggleStickerTray,
+  stickerLibrary,
+  onPickLibrarySticker,
+  onDrawSticker,
+  onPhotoSticker,
   draft,
   onChangeDraft,
   onInputSize,
@@ -1057,6 +1132,44 @@ function ComposerFooter({
             ) : null}
           </View>
         ) : null}
+        {stickerTrayOpen ? (
+          <View testID={showIds ? 'sticker-tray' : undefined} style={[styles.stickerTray, web && styles.stickerTrayWeb]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerTrayScroll}>
+              <Pressable
+                testID={showIds ? 'sticker-new-draw' : undefined}
+                accessibilityRole="button"
+                accessibilityLabel="Draw sticker"
+                onPress={onDrawSticker}
+                style={styles.stickerTrayAction}
+              >
+                <MaterialCommunityIcons name="draw-pen" size={22} color={ink} />
+                <Text style={styles.stickerTrayLabel}>Draw</Text>
+              </Pressable>
+              <Pressable
+                testID={showIds ? 'sticker-new-photo' : undefined}
+                accessibilityRole="button"
+                accessibilityLabel="Sticker from photo"
+                onPress={onPhotoSticker}
+                style={styles.stickerTrayAction}
+              >
+                <Feather name="image" size={20} color={ink} />
+                <Text style={styles.stickerTrayLabel}>Photo</Text>
+              </Pressable>
+              {stickerLibrary.map((item, index) => (
+                <Pressable
+                  key={`${index}-${item.slice(0, 32)}`}
+                  testID={showIds ? `sticker-saved-${index}` : undefined}
+                  accessibilityRole="button"
+                  accessibilityLabel="Saved sticker"
+                  onPress={() => onPickLibrarySticker?.(item)}
+                  style={styles.stickerTrayThumbWrap}
+                >
+                  <Image source={{ uri: item }} resizeMode="contain" style={styles.stickerTrayThumb} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
         <View testID={showIds ? 'composer-bar' : undefined} style={[styles.composer, web && styles.webComposer]}>
           {photo ? (
             <View style={styles.previewWrap}>
@@ -1066,6 +1179,25 @@ function ComposerFooter({
                 accessibilityRole="button"
                 accessibilityLabel="Remove photo"
                 onPress={onClearPhoto}
+                style={styles.previewClear}
+              >
+                <Feather name="x" size={14} color={ink} />
+              </Pressable>
+            </View>
+          ) : null}
+          {!photo && sticker ? (
+            <View style={styles.previewWrap}>
+              <Image
+                testID={showIds ? 'sticker-preview' : undefined}
+                source={{ uri: sticker }}
+                resizeMode="contain"
+                style={styles.stickerPreview}
+              />
+              <Pressable
+                testID={showIds ? 'sticker-clear' : undefined}
+                accessibilityRole="button"
+                accessibilityLabel="Remove sticker"
+                onPress={onClearSticker}
                 style={styles.previewClear}
               >
                 <Feather name="x" size={14} color={ink} />
@@ -1088,6 +1220,16 @@ function ComposerFooter({
             style={[styles.input, { height: inputHeight }]}
           />
           <View style={styles.boxTools}>
+            <Pressable
+              testID={showIds ? 'attach-sticker' : undefined}
+              accessibilityRole="button"
+              accessibilityLabel="Stickers"
+              accessibilityState={{ expanded: stickerTrayOpen }}
+              onPress={onToggleStickerTray}
+              style={styles.photoButton}
+            >
+              <MaterialCommunityIcons name="sticker-emoji" size={22} color={ink} />
+            </Pressable>
             <Pressable
               testID={showIds ? 'attach-photo' : undefined}
               accessibilityRole="button"
@@ -1283,7 +1425,9 @@ function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming
       style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut]}
     >
       {parts.map((kind) =>
-        kind === 'photo' ? (
+        kind === 'sticker' ? (
+          <StickerBubble key={`${message.id}-sticker`} message={message} incoming={incoming} onOpenPhoto={onOpenPhoto} />
+        ) : kind === 'photo' ? (
           <PhotoBubble key={`${message.id}-photo`} message={message} incoming={incoming} onOpenPhoto={onOpenPhoto} />
         ) : (
           <TextBubble key={`${message.id}-text`} message={message} incoming={incoming} />
@@ -1306,6 +1450,36 @@ function TextBubble({ message, incoming }) {
       </View>
       <Text style={styles.bubbleText}>{message.body}</Text>
     </View>
+  );
+}
+
+function StickerBubble({ message, incoming, onOpenPhoto }) {
+  const [aspect, setAspect] = useState(1);
+  useEffect(() => {
+    if (!message.sticker) return;
+    Image.getSize(
+      message.sticker,
+      (width, height) => {
+        if (width > 0 && height > 0) setAspect(width / height);
+      },
+      () => {},
+    );
+  }, [message.sticker]);
+  return (
+    <Pressable
+      testID={incoming ? 'sticker-in' : 'sticker-out'}
+      accessibilityRole="button"
+      accessibilityLabel="View sticker"
+      onPress={() => onOpenPhoto?.(message.sticker)}
+      style={[
+        styles.stickerBubble,
+        incoming ? styles.stickerBubbleIn : styles.stickerBubbleOut,
+        web && styles.stickerBubbleWeb,
+        { width: photoMaxWidth, aspectRatio: aspect },
+      ]}
+    >
+      <Image testID="bubble-sticker" source={{ uri: message.sticker }} resizeMode="contain" style={styles.stickerImage} />
+    </Pressable>
   );
 }
 
@@ -1526,6 +1700,53 @@ const styles = StyleSheet.create({
   messageStack: { gap: 6, maxWidth: '100%' },
   messageStackIn: { alignSelf: 'flex-start', marginTop: 10 },
   messageStackOut: { alignSelf: 'flex-end' },
+  stickerTray: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: '100%',
+    marginBottom: 6,
+    backgroundColor: paper,
+    borderWidth: 1,
+    borderColor: ink,
+    borderRadius: 16,
+    zIndex: 6,
+    maxHeight: 112,
+  },
+  stickerTrayWeb: { left: 56, right: 56 },
+  stickerTrayScroll: { flexDirection: 'row', padding: 10, gap: 10, alignItems: 'center' },
+  stickerTrayAction: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#f8f8f8',
+  },
+  stickerTrayLabel: { color: ink, fontSize: 12, lineHeight: 14 },
+  stickerTrayThumbWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#d8d8d8',
+    overflow: 'hidden',
+    backgroundColor: '#fafafa',
+  },
+  stickerTrayThumb: { width: '100%', height: '100%' },
+  stickerPreview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#fafafa' },
+  stickerBubble: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+  },
+  stickerBubbleIn: { alignSelf: 'flex-start' },
+  stickerBubbleOut: { alignSelf: 'flex-end' },
+  stickerBubbleWeb: { maxWidth: 'min(320px, 84%)' },
+  stickerImage: { width: '100%', height: '100%' },
   photoBubble: {
     borderRadius: 16,
     overflow: 'hidden',

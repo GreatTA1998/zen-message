@@ -407,6 +407,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
         id: await hex(8),
         body: body?.body,
         photo: body?.photo,
+        sticker: body?.sticker,
         intent: body?.intent,
         releaseAt: body?.releaseAt,
         now: Date.now(),

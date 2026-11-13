@@ -9,6 +9,7 @@ export function deliverMessage(sender, recipient, action) {
     contactName: recipient.id,
     body: action.body,
     photo: action.photo,
+    sticker: action.sticker,
     intent: action.intent,
     now: action.now,
   });
@@ -19,6 +20,7 @@ export function deliverMessage(sender, recipient, action) {
     contactName: sender.id,
     body: action.body,
     photo: action.photo,
+    sticker: action.sticker,
     intent: action.intent,
     now: action.now,
     offsetMinutes: recipient.offsetMinutes,
