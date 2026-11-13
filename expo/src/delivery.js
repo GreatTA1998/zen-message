@@ -123,13 +123,29 @@ export function threadMessages(messages, contactId) {
   return messages.filter((item) => item.contactId === contactId && item.visible);
 }
 
+export function photoFromPickerAsset(asset) {
+  if (!asset || asset.type === 'video' || String(asset.mimeType || '').startsWith('video/')) return null;
+  const rawBase64 = typeof asset.base64 === 'string' ? asset.base64.replace(/\s+/g, '') : '';
+  if (!rawBase64) return null;
+  const mime = String(asset.mimeType || 'image/jpeg');
+  let subtype = mime.slice('image/'.length).split(';')[0].trim().toLowerCase() || 'jpeg';
+  if (subtype === 'heic' || subtype === 'heif' || subtype === 'jpg') {
+    subtype = 'jpeg';
+  }
+  if (!['jpeg', 'png', 'webp'].includes(subtype)) {
+    subtype = 'jpeg';
+  }
+  return messagePhoto(`data:image/${subtype};base64,${rawBase64}`);
+}
+
 export function messagePhoto(value) {
   if (typeof value !== 'string') return null;
-  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([a-z0-9+/=\s]+)$/i.exec(value.trim());
+  const match = /^data:image\/(jpeg|jpg|png|webp|heic|heif);base64,([a-z0-9+/=\s]+)$/i.exec(value.trim());
   if (!match) return null;
   const payload = match[2].replace(/\s+/g, '');
   if (!payload || payload.length > 900000) return null;
-  const type = match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase();
+  const raw = match[1].toLowerCase();
+  const type = raw === 'jpg' || raw === 'heic' || raw === 'heif' ? 'jpeg' : raw;
   return `data:image/${type};base64,${payload}`;
 }
 

@@ -30,7 +30,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "server": "node server/index.js",
-    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js src/googleSignIn.web.test.js src/googleSignIn.ios.test.js src/appleSignIn.web.test.js src/LoginView.test.js src/messageBubble.test.js server/deliver.test.js"
+    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js src/googleSignIn.web.test.js src/googleSignIn.ios.test.js src/appleSignIn.web.test.js src/LoginView.test.js src/messageBubble.test.js src/pickPhoto.test.js server/deliver.test.js"
   },
   "private": true
 }

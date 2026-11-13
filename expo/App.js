@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -22,7 +22,6 @@ import {
   INTENTS,
   dailyClock,
   dayPhrase,
-  messagePhoto,
   nextDaily,
   receiptPhrase,
   scheduledChoices,
@@ -40,6 +39,7 @@ import { loadSession, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
+import { photoFromPickerAsset, pickLibraryPhoto } from './src/pickPhoto';
 
 function summaryAt(hour, minute = 0) {
   const suffix = hour >= 12 ? 'pm' : 'am';
@@ -430,7 +430,9 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   const [notice, setNotice] = useState('');
   const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
+  const [pendingOutbound, setPendingOutbound] = useState([]);
   const focusRequest = useRef(0);
+  const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const phoneRef = useRef(null);
   const { open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
@@ -440,8 +442,12 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
   const contactPendingOut = contact?.status === 'pending-out';
-  const messages =
-    contact && state && contactActive ? threadMessages(state.messages, contact.id) : [];
+  const messages = useMemo(() => {
+    if (!contact || !state || !contactActive) return [];
+    const base = threadMessages(state.messages, contact.id);
+    const pending = pendingOutbound.filter((item) => item.contactId === contact.id);
+    return pending.length ? [...base, ...pending] : base;
+  }, [contact, state, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
@@ -468,6 +474,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
       setAccountOpen(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (open) return;
+    threadRef.current?.scrollToEnd({ animated: false });
+  }, [messages.length, open]);
 
   async function mutate(path, body) {
     const next = await api(path, { token, method: 'POST', body });
@@ -519,16 +530,40 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     const sentIntent = intent;
     const sentContact = contact;
     const sentAt = selectedAt?.getTime();
+    const createdAt = Date.now();
+    const pendingId = `local-${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
     setDraft('');
     setPhoto(null);
     setInputHeight(44);
+    setPendingOutbound((current) => [
+      ...current,
+      {
+        id: pendingId,
+        contactId: sentContact.id,
+        contactName: sentContact.firstName || sentContact.id,
+        body,
+        photo: attached,
+        intent: sentIntent,
+        createdAt,
+        visible: true,
+        releaseAt: null,
+        direction: 'out',
+      },
+    ]);
     mutate('/v1/messages', {
       contactId: sentContact.id,
       body,
       photo: attached,
       intent: sentIntent,
       releaseAt: sentIntent === 'scheduled' ? sentAt : undefined,
-    }).catch(() => {});
+    })
+      .then(() => {
+        setPendingOutbound((current) => current.filter((item) => item.id !== pendingId));
+      })
+      .catch(() => {
+        setPendingOutbound((current) => current.filter((item) => item.id !== pendingId));
+        flashNotice('Could not send message.');
+      });
     if (sentIntent !== 'realtime') {
       const at =
         sentIntent === 'scheduled'
@@ -544,22 +579,34 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   }
 
   async function attach(source) {
-    const permission =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
-    const options = { mediaTypes: ['images'], quality: 0.4, base64: true, exif: false };
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-    const asset = result.canceled ? null : result.assets?.[0];
-    if (!asset || asset.type === 'video' || String(asset.mimeType || '').startsWith('video/')) return;
-    const mime = String(asset.mimeType || 'image/jpeg');
-    const subtype = mime.slice('image/'.length).split(';')[0] || 'jpeg';
-    const next = asset.base64 ? messagePhoto(`data:image/${subtype};base64,${asset.base64}`) : null;
-    if (next) setPhoto(next);
+    if (attachBusy.current) return;
+    attachBusy.current = true;
+    try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) return;
+        const options = {
+          mediaTypes: ['images'],
+          quality: 0.4,
+          base64: true,
+          exif: false,
+        };
+        if (Platform.OS === 'ios') {
+          options.preferredAssetRepresentationMode =
+            ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible;
+        }
+        const result = await ImagePicker.launchCameraAsync(options);
+        const asset = result.canceled ? null : result.assets?.[0];
+        if (!asset) return;
+        const next = photoFromPickerAsset(asset);
+        if (next) setPhoto(next);
+        return;
+      }
+      const next = await pickLibraryPhoto();
+      if (next) setPhoto(next);
+    } finally {
+      attachBusy.current = false;
+    }
   }
 
   function onChangeDraft(value) {
