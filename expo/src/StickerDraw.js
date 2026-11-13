@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { captureRef } from 'react-native-view-shot';
+import { hasDrawnInk, paintStrokes } from './stickerExport.js';
 
 const ink = '#1c1c1c';
 const paper = '#fff';
@@ -30,59 +30,68 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
   const active = useRef([]);
+  const strokesRef = useRef(strokes);
+  strokesRef.current = strokes;
+
+  const repaint = useCallback(
+    (activeStroke = null) => {
+      const canvas = canvasRef.current;
+      if (!canvas || !width || !height) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      paintStrokes(ctx, strokesRef.current, width, height, activeStroke);
+    },
+    [width, height],
+  );
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !width || !height) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, width, height);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = strokeWidth;
-    for (const stroke of strokes) {
-      if (stroke.length < 2) continue;
-      ctx.beginPath();
-      ctx.moveTo(stroke[0].x, stroke[0].y);
-      for (let i = 1; i < stroke.length; i += 1) {
-        ctx.lineTo(stroke[i].x, stroke[i].y);
-      }
-      ctx.stroke();
-    }
-  }, [strokes, width, height]);
+    repaint();
+  }, [strokes, width, height, repaint]);
+
+  const localPoint = (event) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+  };
 
   const onPointerDown = (event) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const point = localPoint(event);
+    if (!point) return;
     drawing.current = true;
-    active.current = [
-      {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      },
-    ];
+    active.current = [point];
+  try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Some browsers reject capture on unsupported targets.
+    }
+    event.preventDefault();
   };
 
   const onPointerMove = (event) => {
     if (!drawing.current) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    active.current.push({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
-    onStrokeEnd([...strokes, [...active.current]], true);
+    const point = localPoint(event);
+    if (!point) return;
+    active.current.push(point);
+    repaint([...active.current]);
+    event.preventDefault();
   };
 
-  const onPointerUp = () => {
+  const endStroke = (event) => {
     if (!drawing.current) return;
     drawing.current = false;
+    try {
+      event?.currentTarget?.releasePointerCapture?.(event.pointerId);
+    } catch {
+      // Ignore release errors.
+    }
     if (active.current.length > 1) {
-      onStrokeEnd([...strokes, [...active.current]], false);
-    } else {
-      onStrokeEnd(strokes, false);
+      onStrokeEnd([...strokesRef.current, [...active.current]]);
     }
     active.current = [];
+    repaint();
   };
 
   return (
@@ -90,11 +99,12 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
       ref={canvasRef}
       width={width}
       height={height}
-      style={{ width, height, touchAction: 'none', display: 'block' }}
+      style={{ width, height, touchAction: 'none', display: 'block', cursor: 'crosshair' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerLeave={onPointerUp}
+      onPointerUp={endStroke}
+      onPointerCancel={endStroke}
+      onPointerLeave={endStroke}
     />
   );
 }
@@ -107,6 +117,7 @@ function NativeDrawSurface({ width, height, strokes, setStrokes }) {
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (event) => {
           const { locationX, locationY } = event.nativeEvent;
           active.current = [{ x: locationX, y: locationY }];
@@ -153,32 +164,20 @@ function NativeDrawSurface({ width, height, strokes, setStrokes }) {
 }
 
 export async function exportDrawnSticker(strokes, captureView, size) {
-  const hasInk = strokes.some((stroke) => stroke.length > 1);
-  if (!hasInk) return null;
+  if (!hasDrawnInk(strokes)) return null;
 
   if (Platform.OS === 'web') {
     const canvas = document.createElement('canvas');
     canvas.width = size.width;
     canvas.height = size.height;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, size.width, size.height);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = strokeWidth;
-    for (const stroke of strokes) {
-      if (stroke.length < 2) continue;
-      ctx.beginPath();
-      ctx.moveTo(stroke[0].x, stroke[0].y);
-      for (let i = 1; i < stroke.length; i += 1) {
-        ctx.lineTo(stroke[i].x, stroke[i].y);
-      }
-      ctx.stroke();
-    }
+    if (!ctx) return null;
+    paintStrokes(ctx, strokes, size.width, size.height);
     return canvas.toDataURL('image/png');
   }
 
   if (!captureView) return null;
+  const { captureRef } = await import('react-native-view-shot');
   const base64 = await captureRef(captureView, {
     format: 'png',
     quality: 0.92,
@@ -188,9 +187,19 @@ export async function exportDrawnSticker(strokes, captureView, size) {
   return `data:image/png;base64,${base64}`;
 }
 
+function StickerDrawShell({ children }) {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webOverlay} accessibilityViewIsModal>
+        {children}
+      </View>
+    );
+  }
+  return children;
+}
+
 export function StickerDrawModal({ visible, onCancel, onDone }) {
   const [strokes, setStrokes] = useState([]);
-  const [draftStrokes, setDraftStrokes] = useState(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const captureRefView = useRef(null);
   const saving = useRef(false);
@@ -198,61 +207,63 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
   useEffect(() => {
     if (!visible) {
       setStrokes([]);
-      setDraftStrokes(null);
       saving.current = false;
     }
   }, [visible]);
 
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'web') return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onCancel?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [visible, onCancel]);
+
   const clear = useCallback(() => {
     setStrokes([]);
-    setDraftStrokes(null);
   }, []);
 
   const finish = useCallback(async () => {
     if (saving.current) return;
     saving.current = true;
     try {
-      const working = draftStrokes ?? strokes;
-      const dataUri = await exportDrawnSticker(working, captureRefView, size);
+      const dataUri = await exportDrawnSticker(strokes, captureRefView, size);
       if (dataUri) onDone?.(dataUri);
     } finally {
       saving.current = false;
     }
-  }, [draftStrokes, onDone, size, strokes]);
+  }, [onDone, size, strokes]);
 
   const onLayout = (event) => {
     const { width, height } = event.nativeEvent.layout;
     if (width > 0 && height > 0) setSize({ width, height });
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onCancel}>
+  if (!visible) return null;
+
+  const body = (
+    <StickerDrawShell>
       <View style={styles.sheet}>
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cancel drawing" onPress={onCancel} style={styles.headerButton}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel drawing"
+            onPress={onCancel}
+            style={styles.headerButton}
+          >
             <Text style={styles.headerAction}>Cancel</Text>
           </Pressable>
           <Text style={styles.headerTitle}>Draw sticker</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Clear drawing" onPress={clear} style={styles.headerButton}>
-            <Text style={styles.headerAction}>Clear</Text>
+            <Text style={[styles.headerAction, styles.headerActionRight]}>Clear</Text>
           </Pressable>
         </View>
         <View style={styles.canvasFrame} onLayout={onLayout}>
           {size.width > 0 && size.height > 0 ? (
             <View ref={captureRefView} collapsable={false} style={styles.canvasInner}>
               {Platform.OS === 'web' ? (
-                <WebDrawSurface
-                  width={size.width}
-                  height={size.height}
-                  strokes={draftStrokes ?? strokes}
-                  onStrokeEnd={(next, isDraft) => {
-                    if (isDraft) setDraftStrokes(next);
-                    else {
-                      setStrokes(next);
-                      setDraftStrokes(null);
-                    }
-                  }}
-                />
+                <WebDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
               ) : (
                 <NativeDrawSurface width={size.width} height={size.height} strokes={strokes} setStrokes={setStrokes} />
               )}
@@ -263,25 +274,46 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
           <Text style={styles.doneText}>Done</Text>
         </Pressable>
       </View>
+    </StickerDrawShell>
+  );
+
+  if (Platform.OS === 'web') {
+    return body;
+  }
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onCancel}>
+      {body}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  webOverlay: {
+    position: 'fixed',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 2000,
+    backgroundColor: '#f4f4f4',
+  },
   sheet: { flex: 1, backgroundColor: '#f4f4f4' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 14,
+    paddingTop: Platform.OS === 'web' ? 16 : 14,
     paddingHorizontal: 16,
     paddingBottom: 10,
     backgroundColor: paper,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
+    zIndex: 2,
   },
-  headerButton: { minWidth: 64 },
+  headerButton: { minWidth: 64, paddingVertical: 8, zIndex: 3 },
   headerAction: { color: ink, fontSize: 16, lineHeight: 22 },
+  headerActionRight: { textAlign: 'right' },
   headerTitle: { color: ink, fontSize: 17, fontWeight: '600' },
   canvasFrame: { flex: 1, margin: pad, borderRadius: 18, overflow: 'hidden', backgroundColor: paper },
   canvasInner: { flex: 1, backgroundColor: paper },
@@ -292,6 +324,7 @@ const styles = StyleSheet.create({
     backgroundColor: ink,
     paddingVertical: 14,
     alignItems: 'center',
+    zIndex: 2,
   },
   doneText: { color: paper, fontSize: 17, fontWeight: '600' },
 });
