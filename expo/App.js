@@ -44,6 +44,13 @@ import { photoFromPickerAsset, pickLibraryPhoto } from './src/pickPhoto';
 import { loadStickerLibrary, rememberSticker } from './src/stickerLibrary';
 import { StickerDrawModal } from './src/StickerDraw';
 
+const ink = '#1c1c1c';
+const paper = '#fff';
+const moon = '#5E5CE6';
+const web = Platform.OS === 'web';
+const side = 32;
+const photoMaxWidth = web ? 320 : 280;
+
 function summaryAt(hour, minute = 0) {
   const suffix = hour >= 12 ? 'pm' : 'am';
   const shown = hour % 12 || 12;
@@ -551,8 +558,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   function send(text = draft) {
     const body = text.trim();
     if ((!body && !photo && !sticker) || !contact) return;
-    const attached = photo;
     const attachedSticker = sticker;
+    const attached = attachedSticker ? null : photo;
     const sentIntent = intent;
     const sentContact = contact;
     const sentAt = selectedAt?.getTime();
@@ -648,6 +655,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     if (attachBusy.current) return;
     attachBusy.current = true;
     try {
+      setPhoto(null);
+      setStickerTrayOpen(false);
       const next = await pickLibraryPhoto();
       if (next) await adoptSticker(next);
     } finally {
@@ -683,6 +692,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     onPickLibrarySticker: (dataUri) => adoptSticker(dataUri, false),
     onDrawSticker: () => {
       setStickerTrayOpen(false);
+      Keyboard.dismiss();
       setDrawStickerOpen(true);
     },
     onPhotoSticker: () => attachStickerFromPhoto(),
@@ -977,16 +987,14 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
             }}
           />
         ) : null}
-        {drawStickerOpen ? (
-          <StickerDrawModal
-            visible={drawStickerOpen}
-            onCancel={() => setDrawStickerOpen(false)}
-            onDone={async (dataUri) => {
-              setDrawStickerOpen(false);
-              await adoptSticker(dataUri);
-            }}
-          />
-        ) : null}
+        <StickerDrawModal
+          visible={drawStickerOpen}
+          onCancel={() => setDrawStickerOpen(false)}
+          onDone={async (dataUri) => {
+            setDrawStickerOpen(false);
+            await adoptSticker(dataUri);
+          }}
+        />
         {photoViewerUri ? (
           <View testID="photo-viewer" style={styles.photoViewer}>
             <Pressable
@@ -1066,6 +1074,7 @@ function ComposerFooter({
   const inputRef = useRef(null);
   const [timesOpen, setTimesOpen] = useState(false);
   const showIds = testID === 'composer';
+  const stickersEnabled = Platform.OS === 'web' || Platform.OS === 'ios';
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
@@ -1132,7 +1141,7 @@ function ComposerFooter({
             ) : null}
           </View>
         ) : null}
-        {stickerTrayOpen ? (
+        {stickersEnabled && stickerTrayOpen ? (
           <View testID={showIds ? 'sticker-tray' : undefined} style={[styles.stickerTray, web && styles.stickerTrayWeb]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerTrayScroll}>
               <Pressable
@@ -1220,16 +1229,18 @@ function ComposerFooter({
             style={[styles.input, { height: inputHeight }]}
           />
           <View style={styles.boxTools}>
-            <Pressable
-              testID={showIds ? 'attach-sticker' : undefined}
-              accessibilityRole="button"
-              accessibilityLabel="Stickers"
-              accessibilityState={{ expanded: stickerTrayOpen }}
-              onPress={onToggleStickerTray}
-              style={styles.photoButton}
-            >
-              <MaterialCommunityIcons name="sticker-emoji" size={22} color={ink} />
-            </Pressable>
+            {stickersEnabled ? (
+              <Pressable
+                testID={showIds ? 'attach-sticker' : undefined}
+                accessibilityRole="button"
+                accessibilityLabel="Stickers"
+                accessibilityState={{ expanded: stickerTrayOpen }}
+                onPress={onToggleStickerTray}
+                style={styles.photoButton}
+              >
+                <MaterialCommunityIcons name="sticker-emoji" size={22} color={ink} />
+              </Pressable>
+            ) : null}
             <Pressable
               testID={showIds ? 'attach-photo' : undefined}
               accessibilityRole="button"
@@ -1392,8 +1403,6 @@ function ScheduleSettings({ state, onChoose }) {
   );
 }
 
-const photoMaxWidth = web ? 320 : 280;
-
 function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
   const incoming = message.direction === 'in';
   const parts = messageBubbleParts(message);
@@ -1512,12 +1521,6 @@ function PhotoBubble({ message, incoming, onOpenPhoto }) {
     </Pressable>
   );
 }
-
-const ink = '#1c1c1c';
-const paper = '#fff';
-const moon = '#5E5CE6';
-const web = Platform.OS === 'web';
-const side = 32;
 
 const styles = StyleSheet.create({
   boot: { flex: 1, backgroundColor: paper },
@@ -1742,6 +1745,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   stickerBubbleIn: { alignSelf: 'flex-start' },
   stickerBubbleOut: { alignSelf: 'flex-end' },
