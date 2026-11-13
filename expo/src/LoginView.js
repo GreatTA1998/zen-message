@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import { LOGO } from './contacts';
 import { completeGoogleRedirect, signInWithGoogle } from './googleSignIn';
+import { signInWithApple } from './appleSignIn';
+
+const dualLogin = Platform.OS === 'web' || Platform.OS === 'ios';
 
 export function LoginView({ onSubject, notice }) {
   useEffect(() => {
@@ -18,11 +20,50 @@ export function LoginView({ onSubject, notice }) {
     };
   }, [onSubject]);
 
+  async function handleGoogle() {
+    const result = await signInWithGoogle();
+    if (result?.cancelled || result?.pending || result?.missing) {
+      if (result?.missing) onSubject(result);
+      return;
+    }
+    onSubject(result);
+  }
+
+  async function handleApple() {
+    const result = await signInWithApple();
+    if (result?.cancelled || result?.missing) {
+      if (result?.missing) onSubject(result);
+      return;
+    }
+    onSubject(result);
+  }
+
   return (
     <View style={styles.screen}>
       <Image source={LOGO} style={styles.mark} />
       <Text style={styles.title}>Zen Message</Text>
-      {Platform.OS === 'web' ? <GoogleButton onSubject={onSubject} /> : <AppleButton onSubject={onSubject} />}
+      {dualLogin ? (
+        <View style={styles.stack}>
+          <Pressable
+            testID="google-login"
+            accessibilityRole="button"
+            accessibilityLabel="Sign in with Google"
+            onPress={handleGoogle}
+            style={[styles.provider, styles.google]}
+          >
+            <Text style={styles.providerText}>Sign in with Google</Text>
+          </Pressable>
+          <Pressable
+            testID="apple-login"
+            accessibilityRole="button"
+            accessibilityLabel="Sign in with Apple"
+            onPress={handleApple}
+            style={[styles.provider, styles.apple]}
+          >
+            <Text style={[styles.providerText, styles.appleText]}>Sign in with Apple</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {notice ? (
         <Text testID="login-notice" style={styles.notice}>
           {notice}
@@ -30,63 +71,6 @@ export function LoginView({ onSubject, notice }) {
       ) : null}
     </View>
   );
-}
-
-function GoogleButton({ onSubject }) {
-  return (
-    <Pressable
-      testID="google-login"
-      accessibilityRole="button"
-      accessibilityLabel="Sign in with Google"
-      onPress={() => signInWithGoogle().then((result) => {
-        if (result?.cancelled || result?.pending) return;
-        onSubject(result);
-      })}
-      style={[styles.provider, styles.google]}
-    >
-      <Text style={styles.providerText}>Sign in with Google</Text>
-    </Pressable>
-  );
-}
-
-function AppleButton({ onSubject }) {
-  return (
-    <Pressable
-      testID="apple-login"
-      accessibilityRole="button"
-      accessibilityLabel="Sign in with Apple"
-      onPress={() => signInWithApple(onSubject)}
-      style={[styles.provider, styles.apple]}
-    >
-      <Text style={[styles.providerText, styles.appleText]}>Sign in with Apple</Text>
-    </Pressable>
-  );
-}
-
-async function signInWithApple(onSubject) {
-  try {
-    const available = Platform.OS === 'ios' && (await AppleAuthentication.isAvailableAsync());
-    if (!available) {
-      onSubject({ provider: 'apple', missing: 'apple_capability' });
-      return;
-    }
-    const credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      ],
-    });
-    if (credential?.user) {
-      onSubject({
-        provider: 'apple',
-        subject: credential.user,
-        firstName: credential.fullName?.givenName || '',
-      });
-    }
-  } catch (error) {
-    if (error?.code === 'ERR_REQUEST_CANCELED') return;
-    onSubject({ provider: 'apple', missing: 'apple_capability' });
-  }
 }
 
 const ink = '#1c1c1c';
@@ -103,6 +87,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 28,
     gap: 14,
+  },
+  stack: {
+    width: '100%',
+    gap: 12,
   },
   mark: {
     width: 72,

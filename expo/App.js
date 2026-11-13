@@ -190,6 +190,7 @@ function useConversation(hostRef) {
 
 const MISSING = {
   apple_capability: 'Apple sign-in needs the Apple capability on this device.',
+  apple_unavailable: 'Apple sign-in is not available in this browser.',
   google_unavailable: 'Google sign-in is not available in this browser.',
 };
 
