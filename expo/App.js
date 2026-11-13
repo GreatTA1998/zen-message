@@ -550,20 +550,32 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
         direction: 'out',
       },
     ]);
-    mutate('/v1/messages', {
-      contactId: sentContact.id,
-      body,
-      photo: attached,
-      intent: sentIntent,
-      releaseAt: sentIntent === 'scheduled' ? sentAt : undefined,
-    })
-      .then(() => {
-        setPendingOutbound((current) => current.filter((item) => item.id !== pendingId));
-      })
-      .catch(() => {
-        setPendingOutbound((current) => current.filter((item) => item.id !== pendingId));
+    const removePending = () => {
+      setPendingOutbound((current) => current.filter((item) => item.id !== pendingId));
+    };
+    api('/v1/messages', {
+      token,
+      method: 'POST',
+      body: {
+        contactId: sentContact.id,
+        body,
+        photo: attached,
+        intent: sentIntent,
+        releaseAt: sentIntent === 'scheduled' ? sentAt : undefined,
+      },
+    }).then(
+      (next) => {
+        removePending();
+        onInbox(next);
+        if (next.effects?.length) {
+          api('/v1/effects/ack', { token, method: 'POST', body: {} }).catch(() => {});
+        }
+      },
+      () => {
+        removePending();
         flashNotice('Could not send message.');
-      });
+      },
+    );
     if (sentIntent !== 'realtime') {
       const at =
         sentIntent === 'scheduled'
