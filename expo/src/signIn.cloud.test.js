@@ -38,7 +38,7 @@ test('a successful Apple credential saves the session and leaves the login scree
     });
     assert.notEqual(outcome.screen, 'login');
     assert.notEqual(outcome.notice, 'Could not finish sign-in.');
-    assert.equal(outcome.screen, 'main');
+    assert.equal(outcome.screen, 'onboarding');
     assert.equal(typeof outcome.token, 'string');
     assert.ok(outcome.token.length > 0);
     assert.equal(sessions.get('current'), outcome.token);
