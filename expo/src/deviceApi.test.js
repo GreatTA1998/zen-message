@@ -304,6 +304,118 @@ test('three characters show a nickname or not found before add', async () => {
   assert.deepEqual(self, { found: false });
 });
 
+test('account deletion removes the user and their data', async () => {
+  const storage = sharedStore();
+  const leftApi = createDeviceApi(storage, (length) => new Uint8Array(length).fill(4));
+  const rightApi = createDeviceApi(storage, (length) => new Uint8Array(length).fill(5));
+  const left = await leftApi('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-user-delete' },
+  });
+  const right = await rightApi('/v1/session', {
+    method: 'POST',
+    body: { provider: 'google', subject: 'google-user-delete' },
+  });
+  await leftApi('/v1/profile', { token: left.token, method: 'POST', body: { nickname: 'Left' } });
+  await rightApi('/v1/profile', { token: right.token, method: 'POST', body: { nickname: 'Right' } });
+  await leftApi('/v1/contacts', { token: left.token, method: 'POST', body: { code: right.user.id } });
+  await rightApi('/v1/friend-request/accept', { token: right.token, method: 'POST', body: { contactId: left.user.id } });
+  await leftApi('/v1/messages', {
+    token: left.token,
+    method: 'POST',
+    body: { contactId: right.user.id, body: 'bye', intent: 'realtime' },
+  });
+  const deleted = await leftApi('/v1/account/delete', { token: left.token, method: 'POST', body: {} });
+  assert.equal(deleted.ok, true);
+  let blocked = false;
+  try {
+    await leftApi('/v1/inbox?offset=0', { token: left.token });
+  } catch {
+    blocked = true;
+  }
+  assert.equal(blocked, true);
+  const survivor = await rightApi('/v1/inbox?offset=0', { token: right.token });
+  assert.equal(survivor.contacts.some((item) => item.id === left.user.id), false);
+  assert.equal(survivor.state.messages.some((message) => message.body === 'bye'), false);
+});
+
+test('blocking removes a contact and stops delivery both ways', async () => {
+  const storage = sharedStore();
+  const leftApi = createDeviceApi(storage, (length) => new Uint8Array(length).fill(4));
+  const rightApi = createDeviceApi(storage, (length) => new Uint8Array(length).fill(5));
+  const left = await leftApi('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-user-block' },
+  });
+  const right = await rightApi('/v1/session', {
+    method: 'POST',
+    body: { provider: 'google', subject: 'google-user-block' },
+  });
+  await leftApi('/v1/contacts', { token: left.token, method: 'POST', body: { code: right.user.id } });
+  await rightApi('/v1/friend-request/accept', { token: right.token, method: 'POST', body: { contactId: left.user.id } });
+  const blocked = await leftApi('/v1/block', { token: left.token, method: 'POST', body: { contactId: right.user.id } });
+  assert.equal(blocked.contacts.some((item) => item.id === right.user.id), false);
+  let stopped = false;
+  try {
+    await leftApi('/v1/messages', {
+      token: left.token,
+      method: 'POST',
+      body: { contactId: right.user.id, body: 'nope', intent: 'realtime' },
+    });
+  } catch {
+    stopped = true;
+  }
+  assert.equal(stopped, true);
+  const other = await rightApi('/v1/inbox?offset=0', { token: right.token });
+  assert.equal(other.contacts.some((item) => item.id === left.user.id), false);
+  let stoppedOther = false;
+  try {
+    await rightApi('/v1/messages', {
+      token: right.token,
+      method: 'POST',
+      body: { contactId: left.user.id, body: 'nope', intent: 'realtime' },
+    });
+  } catch {
+    stoppedOther = true;
+  }
+  assert.equal(stoppedOther, true);
+});
+
+test('reporting records a report quietly', async () => {
+  const storage = sharedStore();
+  const leftApi = createDeviceApi(storage, (length) => new Uint8Array(length).fill(4));
+  const rightApi = createDeviceApi(storage, (length) => new Uint8Array(length).fill(5));
+  const left = await leftApi('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-user-report' },
+  });
+  const right = await rightApi('/v1/session', {
+    method: 'POST',
+    body: { provider: 'google', subject: 'google-user-report' },
+  });
+  await leftApi('/v1/contacts', { token: left.token, method: 'POST', body: { code: right.user.id } });
+  await rightApi('/v1/friend-request/accept', { token: right.token, method: 'POST', body: { contactId: left.user.id } });
+  const sent = await rightApi('/v1/messages', {
+    token: right.token,
+    method: 'POST',
+    body: { contactId: left.user.id, body: 'rude', intent: 'realtime' },
+  });
+  const message = sent.state.messages.find((item) => item.body === 'rude');
+  const reported = await leftApi('/v1/report', {
+    token: left.token,
+    method: 'POST',
+    body: { contactId: right.user.id, messageId: message.id },
+  });
+  assert.equal(reported.ok, true);
+  await storage.transact(async (store) => {
+    const state = JSON.parse(await store.getItem('zen-message.device'));
+    assert.equal(state.reports.length, 1);
+    assert.equal(state.reports[0].reporterId, left.user.id);
+    assert.equal(state.reports[0].reportedId, right.user.id);
+    assert.equal(state.reports[0].messageId, message.id);
+  });
+});
+
 test('a token from a previous install still opens the inbox', async () => {
   const storage = memoryStorage();
   const api = createDeviceApi(storage);

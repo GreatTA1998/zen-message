@@ -119,6 +119,49 @@ function removeContact(contacts, id) {
   return (contacts || []).filter((item) => item.id !== id);
 }
 
+function blockedIds(user) {
+  return user.blocked || [];
+}
+
+function isBlocked(user, otherId) {
+  return blockedIds(user).includes(otherId);
+}
+
+function rememberBlocked(user, otherId) {
+  if (isBlocked(user, otherId)) return;
+  user.blocked = [...blockedIds(user), otherId];
+}
+
+function purgeThread(user, otherId) {
+  user.contacts = removeContact(user.contacts, otherId);
+  user.messages = (user.messages || []).filter((message) => message.contactId !== otherId);
+  if (user.contactId === otherId) user.contactId = user.contacts[0]?.id ?? null;
+}
+
+function purgeUser(state, userId) {
+  delete state.users[userId];
+  for (const token of Object.keys(state.sessions)) {
+    if (state.sessions[token] === userId) delete state.sessions[token];
+  }
+  for (const person of Object.values(state.users)) {
+    purgeThread(person, userId);
+    person.blocked = blockedIds(person).filter((id) => id !== userId);
+  }
+  state.reports = (state.reports || []).filter(
+    (report) => report.reporterId !== userId && report.reportedId !== userId
+  );
+}
+
+function blockPair(state, user, otherId) {
+  const other = state.users[otherId];
+  if (!other || otherId === user.id) return false;
+  purgeThread(user, otherId);
+  purgeThread(other, user.id);
+  rememberBlocked(user, otherId);
+  rememberBlocked(other, user.id);
+  return true;
+}
+
 function becomeFriends(state, leftId, rightId) {
   const left = state.users[leftId];
   const right = state.users[rightId];
@@ -128,6 +171,7 @@ function becomeFriends(state, leftId, rightId) {
 }
 
 function sendFriendRequest(state, fromUser, toUser) {
+  if (isBlocked(fromUser, toUser.id) || isBlocked(toUser, fromUser.id)) fail('person_not_found');
   if (isActiveContact(fromUser.contacts, toUser.id)) fail('already_friends');
   if (isActiveContact(toUser.contacts, fromUser.id)) fail('already_friends');
   const fromHasIn = fromUser.contacts.some(
@@ -351,7 +395,14 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
 
     if (method === 'POST' && url.pathname === '/v1/messages') {
       const recipient = state.users[body?.contactId];
-      if (!recipient || !isActiveContact(user.contacts, recipient.id)) fail('person_not_found');
+      if (
+        !recipient ||
+        !isActiveContact(user.contacts, recipient.id) ||
+        isBlocked(user, recipient.id) ||
+        isBlocked(recipient, user.id)
+      ) {
+        fail('person_not_found');
+      }
       const result = deliverMessage(user, recipient, {
         id: await hex(8),
         body: body?.body,
@@ -403,6 +454,42 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       user.pendingEffects = [];
       await commit(store, state);
       return inbox(state, user);
+    }
+
+    if (method === 'POST' && url.pathname === '/v1/account/delete') {
+      const userId = user.id;
+      purgeUser(state, userId);
+      await commit(store, state);
+      return { ok: true };
+    }
+
+    if (method === 'POST' && url.pathname === '/v1/block') {
+      const id = normalizeCode(body?.contactId);
+      if (!isCode(id)) fail('person_not_found');
+      if (!blockPair(state, user, id)) fail('person_not_found');
+      await commit(store, state);
+      return inbox(state, user);
+    }
+
+    if (method === 'POST' && url.pathname === '/v1/report') {
+      const id = normalizeCode(body?.contactId);
+      if (!isCode(id)) fail('person_not_found');
+      const other = state.users[id];
+      if (!other || other.id === user.id) fail('person_not_found');
+      const messageId = typeof body?.messageId === 'string' ? body.messageId.slice(0, 32) : null;
+      if (messageId && !(user.messages || []).some((message) => message.id === messageId && message.contactId === id)) {
+        fail('person_not_found');
+      }
+      state.reports = state.reports || [];
+      state.reports.push({
+        id: await hex(8),
+        reporterId: user.id,
+        reportedId: id,
+        messageId,
+        at: Date.now(),
+      });
+      await commit(store, state);
+      return { ok: true };
     }
 
     fail('not_found');
