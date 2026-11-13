@@ -28,6 +28,7 @@ export async function signInWithGoogle() {
       // iOS ignores Play Services; Android should not use this module per product scope.
     }
     const result = await GoogleSignin.signIn();
+    if (result?.type === 'cancelled') return { provider: 'google', cancelled: true };
     const idToken = result?.data?.idToken;
     if (!idToken) return { provider: 'google', missing: 'google_unavailable' };
     const credential = GoogleAuthProvider.credential(idToken);
