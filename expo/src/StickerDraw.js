@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 
@@ -30,6 +31,7 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
   const active = useRef([]);
+  const baseStrokes = useRef(strokes);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -55,12 +57,20 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     drawing.current = true;
+    // Later moves receive a strokes prop that already ends with this gesture.
+    baseStrokes.current = strokes;
     active.current = [
       {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top,
       },
     ];
+  };
+
+  const publishStroke = (isDraft) => {
+    const live = [...active.current];
+    if (live.length > 1) onStrokeEnd([...baseStrokes.current, live], isDraft);
+    else if (!isDraft) onStrokeEnd(baseStrokes.current, false);
   };
 
   const onPointerMove = (event) => {
@@ -71,17 +81,13 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     });
-    onStrokeEnd([...strokes, [...active.current]], true);
+    publishStroke(true);
   };
 
   const onPointerUp = () => {
     if (!drawing.current) return;
     drawing.current = false;
-    if (active.current.length > 1) {
-      onStrokeEnd([...strokes, [...active.current]], false);
-    } else {
-      onStrokeEnd(strokes, false);
-    }
+    publishStroke(false);
     active.current = [];
   };
 
@@ -189,6 +195,9 @@ export async function exportDrawnSticker(strokes, captureView, size) {
 }
 
 export function StickerDrawModal({ visible, onCancel, onDone }) {
+  const insets = useSafeAreaInsets();
+  const safeTop = Platform.OS === 'ios' ? insets.top : 0;
+  const safeBottom = Platform.OS === 'ios' ? insets.bottom : 0;
   const [strokes, setStrokes] = useState([]);
   const [draftStrokes, setDraftStrokes] = useState(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -228,7 +237,7 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onCancel}>
       <View style={styles.sheet}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: 14 + safeTop }]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Cancel drawing" onPress={onCancel} style={styles.headerButton}>
             <Text style={styles.headerAction}>Cancel</Text>
           </Pressable>
@@ -259,7 +268,7 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
             </View>
           ) : null}
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={finish} style={styles.done}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={finish} style={[styles.done, { marginBottom: pad + 8 + safeBottom }]}>
           <Text style={styles.doneText}>Done</Text>
         </Pressable>
       </View>
@@ -273,7 +282,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 14,
     paddingHorizontal: 16,
     paddingBottom: 10,
     backgroundColor: paper,
@@ -287,7 +295,6 @@ const styles = StyleSheet.create({
   canvasInner: { flex: 1, backgroundColor: paper },
   done: {
     marginHorizontal: pad,
-    marginBottom: pad + 8,
     borderRadius: 14,
     backgroundColor: ink,
     paddingVertical: 14,
