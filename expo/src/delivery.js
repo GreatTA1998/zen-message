@@ -153,22 +153,27 @@ function messageBody(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function noticeText(body, photo) {
-  return body || (photo ? 'Photo' : '');
+export function messageSticker(value) {
+  return messagePhoto(value);
+}
+
+function noticeText(body, photo, sticker) {
+  return body || (sticker ? 'Sticker' : photo ? 'Photo' : '');
 }
 
 function readContent(action) {
   const body = messageBody(action.body);
-  const photo = messagePhoto(action.photo);
-  if ((!body && !photo) || !INTENT_IDS.has(action.intent)) return null;
-  return { body, photo };
+  const photo = action.sticker ? null : messagePhoto(action.photo);
+  const sticker = messageSticker(action.sticker);
+  if ((!body && !photo && !sticker) || !INTENT_IDS.has(action.intent)) return null;
+  return { body, photo, sticker };
 }
 
 export function immediatePlan(message) {
   const quiet = message.intent === 'timely';
   return {
     title: message.contactName,
-    body: noticeText(message.body, message.photo),
+    body: noticeText(message.body, message.photo, message.sticker),
     quiet,
     data: {
       kind: quiet ? 'timely' : 'realtime',
@@ -186,7 +191,7 @@ export function digestPlan(messages) {
   }
   const body =
     ordered.length === 1
-      ? `${ordered[0].contactName}: ${noticeText(ordered[0].body, ordered[0].photo)}`
+      ? `${ordered[0].contactName}: ${noticeText(ordered[0].body, ordered[0].photo, ordered[0].sticker)}`
       : `${ordered.length} messages · ${
           names.length <= 3 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`
         }`;
@@ -273,6 +278,7 @@ function outgoing(state, action, now) {
     contactName: action.contactName,
     body: content.body,
     photo: content.photo,
+    sticker: content.sticker,
     intent: action.intent,
     createdAt: now,
     visible: true,
@@ -291,6 +297,7 @@ function send(state, action, now) {
     contactName: action.contactName,
     body: content.body,
     photo: content.photo,
+    sticker: content.sticker,
     intent: action.intent,
     createdAt: now,
     visible: false,
@@ -376,6 +383,7 @@ function finishDigest(state, effects) {
 
 function isMessage(value) {
   const photo = value?.photo == null || value.photo === '' ? null : messagePhoto(value.photo);
+  const sticker = value?.sticker == null || value.sticker === '' ? null : messageSticker(value.sticker);
   return (
     value &&
     typeof value.id === 'string' &&
@@ -383,7 +391,8 @@ function isMessage(value) {
     typeof value.contactName === 'string' &&
     typeof value.body === 'string' &&
     (value.photo == null || value.photo === '' || Boolean(photo)) &&
-    (value.body.trim() || photo) &&
+    (value.sticker == null || value.sticker === '' || Boolean(sticker)) &&
+    (value.body.trim() || photo || sticker) &&
     INTENT_IDS.has(value.intent) &&
     typeof value.createdAt === 'number' &&
     typeof value.visible === 'boolean'

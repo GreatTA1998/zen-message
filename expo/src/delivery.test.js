@@ -24,6 +24,7 @@ function send(state, fields, now) {
     contactName: fields.contactName ?? 'Wren',
     body: fields.body,
     photo: fields.photo,
+    sticker: fields.sticker,
     intent: fields.intent,
     now: now.getTime(),
   });
@@ -239,6 +240,18 @@ test('digest copy stays a single notice for many contacts', () => {
   assert.equal(plan.body, '4 messages · Wren, Pip +2');
   assert.equal(JSON.stringify(plan).includes('relax'), false);
   assert.equal(JSON.stringify(plan).includes('batched'), false);
+});
+
+test('a sticker uses the same delivery as a photo', () => {
+  const sticker = 'data:image/png;base64,bbbb';
+  const batched = send(createState(), { id: 's', body: '', sticker, intent: 'anytime' }, at(10, 15));
+  assert.equal(batched.state.messages[0].visible, false);
+  assert.equal(batched.state.messages[0].sticker, sticker);
+  assert.equal(batched.effects[0].plan.body, 'Wren: Sticker');
+
+  const relaxed = reduce(createState(), { type: 'set-mode', mode: 'relaxed' });
+  const shown = send(relaxed.state, { id: 's2', body: '', sticker, intent: 'realtime' }, at(10, 15));
+  assert.equal(shown.state.messages[0].visible, true);
 });
 
 test('a photo uses the same delivery as text and is not a video', () => {
