@@ -655,7 +655,6 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     if (attachBusy.current) return;
     attachBusy.current = true;
     try {
-      setPhoto(null);
       setStickerTrayOpen(false);
       const next = await pickLibraryPhoto();
       if (next) await adoptSticker(next);

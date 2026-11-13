@@ -88,7 +88,9 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
       // Ignore release errors.
     }
     if (active.current.length > 1) {
-      onStrokeEnd([...strokesRef.current, [...active.current]]);
+      const committed = [...strokesRef.current, [...active.current]];
+      strokesRef.current = committed;
+      onStrokeEnd(committed);
     }
     active.current = [];
     repaint();
