@@ -258,6 +258,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     return {
       users: parsed.users || {},
       sessions: parsed.sessions || {},
+      reports: parsed.reports || [],
     };
   }
 

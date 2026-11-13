@@ -343,17 +343,19 @@ function Root() {
   async function onDeleteAccount() {
     const current = tokenRef.current;
     if (!current) return 'Could not delete account.';
-    try {
-      await api('/v1/account/delete', { token: current, method: 'POST', body: {} });
-    } catch {
-      return 'Could not delete account.';
-    }
     const authResult = await deleteFirebaseUser();
     if (!authResult.ok) {
       if (authResult.code === 'recent_login') {
         return 'Sign in again, then delete account.';
       }
-      return 'Account data was removed. Sign-in could not be cleared.';
+      return 'Could not delete account.';
+    }
+    try {
+      await api('/v1/account/delete', { token: current, method: 'POST', body: {} });
+    } catch {
+      setNotice('Could not delete account.');
+      await onLogout();
+      return '';
     }
     await onLogout();
     return '';

@@ -407,6 +407,7 @@ test('reporting records a report quietly', async () => {
     body: { contactId: right.user.id, messageId: message.id },
   });
   assert.equal(reported.ok, true);
+  await leftApi('/v1/inbox?offset=0', { token: left.token });
   await storage.transact(async (store) => {
     const state = JSON.parse(await store.getItem('zen-message.device'));
     assert.equal(state.reports.length, 1);
