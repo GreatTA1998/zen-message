@@ -40,15 +40,22 @@ test('an Apple credential opens a session on the device', async () => {
 });
 
 test('the same account gets the same ID on an empty store', async () => {
+  const api = createDeviceApi(memoryStorage());
   const open = () =>
-    createDeviceApi(memoryStorage())('/v1/session', {
+    api('/v1/session', {
       method: 'POST',
-      body: { provider: 'apple', subject: 'apple-user-001', firstName: 'Ada Lovelace' },
+      body: { provider: 'apple', subject: 'apple-user-001' },
     });
   const first = await open();
   const again = await open();
   assert.equal(again.user.id, first.user.id);
-  assert.equal(first.user.firstName, 'Ada');
+  const profile = await api('/v1/profile', {
+    token: first.token,
+    method: 'POST',
+    body: { nickname: 'Ada Lovelace' },
+  });
+  assert.equal(profile.user.firstName, 'Ada');
+  assert.equal(profile.user.onboarded, true);
 });
 
 test('the same Apple credential keeps the same person after a relaunch', async () => {
@@ -99,14 +106,33 @@ test('two clients on one store can add each other and exchange a message', async
   assert.equal(apple.user.provider, 'apple');
   assert.equal(google.user.provider, 'google');
   assert.notEqual(apple.user.id, google.user.id);
+  await phone('/v1/profile', { token: apple.token, method: 'POST', body: { nickname: 'Ada' } });
+  await web('/v1/profile', { token: google.token, method: 'POST', body: { nickname: 'Gus' } });
   await phone('/v1/contacts', { token: apple.token, method: 'POST', body: { code: google.user.id } });
+  let blocked = false;
+  try {
+    await phone('/v1/messages', {
+      token: apple.token,
+      method: 'POST',
+      body: { contactId: google.user.id, body: 'hello from the phone', intent: 'realtime' },
+    });
+  } catch {
+    blocked = true;
+  }
+  assert.equal(blocked, true);
+  let pending = await web('/v1/inbox?offset=0', { token: google.token });
+  assert.equal(
+    pending.contacts.some((item) => item.id === apple.user.id && item.status === 'pending-in'),
+    true
+  );
+  await web('/v1/friend-request/accept', { token: google.token, method: 'POST', body: { contactId: apple.user.id } });
   await phone('/v1/messages', {
     token: apple.token,
     method: 'POST',
     body: { contactId: google.user.id, body: 'hello from the phone', intent: 'realtime' },
   });
   const inbox = await web('/v1/inbox?offset=0', { token: google.token });
-  assert.equal(inbox.contacts.some((item) => item.id === apple.user.id), true);
+  assert.equal(inbox.contacts.some((item) => item.id === apple.user.id && item.status === 'active'), true);
   assert.equal(inbox.state.contactId, apple.user.id);
   assert.equal(
     inbox.state.messages.some((message) => message.body === 'hello from the phone' && message.visible),
@@ -155,8 +181,9 @@ test('a web realtime message alerts the signed-in phone once', async () => {
   const web = createDeviceApi(storage, (length) => new Uint8Array(length).fill(5));
   const apple = await phone('/v1/session', {
     method: 'POST',
-    body: { provider: 'apple', subject: 'apple-user-phone', firstName: 'Ada' },
+    body: { provider: 'apple', subject: 'apple-user-phone' },
   });
+  await phone('/v1/profile', { token: apple.token, method: 'POST', body: { nickname: 'Ada' } });
   const google = await web('/v1/session', {
     method: 'POST',
     body: { provider: 'google', subject: 'google-user-laptop' },
@@ -168,7 +195,9 @@ test('a web realtime message alerts the signed-in phone once', async () => {
     body: { token: 'ExponentPushToken[phonephonephone]' },
   });
   assert.equal(registered.ok, true);
+  await web('/v1/profile', { token: google.token, method: 'POST', body: { nickname: 'Gus' } });
   await web('/v1/contacts', { token: google.token, method: 'POST', body: { code: apple.user.id } });
+  await web('/v1/friend-request/accept', { token: apple.token, method: 'POST', body: { contactId: google.user.id } });
   const sent = await web('/v1/messages', {
     token: google.token,
     method: 'POST',
@@ -202,7 +231,10 @@ test('batched anytime waits for one digest, and relaxed stays private', async ()
     method: 'POST',
     body: { token: 'ExponentPushToken[phonephonephone]' },
   });
+  await web('/v1/profile', { token: google.token, method: 'POST', body: { nickname: 'Gus' } });
+  await phone('/v1/profile', { token: apple.token, method: 'POST', body: { nickname: 'Ada' } });
   await web('/v1/contacts', { token: google.token, method: 'POST', body: { code: apple.user.id } });
+  await phone('/v1/friend-request/accept', { token: apple.token, method: 'POST', body: { contactId: google.user.id } });
   const anytime = await web('/v1/messages', {
     token: google.token,
     method: 'POST',
@@ -255,8 +287,9 @@ test('three characters show a nickname or not found before add', async () => {
   const api = createDeviceApi(memoryStorage(), (length) => new Uint8Array(length).fill(4));
   const ada = await api('/v1/session', {
     method: 'POST',
-    body: { provider: 'apple', subject: 'apple-user-ada', firstName: 'Ada' },
+    body: { provider: 'apple', subject: 'apple-user-ada' },
   });
+  await api('/v1/profile', { token: ada.token, method: 'POST', body: { nickname: 'Ada' } });
   const bea = await api('/v1/session', {
     method: 'POST',
     body: { provider: 'google', subject: 'google-user-bea' },

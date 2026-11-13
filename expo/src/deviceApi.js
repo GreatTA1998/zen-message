@@ -32,8 +32,22 @@ async function defaultBytes(length) {
   return out;
 }
 
+function contactKind(contact) {
+  return contact?.status || 'active';
+}
+
+function isActiveContact(contacts, id) {
+  return contacts.some((item) => item.id === id && contactKind(item) === 'active');
+}
+
 function publicUser(user) {
-  return { id: user.id, provider: user.provider, firstName: user.firstName || '' };
+  const onboarded = user.onboarded ?? Boolean(user.firstName);
+  return {
+    id: user.id,
+    provider: user.provider,
+    firstName: user.firstName || '',
+    onboarded,
+  };
 }
 
 function expoPushToken(value) {
@@ -47,6 +61,7 @@ function contactCard(users, contact) {
   return {
     id: contact.id,
     firstName: person?.firstName || '',
+    status: contactKind(contact),
     dayHour: Number.isInteger(person?.dayHour) ? person.dayHour : 19,
     dayMinute: Number.isInteger(person?.dayMinute) ? person.dayMinute : 0,
     offsetMinutes: Number.isInteger(person?.offsetMinutes) ? person.offsetMinutes : 0,
@@ -73,6 +88,7 @@ function keepAccount(user) {
   return {
     id: user.id,
     firstName: user.firstName || '',
+    onboarded: user.onboarded ?? Boolean(user.firstName),
     contacts: user.contacts,
     pushToken: user.pushToken,
     offsetMinutes: user.offsetMinutes,
@@ -80,6 +96,53 @@ function keepAccount(user) {
     subject: user.subject,
     pendingEffects: user.pendingEffects,
   };
+}
+
+function upsertContact(contacts, id, status) {
+  const list = contacts || [];
+  const index = list.findIndex((item) => item.id === id);
+  if (index < 0) return [...list, { id, status }];
+  const current = contactKind(list[index]);
+  if (current === 'active') return list;
+  if (status === 'active') {
+    const next = [...list];
+    next[index] = { id, status: 'active' };
+    return next;
+  }
+  if (current === status) return list;
+  const next = [...list];
+  next[index] = { id, status };
+  return next;
+}
+
+function removeContact(contacts, id) {
+  return (contacts || []).filter((item) => item.id !== id);
+}
+
+function becomeFriends(state, leftId, rightId) {
+  const left = state.users[leftId];
+  const right = state.users[rightId];
+  if (!left || !right) return;
+  left.contacts = upsertContact(left.contacts, rightId, 'active');
+  right.contacts = upsertContact(right.contacts, leftId, 'active');
+}
+
+function sendFriendRequest(state, fromUser, toUser) {
+  if (isActiveContact(fromUser.contacts, toUser.id)) fail('already_friends');
+  if (isActiveContact(toUser.contacts, fromUser.id)) fail('already_friends');
+  const fromHasIn = fromUser.contacts.some(
+    (item) => item.id === toUser.id && contactKind(item) === 'pending-in'
+  );
+  const toHasOut = toUser.contacts.some(
+    (item) => item.id === fromUser.id && contactKind(item) === 'pending-out'
+  );
+  if (fromHasIn && toHasOut) {
+    becomeFriends(state, fromUser.id, toUser.id);
+    return;
+  }
+  if (fromUser.contacts.some((item) => item.id === toUser.id)) return;
+  fromUser.contacts = upsertContact(fromUser.contacts, toUser.id, 'pending-out');
+  toUser.contacts = upsertContact(toUser.contacts, fromUser.id, 'pending-in');
 }
 
 function adopt(user, next) {
@@ -128,8 +191,8 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     for (const message of user.messages || []) {
       if (message.direction !== 'in' || !message.contactId || message.contactId === user.id) continue;
       if (!state.users[message.contactId]) continue;
-      if (!user.contacts.some((item) => item.id === message.contactId)) {
-        user.contacts = [...user.contacts, { id: message.contactId }];
+      if (!isActiveContact(user.contacts, message.contactId)) {
+        user.contacts = upsertContact(user.contacts, message.contactId, 'active');
       }
       if (!user.contactId) user.contactId = message.contactId;
     }
@@ -204,13 +267,12 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
           provider,
           subject,
           firstName: '',
+          onboarded: false,
           pushToken: null,
           offsetMinutes: 0,
           contacts: [],
           pendingEffects: [],
         };
-      const name = firstName(body?.firstName);
-      if (name) user.firstName = name;
       state.users[user.id] = user;
       const sessionToken = await hex(24);
       state.sessions[sessionToken] = user.id;
@@ -236,15 +298,47 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       return inbox(state, user);
     }
 
+    if (method === 'POST' && url.pathname === '/v1/profile') {
+      const nickname = firstName(body?.nickname);
+      if (!nickname) fail('nickname_missing');
+      user.firstName = nickname;
+      user.onboarded = true;
+      await commit(store, state);
+      return { user: publicUser(user) };
+    }
+
     if (method === 'POST' && url.pathname === '/v1/contacts') {
       const code = normalizeCode(body?.code);
       if (hasConfusingCharacter(code) || (code && !isCode(code))) fail('code_invalid');
       const found = isCode(code) ? state.users[code] : null;
       if (!found || found.id === user.id) fail('person_not_found');
-      if (!user.contacts.some((item) => item.id === found.id)) {
-        user.contacts = [...user.contacts, { id: found.id }];
-      }
+      sendFriendRequest(state, user, found);
       if (!user.contactId) user.contactId = found.id;
+      await commit(store, state);
+      return inbox(state, user);
+    }
+
+    if (method === 'POST' && url.pathname === '/v1/friend-request/accept') {
+      const id = normalizeCode(body?.contactId);
+      if (!isCode(id)) fail('person_not_found');
+      const other = state.users[id];
+      const pending = user.contacts.find((item) => item.id === id && contactKind(item) === 'pending-in');
+      if (!other || !pending) fail('person_not_found');
+      becomeFriends(state, user.id, other.id);
+      user.contactId = other.id;
+      await commit(store, state);
+      return inbox(state, user);
+    }
+
+    if (method === 'POST' && url.pathname === '/v1/friend-request/decline') {
+      const id = normalizeCode(body?.contactId);
+      if (!isCode(id)) fail('person_not_found');
+      const other = state.users[id];
+      const pending = user.contacts.find((item) => item.id === id && contactKind(item) === 'pending-in');
+      if (!other || !pending) fail('person_not_found');
+      user.contacts = removeContact(user.contacts, id);
+      other.contacts = removeContact(other.contacts, user.id);
+      if (user.contactId === id) user.contactId = user.contacts[0]?.id ?? null;
       await commit(store, state);
       return inbox(state, user);
     }
@@ -257,7 +351,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
 
     if (method === 'POST' && url.pathname === '/v1/messages') {
       const recipient = state.users[body?.contactId];
-      if (!recipient || !user.contacts.some((item) => item.id === recipient.id)) fail('person_not_found');
+      if (!recipient || !isActiveContact(user.contacts, recipient.id)) fail('person_not_found');
       const result = deliverMessage(user, recipient, {
         id: await hex(8),
         body: body?.body,

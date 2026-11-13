@@ -39,12 +39,14 @@ test('a phone and a browser share the live hosted store', async () => {
   try {
     const apple = await phone('/v1/session', {
       method: 'POST',
-      body: { provider: 'apple', subject: appleSubject, firstName: 'Ada' },
+      body: { provider: 'apple', subject: appleSubject },
     });
     const google = await web('/v1/session', {
       method: 'POST',
       body: { provider: 'google', subject: googleSubject },
     });
+    await phone('/v1/profile', { token: apple.token, method: 'POST', body: { nickname: 'Ada' } });
+    await web('/v1/profile', { token: google.token, method: 'POST', body: { nickname: 'Gus' } });
     const appleAgain = await phone('/v1/session', {
       method: 'POST',
       body: { provider: 'apple', subject: appleSubject },
@@ -54,13 +56,17 @@ test('a phone and a browser share the live hosted store', async () => {
     assert.equal(google.user.id, accountCode('google', googleSubject));
     assert.notEqual(apple.user.id, google.user.id);
     await phone('/v1/contacts', { token: apple.token, method: 'POST', body: { code: google.user.id } });
+    await web('/v1/friend-request/accept', { token: google.token, method: 'POST', body: { contactId: apple.user.id } });
     await phone('/v1/messages', {
       token: apple.token,
       method: 'POST',
       body: { contactId: google.user.id, body: 'hello from the phone', intent: 'realtime' },
     });
     const inbox = await web('/v1/inbox?offset=0', { token: google.token });
-    assert.equal(inbox.contacts.some((item) => item.id === apple.user.id && item.firstName === 'Ada'), true);
+    assert.equal(
+      inbox.contacts.some((item) => item.id === apple.user.id && item.firstName === 'Ada' && item.status === 'active'),
+      true
+    );
     assert.equal(inbox.state.contactId, apple.user.id);
     assert.equal(
       inbox.state.messages.some((message) => message.body === 'hello from the phone' && message.visible),
