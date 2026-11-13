@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Image,
   Keyboard,
   Platform,
@@ -36,6 +37,8 @@ import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadSession, saveSession } from './src/session';
+import { deleteFirebaseUser } from './src/accountAuth';
+import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
 
 function summaryAt(hour, minute = 0) {
@@ -337,6 +340,25 @@ function Root() {
     setInbox(null);
   }
 
+  async function onDeleteAccount() {
+    const current = tokenRef.current;
+    if (!current) return 'Could not delete account.';
+    try {
+      await api('/v1/account/delete', { token: current, method: 'POST', body: {} });
+    } catch {
+      return 'Could not delete account.';
+    }
+    const authResult = await deleteFirebaseUser();
+    if (!authResult.ok) {
+      if (authResult.code === 'recent_login') {
+        return 'Sign in again, then delete account.';
+      }
+      return 'Account data was removed. Sign-in could not be cleared.';
+    }
+    await onLogout();
+    return '';
+  }
+
   async function onAdd(raw) {
     const code = normalizeCode(raw);
     if (hasConfusingCharacter(code)) return '1, I, and L are not used.';
@@ -381,6 +403,7 @@ function Root() {
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
+        onDeleteAccount={onDeleteAccount}
       />
     );
   }
@@ -392,7 +415,7 @@ function Root() {
   );
 }
 
-function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
+function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDeleteAccount }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
   const [inputHeight, setInputHeight] = useState(44);
@@ -404,6 +427,8 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const [pendingMode, setPendingMode] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const focusRequest = useRef(0);
   const threadRef = useRef(null);
@@ -450,6 +475,41 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
     if (next.effects?.length) {
       await api('/v1/effects/ack', { token, method: 'POST', body: {} });
     }
+  }
+
+  function flashNotice(text) {
+    setNotice(text);
+    setTimeout(() => setNotice(''), 2800);
+  }
+
+  async function reportContact(targetId, messageId) {
+    try {
+      await api('/v1/report', { token, method: 'POST', body: { contactId: targetId, messageId } });
+      flashNotice('Report received.');
+    } catch {
+      flashNotice('Could not send report.');
+    }
+  }
+
+  function confirmBlock(targetId) {
+    const run = async () => {
+      try {
+        const next = await api('/v1/block', { token, method: 'POST', body: { contactId: targetId } });
+        onInbox(next);
+        setPanel('chat');
+        flashNotice('Contact blocked.');
+      } catch {
+        flashNotice('Could not block contact.');
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Block this contact? You will not receive messages from them.')) run();
+      return;
+    }
+    Alert.alert('Block contact', 'You will not receive messages from them.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Block', style: 'destructive', onPress: run },
+    ]);
   }
 
   function send(text = draft) {
@@ -541,13 +601,14 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
         onLayout={rememberBottom}
         style={[styles.phone, web && styles.webScreen]}
       >
-        {scheduleOpen || accountOpen ? (
+        {scheduleOpen || accountOpen || contactMenuId ? (
           <Pressable
             testID="schedule-backdrop"
             accessibilityLabel="Close menu"
             onPress={() => {
               setScheduleOpen(false);
               setAccountOpen(false);
+              setContactMenuId(null);
             }}
             style={styles.backdrop}
           />
@@ -627,6 +688,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
                     setAccountOpen(false);
                     await onLogout();
                   }}
+                  onDeleteAccount={async () => {
+                    setAccountOpen(false);
+                    const message = await onDeleteAccount();
+                    if (message) flashNotice(message);
+                  }}
                 />
               </View>
             ) : null}
@@ -660,6 +726,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
                   if (item.status === 'pending-in') setPanel('request');
                   else setPanel('chat');
                   mutate('/v1/open', { contactId: item.id });
+                }}
+                onLongPress={() => {
+                  setScheduleOpen(false);
+                  setAccountOpen(false);
+                  setContactMenuId(item.id);
                 }}
                 style={styles.contact}
               >
@@ -696,6 +767,16 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
             </Text>
           </Pressable>
         </ScrollView>
+        {contactMenuId ? (
+          <View testID="contact-actions-popover" style={styles.contactMenuPopover}>
+            <ContactActionsMenu
+              contactId={contactMenuId}
+              onReport={() => reportContact(contactMenuId)}
+              onBlock={() => confirmBlock(contactMenuId)}
+              onClose={() => setContactMenuId(null)}
+            />
+          </View>
+        ) : null}
 
         {panel === 'add' ? (
           <PlusView
@@ -754,7 +835,19 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
             }}
           >
             {messages.map((message) => (
-              <ThreadMessage key={message.id} message={message} onOpenPhoto={setPhotoViewerUri} />
+              <ThreadMessage
+                key={message.id}
+                message={message}
+                onOpenPhoto={setPhotoViewerUri}
+                onReportIncoming={(messageId) => {
+                  if (!contact?.id) return;
+                  reportContact(contact.id, messageId);
+                }}
+                onBlockIncoming={() => {
+                  if (!contact?.id) return;
+                  confirmBlock(contact.id);
+                }}
+              />
             ))}
           </ScrollView>
         </View>
@@ -770,6 +863,14 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
             messages={messages}
             footer={<ComposerFooter testID="composer-copy" autoFocus {...composerProps} />}
             onOpenPhoto={setPhotoViewerUri}
+            onReportIncoming={(messageId) => {
+              if (!contact?.id) return;
+              reportContact(contact.id, messageId);
+            }}
+            onBlockIncoming={() => {
+              if (!contact?.id) return;
+              confirmBlock(contact.id);
+            }}
           />
         ) : null}
         {photoViewerUri ? (
@@ -791,6 +892,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
             >
               <Feather name="x" size={28} color={paper} />
             </Pressable>
+          </View>
+        ) : null}
+        {notice ? (
+          <View testID="chat-notice" style={styles.chatNotice} pointerEvents="none">
+            <Text style={styles.chatNoticeText}>{notice}</Text>
           </View>
         ) : null}
       </View>
@@ -980,7 +1086,7 @@ function ComposerFooter({
   );
 }
 
-function ConversationSheet({ inset, messages, footer, onOpenPhoto }) {
+function ConversationSheet({ inset, messages, footer, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
   const ordered = messages.slice().reverse();
   return (
     <View testID="conversation-copy" style={[styles.copy, { top: 0, paddingBottom: inset }]}>
@@ -994,7 +1100,12 @@ function ConversationSheet({ inset, messages, footer, onOpenPhoto }) {
         >
           {ordered.map((message) => (
             <View key={message.id} style={styles.flip}>
-              <ThreadMessage message={message} onOpenPhoto={onOpenPhoto} />
+              <ThreadMessage
+                message={message}
+                onOpenPhoto={onOpenPhoto}
+                onReportIncoming={onReportIncoming}
+                onBlockIncoming={onBlockIncoming}
+              />
             </View>
           ))}
         </ScrollView>
@@ -1004,9 +1115,14 @@ function ConversationSheet({ inset, messages, footer, onOpenPhoto }) {
   );
 }
 
-function AccountMenu({ userId, onLogout }) {
+const DELETE_ACCOUNT_CONSEQUENCE =
+  'Your account, contacts, and messages are permanently removed from Zen Message and sign-in is cleared. This cannot be undone.';
+
+function AccountMenu({ userId, onLogout, onDeleteAccount }) {
+  const [armingDelete, setArmingDelete] = useState(false);
+
   return (
-    <View testID="account-menu">
+    <View testID="account-menu" style={armingDelete ? styles.accountMenuWide : null}>
       <View style={styles.menuRow}>
         <Text testID="account-id" style={styles.menuText}>
           ID {userId}
@@ -1021,6 +1137,45 @@ function AccountMenu({ userId, onLogout }) {
       >
         <Text style={styles.menuText}>Log out</Text>
       </Pressable>
+      {armingDelete ? (
+        <View testID="delete-account-confirm-step" style={styles.menuFooter}>
+          <Text style={styles.menuConsequence}>{DELETE_ACCOUNT_CONSEQUENCE}</Text>
+          <Pressable
+            testID="delete-account-confirm"
+            accessibilityRole="button"
+            accessibilityLabel="Delete account permanently"
+            onPress={() => {
+              setArmingDelete(false);
+              onDeleteAccount();
+            }}
+            style={styles.menuRow}
+          >
+            <Text style={[styles.menuTextQuiet, styles.menuTextAlert]}>Delete account permanently</Text>
+          </Pressable>
+          <Pressable
+            testID="delete-account-cancel"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel delete account"
+            onPress={() => setArmingDelete(false)}
+            style={styles.menuRow}
+          >
+            <Text style={styles.menuTextQuiet}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.menuFooter}>
+          <Pressable
+            testID="delete-account-button"
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+            onPress={() => setArmingDelete(true)}
+            style={styles.menuRowQuiet}
+            hitSlop={4}
+          >
+            <Text style={styles.menuTextQuiet}>Delete account</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -1050,12 +1205,36 @@ function ScheduleSettings({ state, onChoose }) {
 
 const photoMaxWidth = web ? 320 : 280;
 
-function ThreadMessage({ message, onOpenPhoto }) {
+function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
   const incoming = message.direction === 'in';
   const parts = messageBubbleParts(message);
   if (parts.length === 0) return null;
+
+  function onLongPress() {
+    if (!incoming) return;
+    if (Platform.OS === 'web') {
+      const report = window.confirm('Report this message?');
+      if (report) {
+        onReportIncoming?.(message.id);
+        return;
+      }
+      const block = window.confirm('Block this contact?');
+      if (block) onBlockIncoming?.();
+      return;
+    }
+    Alert.alert('Message', 'Choose an action.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Report', onPress: () => onReportIncoming?.(message.id) },
+      { text: 'Block contact', style: 'destructive', onPress: () => onBlockIncoming?.() },
+    ]);
+  }
+
   return (
-    <View style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut]}>
+    <Pressable
+      onLongPress={incoming ? onLongPress : undefined}
+      delayLongPress={420}
+      style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut]}
+    >
       {parts.map((kind) =>
         kind === 'photo' ? (
           <PhotoBubble key={`${message.id}-photo`} message={message} incoming={incoming} onOpenPhoto={onOpenPhoto} />
@@ -1063,7 +1242,7 @@ function ThreadMessage({ message, onOpenPhoto }) {
           <TextBubble key={`${message.id}-text`} message={message} incoming={incoming} />
         ),
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -1183,6 +1362,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: ink,
     zIndex: 6,
+  },
+  contactMenuPopover: {
+    position: 'absolute',
+    top: 124,
+    left: side,
+    zIndex: 6,
+  },
+  accountMenuWide: { width: 248 },
+  menuFooter: { borderTopWidth: 1, borderTopColor: '#e6e3dc' },
+  menuRowQuiet: { paddingVertical: 10, paddingHorizontal: 18 },
+  menuTextQuiet: { color: '#6a6a6a', fontSize: 13, lineHeight: 17 },
+  menuConsequence: {
+    color: ink,
+    fontSize: 13,
+    lineHeight: 18,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  menuTextAlert: { color: '#b3261e' },
+  chatNotice: {
+    position: 'absolute',
+    left: side,
+    right: side,
+    bottom: 18,
+    alignItems: 'center',
+    zIndex: 12,
+  },
+  chatNoticeText: {
+    color: ink,
+    backgroundColor: paper,
+    borderWidth: 1,
+    borderColor: ink,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 14,
+    lineHeight: 18,
   },
   photoViewer: {
     position: 'absolute',
