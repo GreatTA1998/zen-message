@@ -25,7 +25,8 @@ export async function finishSignIn(provider, credential, { request, saveSession,
     const saved = await loadSession();
     if (saved !== session.token) throw new Error('session_not_saved');
     await refresh(session);
-    return { screen: 'main', notice: '', token: session.token, user: session.user };
+    const screen = session.user?.onboarded ? 'main' : 'onboarding';
+    return { screen, notice: '', token: session.token, user: session.user };
   } catch {
     return { screen: 'login', notice: 'Could not finish sign-in.', token: null, user: null };
   }

@@ -27,7 +27,9 @@ import {
   scheduledChoices,
   threadMessages,
 } from './src/delivery';
+import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
+import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications } from './src/notify';
 import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
@@ -350,11 +352,25 @@ function Root() {
     }
   }
 
+  async function saveNickname(nickname) {
+    const next = await api('/v1/profile', { token, method: 'POST', body: { nickname } });
+    if (next?.user) setUser(next.user);
+    await refresh();
+  }
+
   if (!ready) return <View style={styles.boot} />;
 
   let body = null;
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
+  } else if (user && user.onboarded === false) {
+    body = (
+      <OnboardingView
+        userId={user.id}
+        onSaveNickname={saveNickname}
+        onContinue={refresh}
+      />
+    );
   } else {
     body = (
       <ChatScreen
@@ -383,6 +399,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const [choice, setChoice] = useState(0);
   const [customHour, setCustomHour] = useState(15);
   const [panel, setPanel] = useState('chat');
+  const [requestBusy, setRequestBusy] = useState(false);
   const [pendingMode, setPendingMode] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -394,7 +411,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
   const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
-  const messages = contact && state ? threadMessages(state.messages, contact.id) : [];
+  const contactActive = contact?.status === 'active' || !contact?.status;
+  const contactPendingIn = contact?.status === 'pending-in';
+  const contactPendingOut = contact?.status === 'pending-out';
+  const messages =
+    contact && state && contactActive ? threadMessages(state.messages, contact.id) : [];
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
@@ -403,7 +424,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
   const now = new Date();
   const choices = scheduledChoices(now);
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
-  const canSend = Boolean(contact) && (draft.trim().length > 0 || Boolean(photo));
+  const canSend = contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo));
 
   function onToggleFocus() {
     const next = focused ? 'relaxed' : 'batched';
@@ -622,24 +643,36 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
         >
           {contacts.map((item) => {
             const selected = item.id === contact?.id;
+            const pending = item.status === 'pending-in' || item.status === 'pending-out';
+            const ring = panel !== 'add' && selected;
+            const dim = ring ? styles.circleOn : styles.circleDim;
             return (
               <Pressable
                 key={item.id}
                 testID={`contact-${item.id}`}
                 accessibilityRole="button"
-                accessibilityLabel={item.id}
-                accessibilityState={{ selected: panel === 'chat' && selected }}
+                accessibilityLabel={item.firstName || item.id}
+                accessibilityState={{
+                  selected: (panel === 'chat' || panel === 'request') && selected,
+                }}
                 onPress={() => {
-                  setPanel('chat');
+                  if (item.status === 'pending-in') setPanel('request');
+                  else setPanel('chat');
                   mutate('/v1/open', { contactId: item.id });
                 }}
                 style={styles.contact}
               >
-                <Image
-                  source={PERSON_AVATAR}
-                  resizeMode="cover"
-                  style={[styles.avatar, panel === 'chat' && selected ? styles.circleOn : styles.circleDim]}
-                />
+                {pending ? (
+                  <View style={[styles.avatarShell, styles.avatarDashed, dim]}>
+                    <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatarFill} />
+                  </View>
+                ) : (
+                  <Image
+                    source={PERSON_AVATAR}
+                    resizeMode="cover"
+                    style={[styles.avatar, dim]}
+                  />
+                )}
                 <Text numberOfLines={1} style={styles.contactLabel}>
                   {item.firstName || item.id}
                 </Text>
@@ -674,8 +707,38 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
             }}
           />
         ) : null}
+        {panel === 'request' && contactPendingIn && contact ? (
+          <FriendRequestView
+            contact={contact}
+            busy={requestBusy}
+            onAccept={async () => {
+              setRequestBusy(true);
+              try {
+                await mutate('/v1/friend-request/accept', { contactId: contact.id });
+                setPanel('chat');
+              } finally {
+                setRequestBusy(false);
+              }
+            }}
+            onDecline={async () => {
+              setRequestBusy(true);
+              try {
+                await mutate('/v1/friend-request/decline', { contactId: contact.id });
+                setPanel('chat');
+              } finally {
+                setRequestBusy(false);
+              }
+            }}
+          />
+        ) : null}
         {panel === 'chat' ? (
         <View style={[styles.main, web && styles.webFill]}>
+        {contactPendingOut ? (
+          <View style={styles.pendingMain}>
+            <Text style={styles.pendingText}>Waiting for {contact.firstName || contact.id} to accept.</Text>
+          </View>
+        ) : (
+        <>
         <View style={[styles.thread, web && styles.webFill]}>
           <ScrollView
             ref={threadRef}
@@ -695,7 +758,9 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout }) {
           </ScrollView>
         </View>
 
-        <ComposerFooter testID="composer" {...composerProps} />
+        {contactActive ? <ComposerFooter testID="composer" {...composerProps} /> : null}
+        </>
+        )}
         </View>
         ) : null}
         {panel === 'chat' && open && Platform.OS !== 'web' ? (
@@ -1153,8 +1218,22 @@ const styles = StyleSheet.create({
   contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 18 },
   contact: { width: 76, alignItems: 'center' },
   avatar: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, backgroundColor: paper },
+  avatarShell: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 2,
+    borderColor: ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: paper,
+  },
+  avatarDashed: { borderStyle: 'dashed' },
+  avatarFill: { width: 46, height: 46, borderRadius: 23 },
   circleOn: { opacity: 1, borderWidth: 2, borderColor: ink },
   circleDim: { opacity: 0.4 },
+  pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
   contactLabel: { marginTop: 4, maxWidth: 76, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
   plus: {
     width: 54,
