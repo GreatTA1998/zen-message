@@ -48,3 +48,12 @@ export function googleSubjectFromUser(user) {
     firstName: firstNameFromDisplay(user.displayName),
   };
 }
+
+export function phoneSubjectFromUser(user) {
+  if (!user?.uid) return null;
+  return {
+    provider: 'phone',
+    subject: user.uid,
+    firstName: firstNameFromDisplay(user.displayName),
+  };
+}

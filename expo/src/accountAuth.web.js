@@ -1,10 +1,9 @@
-import { getApps } from 'firebase/app';
-import { deleteUser, getAuth } from 'firebase/auth';
+import { deleteUser } from 'firebase/auth';
+import { firebaseAuth } from './firebaseAuth';
 
 export async function deleteFirebaseUser() {
-  const app = getApps().find((item) => item.name === 'zen-google');
-  if (!app) return { ok: true, skipped: true };
-  const auth = getAuth(app);
+  const auth = firebaseAuth();
+  if (!auth) return { ok: true, skipped: true };
   const user = auth.currentUser;
   if (!user) return { ok: true, skipped: true };
   try {

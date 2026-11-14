@@ -299,7 +299,10 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     const url = new URL(path, 'http://device.local');
 
     if (method === 'POST' && url.pathname === '/v1/session') {
-      const provider = body?.provider === 'apple' || body?.provider === 'google' ? body.provider : null;
+      const provider =
+        body?.provider === 'apple' || body?.provider === 'google' || body?.provider === 'phone'
+          ? body.provider
+          : null;
       const subject = typeof body?.subject === 'string' ? body.subject.trim() : '';
       if (!provider || subject.length < 4) fail('provider_subject_missing');
       const existing = findByIdentity(state, provider, subject);

@@ -12,6 +12,7 @@
     "expo-auth-session": "~58.0.13",
     "expo-clipboard": "~58.0.3",
     "expo-crypto": "~58.0.7",
+    "expo-firebase-recaptcha": "^2.3.1",
     "expo-image-picker": "~58.0.10",
     "expo-notifications": "~58.1.5",
     "expo-status-bar": "~58.0.3",
@@ -24,7 +25,8 @@
     "react-native-safe-area-context": "~5.10.1",
     "react-native-svg": "15.16.0",
     "react-native-view-shot": "6.1.1",
-    "react-native-web": "^0.21.4"
+    "react-native-web": "^0.21.4",
+    "react-native-webview": "14.0.1"
   },
   "scripts": {
     "start": "expo start",
@@ -32,7 +34,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "server": "node server/index.js",
-    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js src/googleSignIn.web.test.js src/googleSignIn.ios.test.js src/appleSignIn.web.test.js src/LoginView.test.js src/messageBubble.test.js src/pickPhoto.test.js src/stickerExport.test.js server/deliver.test.js"
+    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js src/googleSignIn.web.test.js src/googleSignIn.ios.test.js src/appleSignIn.web.test.js src/LoginView.test.js src/phoneNumber.test.js src/messageBubble.test.js src/pickPhoto.test.js src/stickerExport.test.js server/deliver.test.js"
   },
   "private": true
 }
