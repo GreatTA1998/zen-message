@@ -232,14 +232,21 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
   }
 
   function linkIncomingContacts(state, user) {
+    let changed = false;
     for (const message of user.messages || []) {
       if (message.direction !== 'in' || !message.contactId || message.contactId === user.id) continue;
-      if (!state.users[message.contactId]) continue;
-      if (!isActiveContact(user.contacts, message.contactId)) {
-        user.contacts = upsertContact(user.contacts, message.contactId, 'active');
+      const peerId = normalizeCode(message.contactId);
+      if (!isCode(peerId) || !state.users[peerId]) continue;
+      if (!isActiveContact(user.contacts, peerId)) {
+        user.contacts = upsertContact(user.contacts, peerId, 'active');
+        changed = true;
       }
-      if (!user.contactId) user.contactId = message.contactId;
+      if (!user.contactId) {
+        user.contactId = peerId;
+        changed = true;
+      }
     }
+    return changed;
   }
 
   function exclusive(work) {
@@ -373,6 +380,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       if (!other || !pending) fail('person_not_found');
       becomeFriends(state, user.id, other.id);
       user.contactId = other.id;
+      if (!other.contactId) other.contactId = user.id;
       await commit(store, state);
       return inbox(state, user);
     }
@@ -391,13 +399,19 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     }
 
     if (method === 'POST' && url.pathname === '/v1/open') {
-      if (user.contacts.some((item) => item.id === body?.contactId)) user.contactId = body.contactId;
-      await commit(store, state);
+      const id = normalizeCode(body?.contactId);
+      if (isCode(id) && user.contacts.some((item) => item.id === id)) {
+        if (user.contactId !== id) {
+          user.contactId = id;
+          await commit(store, state);
+        }
+      }
       return inbox(state, user);
     }
 
     if (method === 'POST' && url.pathname === '/v1/messages') {
-      const recipient = state.users[body?.contactId];
+      const recipientId = normalizeCode(body?.contactId);
+      const recipient = isCode(recipientId) ? state.users[recipientId] : null;
       if (
         !recipient ||
         !isActiveContact(user.contacts, recipient.id) ||

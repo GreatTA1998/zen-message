@@ -17,11 +17,14 @@ export function PlusView({ code, onLookup, onAdd }) {
     }
     let alive = true;
     setMatch(undefined);
-    Promise.resolve(onLookup(normalized)).then((result) => {
-      if (alive) setMatch(result?.found ? result : { found: false });
-    });
+    const handle = setTimeout(() => {
+      Promise.resolve(onLookup(normalized)).then((result) => {
+        if (alive) setMatch(result?.found ? result : { found: false });
+      });
+    }, 120);
     return () => {
       alive = false;
+      clearTimeout(handle);
     };
   }, [normalized, onLookup]);
 
@@ -29,7 +32,16 @@ export function PlusView({ code, onLookup, onAdd }) {
     await Clipboard.setStringAsync(code);
   }
 
-  const lookup = normalized.length < CODE_LENGTH ? '' : match?.found ? match.name : match ? 'not found' : '';
+  const lookup =
+    normalized.length < CODE_LENGTH
+      ? ''
+      : match === undefined
+        ? '…'
+        : match?.found
+          ? match.name
+          : match
+            ? 'not found'
+            : '';
 
   return (
     <View style={styles.screen}>

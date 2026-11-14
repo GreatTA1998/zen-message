@@ -31,7 +31,7 @@ export function firstNameFromDisplay(displayName) {
 export function appleSubjectFromUser(user) {
   if (!user) return null;
   const linked = user.providerData?.find((entry) => entry.providerId === 'apple.com');
-  const subject = linked?.uid || user.uid;
+  const subject = linked?.uid;
   if (!subject || subject.length < 4) return null;
   return {
     provider: 'apple',

@@ -427,3 +427,34 @@ test('a token from a previous install still opens the inbox', async () => {
   const inbox = await reopened('/v1/inbox?offset=0', { token: session.token });
   assert.equal(inbox.user.id, session.user.id);
 });
+
+test('opening a contact accepts a normalized id and delivering uses the same id', async () => {
+  const storage = sharedStore();
+  const left = createDeviceApi(storage, (length) => new Uint8Array(length).fill(4));
+  const right = createDeviceApi(storage, (length) => new Uint8Array(length).fill(5));
+  const ada = await left('/v1/session', { method: 'POST', body: { provider: 'apple', subject: 'apple-open-a' } });
+  const gus = await right('/v1/session', { method: 'POST', body: { provider: 'google', subject: 'google-open-b' } });
+  await left('/v1/contacts', { token: ada.token, method: 'POST', body: { code: gus.user.id } });
+  await right('/v1/friend-request/accept', {
+    token: gus.token,
+    method: 'POST',
+    body: { contactId: ada.user.id },
+  });
+  const opened = await left('/v1/open', {
+    token: ada.token,
+    method: 'POST',
+    body: { contactId: gus.user.id.toLowerCase() },
+  });
+  assert.equal(opened.state.contactId, gus.user.id);
+  await left('/v1/messages', {
+    token: ada.token,
+    method: 'POST',
+    body: { contactId: gus.user.id.toLowerCase(), body: 'normalized send', intent: 'realtime' },
+  });
+  const inbox = await right('/v1/inbox?offset=0', { token: gus.token });
+  assert.equal(inbox.state.contactId, ada.user.id);
+  assert.equal(
+    inbox.state.messages.some((message) => message.body === 'normalized send' && message.visible),
+    true
+  );
+});
