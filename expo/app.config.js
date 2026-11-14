@@ -33,8 +33,10 @@ module.exports = () => {
       {
         ios: {
           deploymentTarget: '16.4',
+          useFrameworks: 'static',
           extraPods: [
-            { name: 'AppCheckCore', version: '11.2.0' },
+            { name: 'AppCheckCore', modular_headers: true },
+            { name: 'GoogleUtilities', modular_headers: true },
             { name: 'GoogleUtilities/Environment', modular_headers: true },
             { name: 'GoogleUtilities/UserDefaults', modular_headers: true },
             { name: 'RecaptchaInterop', modular_headers: true },
