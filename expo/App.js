@@ -415,13 +415,16 @@ function Root() {
 
   if (!ready) return <View style={styles.boot} />;
 
+  // Prefer inbox.user on the same render as a fresh inbox so onboarding does not flash ChatScreen.
+  const sessionUser = user ?? inbox?.user ?? null;
+
   let body = null;
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
-  } else if (user && user.onboarded === false) {
+  } else if (sessionUser && sessionUser.onboarded === false) {
     body = (
       <OnboardingView
-        userId={user.id}
+        userId={sessionUser.id}
         onSaveNickname={saveNickname}
         onContinue={refresh}
       />
