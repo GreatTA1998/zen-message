@@ -226,6 +226,7 @@ function Root() {
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
   const tokenRef = useRef(null);
+  const lookupCacheRef = useRef(new Map());
 
   const applyInbox = useCallback((next) => {
     setInbox(next);
@@ -338,10 +339,16 @@ function Root() {
   const onLookup = useCallback(async (raw) => {
     const code = normalizeCode(raw);
     if (!isCode(code) || code === user?.id) return { found: false };
+    const cached = lookupCacheRef.current.get(code);
+    if (cached) return cached;
     try {
-      return await api(`/v1/person?code=${encodeURIComponent(code)}`, { token: tokenRef.current });
+      const result = await api(`/v1/person?code=${encodeURIComponent(code)}`, { token: tokenRef.current });
+      lookupCacheRef.current.set(code, result);
+      return result;
     } catch {
-      return { found: false };
+      const miss = { found: false };
+      lookupCacheRef.current.set(code, miss);
+      return miss;
     }
   }, [user?.id]);
 
@@ -449,6 +456,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
   const focusRequest = useRef(0);
+  const openContactSync = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const phoneRef = useRef(null);
@@ -509,6 +517,27 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
     if (next.effects?.length) {
       await api('/v1/effects/ack', { token, method: 'POST', body: {} });
     }
+  }
+
+  function pickContact(item) {
+    if (item.status === 'pending-in') setPanel('request');
+    else setPanel('chat');
+    if (!inbox?.state || item.id === inbox.state.contactId) return;
+    const requestId = openContactSync.current + 1;
+    openContactSync.current = requestId;
+    onInbox({
+      ...inbox,
+      state: {
+        ...inbox.state,
+        contactId: item.id,
+      },
+    });
+    api('/v1/open', { token, method: 'POST', body: { contactId: item.id } })
+      .then((next) => {
+        if (openContactSync.current !== requestId) return;
+        onInbox(next);
+      })
+      .catch(() => {});
   }
 
   function flashNotice(text) {
@@ -839,11 +868,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
                 accessibilityState={{
                   selected: (panel === 'chat' || panel === 'request') && selected,
                 }}
-                onPress={() => {
-                  if (item.status === 'pending-in') setPanel('request');
-                  else setPanel('chat');
-                  mutate('/v1/open', { contactId: item.id });
-                }}
+                onPress={() => pickContact(item)}
                 onLongPress={() => {
                   setScheduleOpen(false);
                   setAccountOpen(false);
