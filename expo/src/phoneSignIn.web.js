@@ -2,12 +2,32 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { firebaseAuth, phoneSubjectFromUser } from './firebaseAuth';
 
 let recaptchaVerifier = null;
+let recaptchaHost = null;
+
+function currentRecaptchaHost() {
+  if (typeof document === 'undefined') return null;
+  const host = document.getElementById('phone-recaptcha-anchor');
+  return host && host.isConnected ? host : null;
+}
+
+function clearRecaptcha() {
+  try {
+    recaptchaVerifier?.clear?.();
+  } catch {
+    // ignore
+  }
+  recaptchaVerifier = null;
+  recaptchaHost = null;
+}
 
 function ensureRecaptcha(auth) {
-  if (recaptchaVerifier) return recaptchaVerifier;
-  recaptchaVerifier = new RecaptchaVerifier(auth, 'phone-recaptcha-anchor', {
+  const host = currentRecaptchaHost();
+  if (recaptchaVerifier && host && recaptchaHost === host) return recaptchaVerifier;
+  clearRecaptcha();
+  recaptchaVerifier = new RecaptchaVerifier(auth, host || 'phone-recaptcha-anchor', {
     size: 'invisible',
   });
+  recaptchaHost = host;
   return recaptchaVerifier;
 }
 
@@ -27,12 +47,7 @@ export async function sendPhoneVerification(phoneNumber) {
     if (error?.code === 'auth/invalid-phone-number') {
       return { provider: 'phone', missing: 'phone_invalid' };
     }
-    try {
-      recaptchaVerifier?.clear?.();
-    } catch {
-      // ignore
-    }
-    recaptchaVerifier = null;
+    clearRecaptcha();
     return { provider: 'phone', missing: 'phone_unavailable' };
   }
 }

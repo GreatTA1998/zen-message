@@ -29,6 +29,7 @@ export function LoginView({ onSubject, notice }) {
   const [busy, setBusy] = useState(false);
   const [phoneNotice, setPhoneNotice] = useState('');
   const recaptchaRef = useRef(null);
+  const submittedCodeRef = useRef('');
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
@@ -97,6 +98,7 @@ export function LoginView({ onSubject, notice }) {
   async function handlePhoneVerify(nextCode) {
     const digits = String(nextCode ?? code).replace(/\D/g, '');
     if (digits.length < 6) return;
+    submittedCodeRef.current = digits;
     setBusy(true);
     setPhoneNotice('');
     const result = await confirmPhoneVerification(confirmation, digits);
@@ -113,9 +115,13 @@ export function LoginView({ onSubject, notice }) {
   }
 
   useEffect(() => {
-    if (phoneStep !== 'code' || busy || !confirmation) return undefined;
+    if (busy) return undefined;
     const digits = code.replace(/\D/g, '');
-    if (digits.length !== 6) return undefined;
+    if (phoneStep !== 'code' || !confirmation || digits.length !== 6) {
+      submittedCodeRef.current = '';
+      return undefined;
+    }
+    if (submittedCodeRef.current === digits) return undefined;
     const handle = setTimeout(() => {
       handlePhoneVerify(digits);
     }, 120);
