@@ -205,6 +205,9 @@ const MISSING = {
   apple_capability: 'Apple sign-in needs the Apple capability on this device.',
   apple_unavailable: 'Apple sign-in is not available in this browser.',
   google_unavailable: 'Google sign-in is not available in this browser.',
+  phone_unavailable: 'Phone sign-in is not available on this device.',
+  phone_invalid: 'That phone number could not be used.',
+  phone_code_invalid: 'That code did not work.',
 };
 
 export default function App() {
@@ -310,7 +313,7 @@ function Root() {
       return;
     }
     const outcome = await finishSignIn(
-      result.provider === 'google' ? 'google' : 'apple',
+      result.provider,
       { user: result.subject, firstName: result.firstName || '' },
       {
         request: api,

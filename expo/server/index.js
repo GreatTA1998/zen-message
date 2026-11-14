@@ -158,7 +158,10 @@ const server = createServer(async (request, response) => {
   try {
     if (request.method === 'POST' && url.pathname === '/v1/session') {
       const body = await readBody(request);
-      const provider = body.provider === 'apple' || body.provider === 'google' ? body.provider : null;
+      const provider =
+        body.provider === 'apple' || body.provider === 'google' || body.provider === 'phone'
+          ? body.provider
+          : null;
       const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
       if (!provider || subject.length < 4) {
         send(response, 400, { error: 'provider_subject_missing' });

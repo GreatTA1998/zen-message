@@ -2,20 +2,26 @@ export async function acceptAppleCredential(credential, deps) {
   return finishSignIn('apple', credential, deps);
 }
 
+const SESSION_PROVIDERS = new Set(['apple', 'google', 'phone']);
+
 export async function finishSignIn(provider, credential, { request, saveSession, loadSession, refresh }) {
   if (!credential?.user) {
     return {
       screen: 'login',
-      notice: 'Apple sign-in needs the Apple capability on this device.',
+      notice: 'Sign-in could not be completed on this device.',
       token: null,
       user: null,
     };
+  }
+  const sessionProvider = SESSION_PROVIDERS.has(provider) ? provider : null;
+  if (!sessionProvider) {
+    return { screen: 'login', notice: 'Could not finish sign-in.', token: null, user: null };
   }
   try {
     const session = await request('/v1/session', {
       method: 'POST',
       body: {
-        provider: provider === 'google' ? 'google' : 'apple',
+        provider: sessionProvider,
         subject: credential.user,
         firstName: credential.firstName || '',
       },
