@@ -26,12 +26,7 @@
       ],
       "expo-web-browser",
       "expo-apple-authentication",
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.37588438028-du0vj0shhbf7vj0tu393gt6lo12opf3k"
-        }
-      ],
+      "@react-native-google-signin/google-signin",
       [
         "expo-image-picker",
         {

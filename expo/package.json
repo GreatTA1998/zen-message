@@ -10,6 +10,7 @@
     "expo": "~58.0.14",
     "expo-apple-authentication": "~58.0.2",
     "expo-auth-session": "~58.0.13",
+    "expo-build-properties": "~58.0.12",
     "expo-clipboard": "~58.0.3",
     "expo-crypto": "~58.0.7",
     "expo-firebase-recaptcha": "^2.3.1",
@@ -35,6 +36,11 @@
     "web": "expo start --web",
     "server": "node server/index.js",
     "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js src/googleSignIn.web.test.js src/googleSignIn.ios.test.js src/appleSignIn.web.test.js src/LoginView.test.js src/phoneNumber.test.js src/messageBubble.test.js src/pickPhoto.test.js src/stickerExport.test.js server/deliver.test.js"
+  },
+  "expo": {
+    "autolinking": {
+      "exclude": ["expo-firebase-core"]
+    }
   },
   "private": true
 }

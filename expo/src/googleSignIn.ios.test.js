@@ -9,6 +9,7 @@ test('iPhone Google sign-in uses the native Google SDK and Firebase credentials'
   assert.match(source, /GoogleSignin\.signIn/);
   assert.match(source, /signInWithCredential/);
   assert.match(source, /GOOGLE_WEB_CLIENT_ID/);
+  assert.match(source, /GOOGLE_IOS_CLIENT_ID/);
   assert.doesNotMatch(source, /signInWithPopup/);
   assert.doesNotMatch(source, /WebBrowser\.open/);
 });
