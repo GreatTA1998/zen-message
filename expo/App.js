@@ -234,10 +234,15 @@ function Root() {
   const selectedContactRef = useRef(null);
 
   const applyInbox = useCallback((next) => {
-    const merged = mergeInboxPreservingSelection(next, selectedContactRef.current);
-    setInbox(merged);
-    if (merged?.user) setUser(merged.user);
+    setInbox((current) => {
+      const payload = typeof next === 'function' ? next(current) : next;
+      return mergeInboxPreservingSelection(payload, selectedContactRef.current);
+    });
   }, []);
+
+  useEffect(() => {
+    if (inbox?.user) setUser(inbox.user);
+  }, [inbox?.user]);
 
   const refresh = useCallback(async () => {
     const current = tokenRef.current;
@@ -567,15 +572,19 @@ function ChatScreen({
     setSelectedContactId(id);
     if (item.status === 'pending-in') setPanel('request');
     else setPanel('chat');
-    if (inbox?.state) {
-      onInbox({
-        ...inbox,
+    // Patch contactId onto the latest inbox — never spread a render-time snapshot
+    // (a concurrent poll/send setInbox could otherwise be overwritten).
+    onInbox((current) => {
+      if (!current?.state) return current;
+      if (normalizeCode(current.state.contactId) === id) return current;
+      return {
+        ...current,
         state: {
-          ...inbox.state,
+          ...current.state,
           contactId: id,
         },
-      });
-    }
+      };
+    });
     if (normalizeCode(state?.contactId) === id) return;
     const requestId = openContactSync.current + 1;
     openContactSync.current = requestId;
