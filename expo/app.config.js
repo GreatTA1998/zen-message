@@ -32,7 +32,7 @@ module.exports = () => {
       'expo-build-properties',
       {
         ios: {
-          deploymentTarget: '15.1',
+          deploymentTarget: '16.4',
           extraPods: [
             { name: 'GoogleUtilities/Environment', modular_headers: true },
             { name: 'GoogleUtilities/UserDefaults', modular_headers: true },
