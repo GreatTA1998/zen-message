@@ -34,6 +34,7 @@ module.exports = () => {
         ios: {
           deploymentTarget: '16.4',
           extraPods: [
+            { name: 'AppCheckCore', version: '11.2.0' },
             { name: 'GoogleUtilities/Environment', modular_headers: true },
             { name: 'GoogleUtilities/UserDefaults', modular_headers: true },
             { name: 'RecaptchaInterop', modular_headers: true },
