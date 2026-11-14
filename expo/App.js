@@ -18,6 +18,10 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR } from './src/contacts';
 import {
+  mergeInboxPreservingSelection,
+  resolveSelectedContactId,
+} from './src/contactSelection';
+import {
   DAY_HOURS,
   INTENTS,
   dailyClock,
@@ -227,10 +231,12 @@ function Root() {
   const [notice, setNotice] = useState('');
   const tokenRef = useRef(null);
   const lookupCacheRef = useRef(new Map());
+  const selectedContactRef = useRef(null);
 
   const applyInbox = useCallback((next) => {
-    setInbox(next);
-    if (next?.user) setUser(next.user);
+    const merged = mergeInboxPreservingSelection(next, selectedContactRef.current);
+    setInbox(merged);
+    if (merged?.user) setUser(merged.user);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -355,6 +361,7 @@ function Root() {
   async function onLogout() {
     await saveSession(null);
     tokenRef.current = null;
+    selectedContactRef.current = null;
     setToken(null);
     setUser(null);
     setInbox(null);
@@ -420,6 +427,7 @@ function Root() {
         token={token}
         inbox={inbox}
         onInbox={applyInbox}
+        selectedContactRef={selectedContactRef}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
@@ -435,7 +443,16 @@ function Root() {
   );
 }
 
-function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDeleteAccount }) {
+function ChatScreen({
+  token,
+  inbox,
+  onInbox,
+  selectedContactRef,
+  onAdd,
+  onLookup,
+  onLogout,
+  onDeleteAccount,
+}) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
   const [sticker, setSticker] = useState(null);
@@ -455,6 +472,11 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
+  const [selectedContactId, setSelectedContactId] = useState(() => {
+    const initial = resolveSelectedContactId(inbox?.contacts, null, inbox?.state?.contactId);
+    selectedContactRef.current = initial;
+    return initial;
+  });
   const focusRequest = useRef(0);
   const openContactSync = useRef(0);
   const attachBusy = useRef(false);
@@ -463,14 +485,21 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   const { open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
-  const contact = contacts.find((item) => item.id === state?.contactId) ?? null;
+  const activeContactId = resolveSelectedContactId(
+    contacts,
+    selectedContactId ?? selectedContactRef.current,
+    state?.contactId
+  );
+  const contact = contacts.find((item) => normalizeCode(item.id) === activeContactId) ?? null;
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
   const contactPendingOut = contact?.status === 'pending-out';
   const messages = useMemo(() => {
     if (!contact || !state || !contactActive) return [];
     const base = threadMessages(state.messages, contact.id);
-    const pending = pendingOutbound.filter((item) => item.contactId === contact.id);
+    const pending = pendingOutbound.filter(
+      (item) => normalizeCode(item.contactId) === normalizeCode(contact.id)
+    );
     return pending.length ? [...base, ...pending] : base;
   }, [contact, state, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
@@ -483,6 +512,18 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
   const canSend =
     contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
+
+  useEffect(() => {
+    selectedContactRef.current = selectedContactId;
+  }, [selectedContactId, selectedContactRef]);
+
+  useEffect(() => {
+    const next = resolveSelectedContactId(contacts, selectedContactRef.current, state?.contactId);
+    if (next !== selectedContactRef.current) {
+      selectedContactRef.current = next;
+      setSelectedContactId(next);
+    }
+  }, [contacts, state?.contactId, selectedContactRef]);
 
   useEffect(() => {
     loadStickerLibrary().then(setStickerLibrary).catch(() => {});
@@ -520,19 +561,25 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
   }
 
   function pickContact(item) {
+    const id = normalizeCode(item.id);
+    if (!id) return;
+    selectedContactRef.current = id;
+    setSelectedContactId(id);
     if (item.status === 'pending-in') setPanel('request');
     else setPanel('chat');
-    if (!inbox?.state || item.id === inbox.state.contactId) return;
+    if (inbox?.state) {
+      onInbox({
+        ...inbox,
+        state: {
+          ...inbox.state,
+          contactId: id,
+        },
+      });
+    }
+    if (normalizeCode(state?.contactId) === id) return;
     const requestId = openContactSync.current + 1;
     openContactSync.current = requestId;
-    onInbox({
-      ...inbox,
-      state: {
-        ...inbox.state,
-        contactId: item.id,
-      },
-    });
-    api('/v1/open', { token, method: 'POST', body: { contactId: item.id } })
+    api('/v1/open', { token, method: 'POST', body: { contactId: id } })
       .then((next) => {
         if (openContactSync.current !== requestId) return;
         onInbox(next);
@@ -855,7 +902,7 @@ function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDelete
           scrollEventThrottle={16}
         >
           {contacts.map((item) => {
-            const selected = item.id === contact?.id;
+            const selected = normalizeCode(item.id) === activeContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
             const ring = panel !== 'add' && selected;
             const dim = ring ? styles.circleOn : styles.circleDim;

@@ -120,7 +120,17 @@ function dayNumber(parts) {
 }
 
 export function threadMessages(messages, contactId) {
-  return messages.filter((item) => item.contactId === contactId && item.visible);
+  const id = String(contactId ?? '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+  if (!id) return [];
+  return messages.filter(
+    (item) =>
+      item.visible &&
+      String(item.contactId ?? '')
+        .replace(/\s+/g, '')
+        .toUpperCase() === id
+  );
 }
 
 export function photoFromPickerAsset(asset) {

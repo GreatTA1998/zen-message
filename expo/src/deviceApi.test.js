@@ -458,3 +458,50 @@ test('opening a contact accepts a normalized id and delivering uses the same id'
     true
   );
 });
+
+test('opening switches between contacts even when a poll still has the previous id', async () => {
+  const storage = sharedStore();
+  const left = createDeviceApi(storage, (length) => new Uint8Array(length).fill(6));
+  const mid = createDeviceApi(storage, (length) => new Uint8Array(length).fill(7));
+  const right = createDeviceApi(storage, (length) => new Uint8Array(length).fill(8));
+  const elton = await left('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-elton-s36' },
+  });
+  const zjf = await mid('/v1/session', {
+    method: 'POST',
+    body: { provider: 'google', subject: 'google-zjf-ghv' },
+  });
+  const self = await right('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-self-viewer' },
+  });
+  await right('/v1/contacts', { token: self.token, method: 'POST', body: { code: elton.user.id } });
+  await left('/v1/friend-request/accept', {
+    token: elton.token,
+    method: 'POST',
+    body: { contactId: self.user.id },
+  });
+  await right('/v1/contacts', { token: self.token, method: 'POST', body: { code: zjf.user.id } });
+  await mid('/v1/friend-request/accept', {
+    token: zjf.token,
+    method: 'POST',
+    body: { contactId: self.user.id },
+  });
+  const onElton = await right('/v1/open', {
+    token: self.token,
+    method: 'POST',
+    body: { contactId: elton.user.id },
+  });
+  assert.equal(onElton.state.contactId, elton.user.id);
+  const onZjf = await right('/v1/open', {
+    token: self.token,
+    method: 'POST',
+    body: { contactId: zjf.user.id },
+  });
+  assert.equal(onZjf.state.contactId, zjf.user.id);
+  assert.equal(
+    onZjf.contacts.some((item) => item.id === zjf.user.id && item.status === 'active'),
+    true
+  );
+});

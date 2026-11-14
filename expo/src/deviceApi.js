@@ -400,9 +400,17 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
 
     if (method === 'POST' && url.pathname === '/v1/open') {
       const id = normalizeCode(body?.contactId);
-      if (isCode(id) && user.contacts.some((item) => item.id === id)) {
-        if (user.contactId !== id) {
-          user.contactId = id;
+      const match = isCode(id)
+        ? user.contacts.find((item) => normalizeCode(item.id) === id)
+        : null;
+      if (match) {
+        const canonical = normalizeCode(match.id);
+        if (normalizeCode(user.contactId) !== canonical) {
+          user.contactId = canonical;
+          match.id = canonical;
+          await commit(store, state);
+        } else if (match.id !== canonical) {
+          match.id = canonical;
           await commit(store, state);
         }
       }
