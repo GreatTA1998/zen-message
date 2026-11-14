@@ -238,6 +238,9 @@ function Root() {
       const payload = typeof next === 'function' ? next(current) : next;
       return mergeInboxPreservingSelection(payload, selectedContactRef.current);
     });
+    // A concrete inbox already includes the account. Set it in this turn — the
+    // updater cannot, and waiting for the effect paints chat before onboarding.
+    if (typeof next !== 'function' && next?.user) setUser(next.user);
   }, []);
 
   useEffect(() => {
@@ -413,15 +416,17 @@ function Root() {
     await refresh();
   }
 
+  const account = user ?? inbox?.user;
+
   if (!ready) return <View style={styles.boot} />;
 
   let body = null;
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
-  } else if (user && user.onboarded === false) {
+  } else if (account && account.onboarded === false) {
     body = (
       <OnboardingView
-        userId={user.id}
+        userId={account.id}
         onSaveNickname={saveNickname}
         onContinue={refresh}
       />
