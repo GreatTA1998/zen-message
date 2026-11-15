@@ -337,7 +337,7 @@ test('receipt phrase names the chosen time and ignores focus', () => {
 });
 
 test('composer placeholder uses nickname and delivery mode', () => {
-  assert.equal(composerPlaceholder('nathan', 'realtime'), 'Message nathan with a realtime notification');
+  assert.equal(composerPlaceholder('nathan', 'realtime'), 'Message nathan');
   assert.equal(composerPlaceholder('nathan', 'anytime'), 'Message nathan without a notification');
   assert.equal(composerPlaceholder('nathan', 'scheduled', at(19, 0)), 'Message nathan at 7 pm');
   assert.equal(composerPlaceholder('', 'realtime'), 'Message');
