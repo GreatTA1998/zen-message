@@ -19,9 +19,13 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR } from './src/contacts';
 import {
+  cachedThread,
   mergeInboxPreservingSelection,
   mergeOpenInbox,
+  nextSelectionAfterRemoval,
   resolveSelectedContactId,
+  seedContactId,
+  updateThreadCache,
 } from './src/contactSelection';
 import {
   DAY_HOURS,
@@ -32,7 +36,6 @@ import {
   receiptPhrase,
   messageSticker,
   scheduledChoices,
-  threadMessages,
 } from './src/delivery';
 import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
@@ -482,8 +485,12 @@ function ChatScreen({
   const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
+  // Selection is local UI authority. Seed once from Root ref (survives remount) or
+  // cold-start hint — never re-seed from poll/open server contactId (that was snap-back).
   const [selectedContactId, setSelectedContactId] = useState(() => {
-    const initial = resolveSelectedContactId(inbox?.contacts, null, inbox?.state?.contactId);
+    const existing = normalizeCode(selectedContactRef.current);
+    if (existing) return existing;
+    const initial = seedContactId(inbox?.contacts, inbox?.state?.contactId);
     selectedContactRef.current = initial;
     return initial;
   });
@@ -491,27 +498,31 @@ function ChatScreen({
   const openContactSync = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
+  const threadCacheRef = useRef(new Map());
   const phoneRef = useRef(null);
   const { open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
+  // Local only — second/third args must never adopt server contactId into the ring.
   const activeContactId = resolveSelectedContactId(
     contacts,
     selectedContactId ?? selectedContactRef.current,
-    state?.contactId
+    null
   );
   const contact = contacts.find((item) => normalizeCode(item.id) === activeContactId) ?? null;
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
   const contactPendingOut = contact?.status === 'pending-out';
   const messages = useMemo(() => {
-    if (!contact || !state || !contactActive) return [];
-    const base = threadMessages(state.messages, contact.id);
+    if (!activeContactId || !contactActive) return [];
+    if (contact && contact.status && contact.status !== 'active') return [];
+    threadCacheRef.current = updateThreadCache(threadCacheRef.current, state?.messages);
+    const base = cachedThread(threadCacheRef.current, state?.messages, activeContactId);
     const pending = pendingOutbound.filter(
-      (item) => normalizeCode(item.contactId) === normalizeCode(contact.id)
+      (item) => normalizeCode(item.contactId) === normalizeCode(activeContactId)
     );
     return pending.length ? [...base, ...pending] : base;
-  }, [contact, state, contactActive, pendingOutbound]);
+  }, [activeContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
@@ -527,13 +538,8 @@ function ChatScreen({
     selectedContactRef.current = selectedContactId;
   }, [selectedContactId, selectedContactRef]);
 
-  useEffect(() => {
-    const next = resolveSelectedContactId(contacts, selectedContactRef.current, state?.contactId);
-    if (next !== selectedContactRef.current) {
-      selectedContactRef.current = next;
-      setSelectedContactId(next);
-    }
-  }, [contacts, state?.contactId, selectedContactRef]);
+  // Intentionally no Effect that syncs selection from contacts / state.contactId.
+  // That Effect was the snap-back to Elton after a slow /v1/open.
 
   useEffect(() => {
     loadStickerLibrary().then(setStickerLibrary).catch(() => {});
@@ -568,17 +574,19 @@ function ChatScreen({
     if (next.effects?.length) {
       await api('/v1/effects/ack', { token, method: 'POST', body: {} });
     }
+    return next;
   }
 
   function pickContact(item) {
     const id = normalizeCode(item.id);
     if (!id) return;
+    // Same-frame UI authority: ring + composer + thread filter. Never await network.
     selectedContactRef.current = id;
     setSelectedContactId(id);
     if (item.status === 'pending-in') setPanel('request');
     else setPanel('chat');
-    // Patch contactId onto the latest inbox — never spread a render-time snapshot
-    // (a concurrent poll/send setInbox could otherwise be overwritten).
+    // Align inbox blob with local selection so later merges do not reintroduce S36.
+    // Does not set React selection — selection already set above.
     onInbox((current) => {
       if (!current?.state) return current;
       if (normalizeCode(current.state.contactId) === id) return current;
@@ -590,17 +598,23 @@ function ChatScreen({
         },
       };
     });
-    if (normalizeCode(state?.contactId) === id) return;
     const requestId = openContactSync.current + 1;
     openContactSync.current = requestId;
-    // Fire-and-forget server sync. Do not replace the whole message list with a
-    // freshly parsed inbox (inline photo data URIs would remount and re-decode).
+    // Background persistence only. Callback must not call setSelectedContactId.
     api('/v1/open', { token, method: 'POST', body: { contactId: id } })
       .then((next) => {
         if (openContactSync.current !== requestId) return;
+        // Always merge against the live ref (last tap), never against this request's id
+        // alone — a newer tap wins. mergeOpenInbox ignores next.state.contactId for selection.
         onInbox((current) => mergeOpenInbox(current, next, selectedContactRef.current));
       })
       .catch(() => {});
+  }
+
+  function adoptSelection(nextId) {
+    const id = normalizeCode(nextId);
+    selectedContactRef.current = id;
+    setSelectedContactId(id);
   }
 
   function flashNotice(text) {
@@ -622,6 +636,9 @@ function ChatScreen({
       try {
         const next = await api('/v1/block', { token, method: 'POST', body: { contactId: targetId } });
         onInbox(next);
+        // Explicit user action: only then may selection move off a removed contact.
+        const nextId = nextSelectionAfterRemoval(next?.contacts, selectedContactRef.current, targetId);
+        adoptSelection(nextId);
         setPanel('chat');
         flashNotice('Contact blocked.');
       } catch {
@@ -795,7 +812,7 @@ function ChatScreen({
     onChangeDraft,
     onInputSize,
     inputHeight,
-    contactId: contact?.id,
+    contactId: activeContactId || contact?.id,
     canSend,
     onSend: () => send(),
     onAttach: () => attach('library'),
@@ -1010,7 +1027,11 @@ function ChatScreen({
             onDecline={async () => {
               setRequestBusy(true);
               try {
-                await mutate('/v1/friend-request/decline', { contactId: contact.id });
+                const declinedId = contact.id;
+                const next = await mutate('/v1/friend-request/decline', { contactId: declinedId });
+                adoptSelection(
+                  nextSelectionAfterRemoval(next?.contacts, selectedContactRef.current, declinedId)
+                );
                 setPanel('chat');
               } finally {
                 setRequestBusy(false);
