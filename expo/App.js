@@ -61,7 +61,7 @@ function summaryAt(hour, minute = 0) {
 }
 
 function scheduleLabel(mode, state) {
-  if (mode === 'relaxed') return 'notified by any message';
+  if (mode === 'relaxed') return 'open to all messages';
   const clock = dailyClock(state);
   return `receiving summary at ${summaryAt(clock.hour, clock.minute)}`;
 }
