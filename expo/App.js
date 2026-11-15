@@ -53,6 +53,7 @@ const moon = '#5E5CE6';
 const web = Platform.OS === 'web';
 const side = 32;
 const photoMaxWidth = web ? 320 : 280;
+const EMPTY_CONTACTS = [];
 
 function useKeyboardInset() {
   const [keyboard, setKeyboard] = useState(0);
@@ -237,6 +238,7 @@ function Root() {
     await saveSession(null);
     await savePickedContact(null);
     await saveDraft('');
+    await saveOpenedAt({});
     tokenRef.current = null;
     setToken(null);
     setUser(null);
@@ -374,7 +376,8 @@ function ChatScreen({
   }, [keyboardInset, hideChrome]);
 
   const state = inbox?.state;
-  const contacts = inbox?.contacts ?? [];
+  const contactList = inbox?.contacts;
+  const contacts = contactList ?? EMPTY_CONTACTS;
   const selectedContactId =
     normalizeCode(pickedId) || normalizeCode(contacts[0]?.id) || null;
   const openedLoaded = openedAt != null;
@@ -384,18 +387,18 @@ function ChatScreen({
   }, [selectedContactId]);
 
   useEffect(() => {
-    if (!openedLoaded) return;
+    if (!openedLoaded || !contactList) return;
     setOpenedAt((current) => {
       const next = syncOpenedAt(
         current || {},
-        contacts,
+        contactList,
         state?.messages,
         panel === 'chat' ? selectedContactId : null
       );
       if (next !== current) saveOpenedAt(next).catch(() => {});
       return next;
     });
-  }, [openedLoaded, contacts, state?.messages, selectedContactId, panel]);
+  }, [openedLoaded, contactList, state?.messages, selectedContactId, panel]);
 
   const contact = contacts.find((item) => normalizeCode(item.id) === selectedContactId) ?? null;
   const contactActive = contact?.status === 'active' || !contact?.status;
@@ -745,6 +748,7 @@ function ChatScreen({
               openedAt &&
               !pending &&
               !selected &&
+              id in openedAt &&
               contactUnread(state?.messages, id, openedAt[id])
                 ? styles.avatarHalo
                 : null;
