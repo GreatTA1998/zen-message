@@ -110,6 +110,12 @@ function NativeDrawSurface({ width, height, strokes, onStrokeEnd }) {
   const strokesRef = useRef(strokes);
   strokesRef.current = strokes;
 
+  useEffect(() => {
+    if (strokes.length) return;
+    active.current = null;
+    setLive('');
+  }, [strokes]);
+
   const finish = () => {
     if (active.current?.length > 1) onStrokeEnd([...strokesRef.current, active.current.slice()]);
     active.current = null;
@@ -211,13 +217,7 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
         {Platform.OS === 'web' ? (
           <WebDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
         ) : (
-          <NativeDrawSurface
-            key={strokes.length ? 'ink' : 'empty'}
-            width={size.width}
-            height={size.height}
-            strokes={strokes}
-            onStrokeEnd={setStrokes}
-          />
+          <NativeDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
         )}
       </View>
     ) : null;
