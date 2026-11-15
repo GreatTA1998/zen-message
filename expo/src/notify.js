@@ -93,11 +93,18 @@ export function listenForDigest(onDigest) {
 }
 
 export async function runNotificationEffects(effects) {
-  let armedDigest = false;
+  let armedDigest = null;
   for (const effect of effects || []) {
     if (effect.type === 'present') await presentNow(effect.plan);
-    else if (effect.type === 'schedule-digest') armedDigest = (await digestNotice(effect.at, effect.plan)) || armedDigest;
-    else if (effect.type === 'cancel-digest') await digestNotice();
+    else if (effect.type === 'schedule-digest') {
+      const armed = await digestNotice(effect.at, effect.plan);
+      armedDigest = armed
+        ? { at: effect.at, messageIds: effect.plan?.data?.messageIds || [] }
+        : null;
+    } else if (effect.type === 'cancel-digest') {
+      await digestNotice();
+      armedDigest = null;
+    }
   }
   return armedDigest;
 }

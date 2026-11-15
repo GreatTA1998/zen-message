@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  ackDigest,
   choiceLabel,
   composerPlaceholder,
   createState,
@@ -231,6 +232,117 @@ test('a shown digest does not present a second time', () => {
   const shown = reduce(held.state, { type: 'shown' });
   assert.equal(shown.state.messages[0].visible, true);
   assert.equal(shown.effects.length, 0);
+});
+
+test('showing a digest arms the later batch', () => {
+  const noon = at(12, 0).getTime();
+  const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
+  const scheduled = reduce(held.state, {
+    type: 'send',
+    id: 'c',
+    contactId: 'wren',
+    contactName: 'Wren',
+    body: 'Today',
+    intent: 'scheduled',
+    releaseAt: noon,
+    now: at(10, 20).getTime(),
+  });
+  const shown = reduce(scheduled.state, { type: 'shown', now: noon });
+  assert.equal(shown.state.messages.find((item) => item.id === 'c').visible, true);
+  assert.equal(shown.state.messages.find((item) => item.id === 'a').visible, false);
+  assert.equal(shown.state.digest.presented, false);
+  assert.equal(shown.state.digest.platformScheduled, false);
+  assert.equal(shown.state.digest.at, at(19, 0).getTime());
+  assert.equal(shown.effects.length, 1);
+  assert.equal(shown.effects[0].type, 'schedule-digest');
+  assert.equal(shown.effects[0].at, at(19, 0).getTime());
+  assert.deepEqual(shown.effects[0].plan.data.messageIds, ['a']);
+});
+
+test('an armed digest stays armed when a later message does not change it', () => {
+  const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
+  const armed = {
+    ...held.state,
+    digest: { ...held.state.digest, platformScheduled: true },
+  };
+  const later = reduce(armed, {
+    type: 'send',
+    id: 'c',
+    contactId: 'pip',
+    contactName: 'Pip',
+    body: 'Tonight',
+    intent: 'scheduled',
+    releaseAt: at(20, 0).getTime(),
+    now: at(10, 20).getTime(),
+  });
+  assert.equal(later.state.digest.at, at(19, 0).getTime());
+  assert.deepEqual(later.state.digest.messageIds, ['a']);
+  assert.equal(later.state.digest.platformScheduled, true);
+  assert.deepEqual(later.effects, []);
+  assert.equal(later.state.messages.find((item) => item.id === 'c').releaseAt, at(20, 0).getTime());
+});
+
+test('another message in an armed digest keeps the alarm and refreshes the copy', () => {
+  const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
+  const armed = {
+    ...held.state,
+    digest: { ...held.state.digest, platformScheduled: true },
+  };
+  const second = send(
+    armed,
+    { id: 'b', contactId: 'pip', contactName: 'Pip', body: 'Later', intent: 'anytime' },
+    at(11, 0)
+  );
+  assert.equal(second.state.digest.at, held.state.digest.at);
+  assert.equal(second.state.digest.platformScheduled, true);
+  assert.deepEqual(second.state.digest.messageIds, ['a', 'b']);
+  assert.equal(second.effects.length, 1);
+  assert.equal(second.effects[0].type, 'schedule-digest');
+  assert.deepEqual(second.effects[0].plan.data.messageIds, ['a', 'b']);
+});
+
+test('a sooner message clears an armed digest so the device reschedules', () => {
+  const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
+  const armed = {
+    ...held.state,
+    digest: { ...held.state.digest, platformScheduled: true },
+  };
+  const noon = at(12, 0).getTime();
+  const sooner = reduce(armed, {
+    type: 'send',
+    id: 'c',
+    contactId: 'wren',
+    contactName: 'Wren',
+    body: 'Today',
+    intent: 'scheduled',
+    releaseAt: noon,
+    now: at(10, 20).getTime(),
+  });
+  assert.equal(sooner.state.digest.at, noon);
+  assert.equal(sooner.state.digest.platformScheduled, false);
+  assert.deepEqual(sooner.state.digest.messageIds, ['c']);
+  assert.equal(sooner.effects.length, 1);
+  assert.equal(sooner.effects[0].type, 'schedule-digest');
+  assert.equal(sooner.effects[0].at, noon);
+});
+
+test('ack marks only the digest slot that was armed', () => {
+  const digest = { at: 5, messageIds: ['a', 'b'], presented: false, platformScheduled: false };
+  const stale = ackDigest(digest, { at: 5, messageIds: ['a'] });
+  assert.equal(stale.digest.platformScheduled, false);
+  assert.equal(stale.clearEffects, false);
+  const otherTime = ackDigest(digest, { at: 9, messageIds: ['a', 'b'] });
+  assert.equal(otherTime.digest, digest);
+  assert.equal(otherTime.clearEffects, false);
+  const unscoped = ackDigest(digest, true);
+  assert.equal(unscoped.digest, digest);
+  assert.equal(unscoped.clearEffects, true);
+  const armed = ackDigest(digest, { at: 5, messageIds: ['a', 'b'] });
+  assert.equal(armed.digest.platformScheduled, true);
+  assert.equal(armed.clearEffects, true);
+  assert.equal(ackDigest(armed.digest, { at: 5, messageIds: ['a', 'b'] }).digest, armed.digest);
+  const presented = { ...digest, presented: true };
+  assert.equal(ackDigest(presented, { at: 5, messageIds: ['a', 'b'] }).digest, presented);
 });
 
 test('digest copy stays a single notice for many contacts', () => {

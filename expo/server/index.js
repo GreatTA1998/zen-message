@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { createState, reduce } from '../src/delivery.js';
+import { ackDigest, createState, reduce } from '../src/delivery.js';
 import { CODE_ALPHABET, CODE_LENGTH, hasConfusingCharacter, isCode, normalizeCode } from '../src/people.js';
 import { changeMode, changeSchedule, deliverMessage, releaseDue } from './deliver.js';
 import { pushesFor, sendExpoPushes } from './push.js';
@@ -267,10 +267,9 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/effects/ack') {
-      if (body.armedDigest && user.digest && !user.digest.presented) {
-        user.digest = { ...user.digest, platformScheduled: true };
-      }
-      user.pendingEffects = [];
+      const ack = ackDigest(user.digest, body.armedDigest);
+      user.digest = ack.digest;
+      if (ack.clearEffects) user.pendingEffects = [];
       save(user);
       send(response, 200, { ok: true });
       return;

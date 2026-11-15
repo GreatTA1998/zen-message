@@ -385,6 +385,14 @@ function chosenRelease(releaseAt, now, offsetMinutes) {
   return scheduledChoices(new Date(now), offsetMinutes)[0].getTime();
 }
 
+function sameIds(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
 function holdDigest(state) {
   const held = heldMessages(state.messages).filter((item) => typeof item.releaseAt === 'number');
   if (!held.length) {
@@ -393,6 +401,10 @@ function holdDigest(state) {
   const at = Math.min(...held.map((item) => item.releaseAt));
   const due = held.filter((item) => item.releaseAt === at);
   const plan = digestPlan(due);
+  const previous = state.digest;
+  const sameTime = previous && !previous.presented && previous.at === at;
+  const sameSlot = sameTime && sameIds(previous.messageIds, plan.data.messageIds);
+  const platformScheduled = Boolean(sameTime && previous.platformScheduled);
   return {
     state: {
       ...state,
@@ -400,10 +412,12 @@ function holdDigest(state) {
         at,
         messageIds: plan.data.messageIds,
         presented: false,
-        platformScheduled: false,
+        platformScheduled,
       },
     },
-    effects: [{ type: 'schedule-digest', at, plan }],
+    // The OS notification still fires at this time. Skip a no-op reschedule
+    // so it is not cancelled; a new copy still needs schedule-digest.
+    effects: sameSlot && platformScheduled ? [] : [{ type: 'schedule-digest', at, plan }],
   };
 }
 
@@ -416,19 +430,35 @@ function release(state, now) {
 
 function shown(state) {
   if (!state.digest || state.digest.presented) return { state, effects: [] };
-  return finishDigest(state, []);
+  return finishDigest(state, [], { scheduleNext: true });
 }
 
-function finishDigest(state, effects) {
+function finishDigest(state, effects, options = {}) {
   const ids = new Set(state.digest.messageIds);
   const held = state.messages.filter((item) => ids.has(item.id));
   const plan = held.length ? digestPlan(held) : null;
   const messages = revealIds(state.messages, ids);
   const rolled = holdDigest({ ...state, messages, digest: null });
   const digest = rolled.state.digest ?? { ...state.digest, presented: true, messageIds: [...ids] };
+  const current = effects ?? (plan ? [{ type: 'present', plan }] : [{ type: 'cancel-digest' }]);
   return {
     state: { ...rolled.state, digest },
-    effects: effects ?? (plan ? [{ type: 'present', plan }] : [{ type: 'cancel-digest' }]),
+    effects: options.scheduleNext ? current.concat(rolled.effects) : current,
+  };
+}
+
+export function ackDigest(digest, armed) {
+  const scoped = Boolean(armed && typeof armed === 'object');
+  const matched = Boolean(
+    scoped &&
+      digest &&
+      !digest.presented &&
+      digest.at === armed.at &&
+      sameIds(digest.messageIds, armed.messageIds)
+  );
+  return {
+    digest: matched && digest.platformScheduled !== true ? { ...digest, platformScheduled: true } : digest,
+    clearEffects: !scoped || matched,
   };
 }
 

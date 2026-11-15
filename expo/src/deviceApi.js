@@ -1,4 +1,4 @@
-import { createState, reduce } from './delivery.js';
+import { ackDigest, createState, reduce } from './delivery.js';
 import { accountCode, firstName, hasConfusingCharacter, isCode, normalizeCode } from './people.js';
 import { changeMode, changeSchedule, deliverMessage, releaseDue } from '../server/deliver.js';
 
@@ -487,10 +487,9 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     }
 
     if (method === 'POST' && url.pathname === '/v1/effects/ack') {
-      if (body?.armedDigest && user.digest && !user.digest.presented) {
-        user.digest = { ...user.digest, platformScheduled: true };
-      }
-      user.pendingEffects = [];
+      const ack = ackDigest(user.digest, body?.armedDigest);
+      user.digest = ack.digest;
+      if (ack.clearEffects) user.pendingEffects = [];
       await commit(store, state);
       return { ok: true };
     }
