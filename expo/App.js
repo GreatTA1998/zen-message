@@ -59,12 +59,6 @@ function summaryAt(hour, minute = 0) {
   return `${shown}:${String(minute).padStart(2, '0')}${suffix}`;
 }
 
-function scheduleLabel(mode, state) {
-  if (mode === 'relaxed') return 'notified by any message';
-  const clock = dailyClock(state);
-  return `receiving summary at ${summaryAt(clock.hour, clock.minute)}`;
-}
-
 function useKeyboardInset() {
   const [keyboard, setKeyboard] = useState(0);
   const { bottom: safeBottom } = useSafeAreaInsets();
@@ -97,8 +91,7 @@ function useKeyboardInset() {
       hide.remove();
     };
   }, []);
-  if (Platform.OS === 'web' || keyboard === 0) return keyboard;
-  return Math.max(0, keyboard - safeBottom);
+  return Platform.OS === 'web' || !keyboard ? keyboard : Math.max(0, keyboard - safeBottom);
 }
 
 const MISSING = {
@@ -362,6 +355,7 @@ function ChatScreen({
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
+  const hideChrome = Platform.OS !== 'web' && keyboardInset > 0 && panel === 'chat';
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -370,10 +364,26 @@ function ChatScreen({
     });
     loadDraft().then(setDraft);
   }, []);
+
+  useEffect(() => {
+    if (hideChrome) {
+      setScheduleOpen(false);
+      setAccountOpen(false);
+      setContactMenuId(null);
+    }
+    if (Platform.OS === 'web' || !keyboardInset) return undefined;
+    const t = setTimeout(() => threadRef.current?.scrollToEnd({ animated: false }), 16);
+    return () => clearTimeout(t);
+  }, [keyboardInset, hideChrome]);
+
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
   const selectedContactId =
     normalizeCode(pickedId) || normalizeCode(contacts[0]?.id) || null;
+
+  useEffect(() => {
+    threadRef.current?.scrollToEnd({ animated: false });
+  }, [selectedContactId]);
   const contact = contacts.find((item) => normalizeCode(item.id) === selectedContactId) ?? null;
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
@@ -388,7 +398,6 @@ function ChatScreen({
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
-  const label = scheduleLabel(mode, state);
   const summaryTime = mode !== 'relaxed' ? summaryAt(dailyClock(state).hour, dailyClock(state).minute) : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
@@ -407,10 +416,6 @@ function ChatScreen({
       if (focusRequest.current === request) setPendingMode(null);
     });
   }
-
-  useEffect(() => {
-    threadRef.current?.scrollToEnd({ animated: false });
-  }, [messages.length, selectedContactId]);
 
   async function mutate(path, body) {
     const next = await api(path, { token, method: 'POST', body });
@@ -624,7 +629,7 @@ function ChatScreen({
             style={styles.backdrop}
           />
         ) : null}
-        <View testID="schedule-panel" style={styles.top}>
+        <View testID="schedule-panel" style={[styles.top, hideChrome && styles.chromeGone]}>
           <View testID="top-bar" style={[styles.header, web && styles.webPad]}>
             <View style={styles.headerMain}>
               <Pressable
@@ -642,7 +647,7 @@ function ChatScreen({
               <View style={styles.scheduleWrap}>
                 {mode === 'relaxed' ? (
                   <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
-                    {label}
+                    notified by any message
                   </Text>
                 ) : (
                   <View style={styles.schedulePhrase}>
@@ -715,8 +720,7 @@ function ChatScreen({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.contacts, web && styles.webPad]}
           testID="contact-strip"
-          style={styles.contactStrip}
-          scrollEventThrottle={16}
+          style={[styles.contactStrip, hideChrome && styles.chromeGone]}
         >
           {contacts.map((item) => {
             const selected = normalizeCode(item.id) === selectedContactId;
@@ -772,7 +776,7 @@ function ChatScreen({
             </Text>
           </Pressable>
         </ScrollView>
-        {contactMenuId ? (
+        {contactMenuId && !hideChrome ? (
           <View testID="contact-actions-popover" style={styles.contactMenuPopover}>
             <ContactActionsMenu
               contactId={contactMenuId}
@@ -931,7 +935,6 @@ function userId(inbox) {
 
 function ComposerFooter({
   testID,
-  autoFocus = false,
   intent,
   onIntent,
   choiceAt,
@@ -953,13 +956,8 @@ function ComposerFooter({
   onSend,
   onAttach,
 }) {
-  const inputRef = useRef(null);
   const [timesOpen, setTimesOpen] = useState(false);
-  const showIds = testID === 'composer';
   const drawEnabled = Platform.OS === 'web' || Platform.OS === 'ios';
-  useEffect(() => {
-    if (autoFocus) inputRef.current?.focus();
-  }, [autoFocus]);
 
   function chooseIntent(id) {
     onIntent(id);
@@ -971,7 +969,7 @@ function ComposerFooter({
     return (
       <Pressable
         key={at.getTime()}
-        testID={showIds ? `choice-${index}` : undefined}
+        testID={`choice-${index}`}
         accessibilityRole="button"
         accessibilityState={{ selected: on }}
         onPress={() => { onChoice(at.getTime()); setTimesOpen(false); }}
@@ -988,7 +986,7 @@ function ComposerFooter({
     <View style={styles.footer}>
       <View style={styles.composerWrap}>
         {timesOpen ? (
-          <View testID={showIds ? 'scheduled-choices' : undefined} style={[styles.choicePopover, web && styles.webChoices]}>
+          <View testID="scheduled-choices" style={[styles.choicePopover, web && styles.webChoices]}>
             <View style={styles.choiceColumns}>
               {[['Today', columns.today, 0], ['Tomorrow', columns.tomorrow, columns.today.length]].map(([title, slots, offset], col) => (
                 <View key={title} style={[{ flex: 1 }, col > 0 && styles.choiceColRight]}>
@@ -999,12 +997,12 @@ function ComposerFooter({
             </View>
           </View>
         ) : null}
-        <View testID={showIds ? 'composer-bar' : undefined} style={[styles.composer, web && styles.webComposer]}>
+        <View testID="composer-bar" style={[styles.composer, web && styles.webComposer]}>
           {photo ? (
             <View style={styles.previewWrap}>
-              <Image testID={showIds ? 'photo-preview' : undefined} source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
+              <Image testID="photo-preview" source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
               <Pressable
-                testID={showIds ? 'photo-clear' : undefined}
+                testID="photo-clear"
                 accessibilityRole="button"
                 accessibilityLabel="Remove photo"
                 onPress={onClearPhoto}
@@ -1017,13 +1015,13 @@ function ComposerFooter({
           {!photo && sticker ? (
             <View style={styles.previewWrap}>
               <Image
-                testID={showIds ? 'draw-preview' : undefined}
+                testID="draw-preview"
                 source={{ uri: sticker }}
                 resizeMode="contain"
                 style={styles.stickerPreview}
               />
               <Pressable
-                testID={showIds ? 'draw-clear' : undefined}
+                testID="draw-clear"
                 accessibilityRole="button"
                 accessibilityLabel="Remove drawing"
                 onPress={onClearSticker}
@@ -1034,10 +1032,8 @@ function ComposerFooter({
             </View>
           ) : null}
           <TextInput
-            ref={inputRef}
             testID={testID}
             value={draft}
-            autoFocus={autoFocus}
             onChangeText={onChangeDraft}
             onContentSizeChange={onInputSize}
             placeholder={composerPlaceholder(contactName, intent, selectedAt)}
@@ -1049,7 +1045,7 @@ function ComposerFooter({
           <View style={styles.boxTools}>
             {drawEnabled ? (
               <Pressable
-                testID={showIds ? 'attach-draw' : undefined}
+                testID="attach-draw"
                 accessibilityRole="button"
                 accessibilityLabel="Draw"
                 onPress={onDraw}
@@ -1059,7 +1055,7 @@ function ComposerFooter({
               </Pressable>
             ) : null}
             <Pressable
-              testID={showIds ? 'attach-photo' : undefined}
+              testID="attach-photo"
               accessibilityRole="button"
               accessibilityLabel="Photo"
               onPress={onAttach}
@@ -1073,7 +1069,7 @@ function ComposerFooter({
                 return (
                   <Pressable
                     key={item.id}
-                    testID={showIds ? `intent-${item.id}` : undefined}
+                    testID={`intent-${item.id}`}
                     accessibilityRole="button"
                     accessibilityState={{ selected, expanded: item.id === 'scheduled' ? timesOpen : undefined }}
                     onPress={() => chooseIntent(item.id)}
@@ -1087,7 +1083,7 @@ function ComposerFooter({
               })}
             </View>
             <Pressable
-              testID={showIds ? 'send' : undefined}
+              testID="send"
               accessibilityRole="button"
               accessibilityLabel="Send"
               disabled={!canSend}
@@ -1287,6 +1283,7 @@ const styles = StyleSheet.create({
   webComposer: { marginHorizontal: side },
   webChoices: { left: side, right: side, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' },
   top: { zIndex: 4, backgroundColor: paper },
+  chromeGone: { display: 'none' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
