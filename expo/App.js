@@ -993,7 +993,7 @@ function ComposerFooter({
               {[['Today', columns.today, 0], ['Tomorrow', columns.tomorrow, columns.today.length]].map(([title, slots, offset], col) => (
                 <View key={title} style={[styles.choiceCol, col > 0 && styles.choiceColRight]}>
                   <Text style={[styles.choiceText, styles.choiceTextOn, styles.choiceRow, styles.choiceRowFirst]}>{title}</Text>
-                  <ScrollView keyboardShouldPersistTaps="handled">{slots.map((at, i) => choiceCell(at, offset + i))}</ScrollView>
+                  <ScrollView style={styles.choiceList} keyboardShouldPersistTaps="handled">{slots.map((at, i) => choiceCell(at, offset + i))}</ScrollView>
                 </View>
               ))}
             </View>
@@ -1494,7 +1494,8 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   choiceColumns: { flexDirection: 'row' },
-  choiceCol: { flex: 1, maxHeight: 260 },
+  choiceCol: { flex: 1 },
+  choiceList: { maxHeight: 220 },
   choiceColRight: { borderLeftWidth: 1, borderLeftColor: ink },
   choiceRow: { paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: ink },
   choiceRowFirst: { borderTopWidth: 0 },
