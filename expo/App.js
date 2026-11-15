@@ -707,17 +707,15 @@ function ChatScreen({
               accessibilityRole="button"
               accessibilityLabel="Account settings"
               accessibilityState={{ expanded: accountOpen }}
-              hitSlop={6}
               onPress={() => {
                 setScheduleOpen(false);
                 setAccountOpen((current) => !current);
               }}
-              style={styles.accountGear}
             >
-              <Feather name="settings" size={22} color={ink} />
+              <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatar} />
             </Pressable>
             {accountOpen ? (
-              <View testID="account-popover" style={styles.accountPopover}>
+              <View testID="account-popover" style={styles.popover}>
                 <AccountMenu
                   userId={accountId}
                   onLogout={async () => {
@@ -1428,18 +1426,6 @@ const styles = StyleSheet.create({
   scheduleLine: { color: ink, fontSize: 16, lineHeight: 20 },
   schedulePrefix: { flexShrink: 1 },
   scheduleTime: { flexShrink: 0, textDecorationLine: 'underline' },
-  accountGear: { padding: 2, flexShrink: 0 },
-  accountPopover: {
-    position: 'absolute',
-    top: '100%',
-    right: 0,
-    marginTop: 8,
-    width: 168,
-    backgroundColor: paper,
-    borderWidth: 1,
-    borderColor: ink,
-    zIndex: 6,
-  },
   contactMenuPopover: {
     position: 'absolute',
     top: 124,
