@@ -12,6 +12,8 @@ import {
   sanitize,
   scheduledChoices,
   scheduledColumns,
+  contactUnread,
+  syncOpenedAt,
   threadMessages,
 } from './delivery.js';
 
@@ -363,4 +365,11 @@ test('thread lists Focus-held GHV rows; pick is independent of poll contactId', 
   ];
   const selected = 'GHV';
   assert.deepEqual(threadMessages(messages, selected).map((item) => item.id), ['2']);
+});
+
+test('unread glow uses opened-at vs latest inbound', () => {
+  const messages = [{ id: '1', contactId: 'GHV', direction: 'in', createdAt: 100 }];
+  assert.equal(contactUnread(messages, 'GHV', 50), true);
+  assert.equal(contactUnread(messages, 'GHV', 100), false);
+  assert.equal(syncOpenedAt({}, [{ id: 'ghv' }], messages, null).GHV, 100);
 });

@@ -18,7 +18,6 @@ export function clampCrop(crop, canvasWidth, canvasHeight) {
   };
 }
 
-/** Move or resize a crop rect. mode: move | n|s|e|w|ne|nw|se|sw */
 export function applyCropDrag(crop, mode, dx, dy, canvasWidth, canvasHeight, minSize = MIN_CROP) {
   if (!crop) return null;
   let { x, y, width, height } = crop;
@@ -42,7 +41,7 @@ function strokePath(ctx, stroke) {
   ctx.stroke();
 }
 
-export function paintStrokes(ctx, strokes, width, height, activeStroke = null, origin = null) {
+export function paintStrokes(ctx, strokes, width, height, origin = null) {
   ctx.clearRect(0, 0, width, height);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -53,6 +52,5 @@ export function paintStrokes(ctx, strokes, width, height, activeStroke = null, o
     ctx.translate(-origin.x, -origin.y);
   }
   for (const stroke of strokes) strokePath(ctx, stroke);
-  if (activeStroke) strokePath(ctx, activeStroke);
   if (origin) ctx.restore();
 }

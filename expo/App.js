@@ -26,8 +26,10 @@ import {
   dailyClock,
   dayPhrase,
   nextDaily,
+  contactUnread,
   messageSticker,
   scheduledColumns,
+  syncOpenedAt,
   threadMessages,
 } from './src/delivery';
 import { FriendRequestView } from './src/FriendRequestView';
@@ -38,7 +40,7 @@ import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
-import { loadDraft, loadPickedContact, loadSession, saveDraft, savePickedContact, saveSession } from './src/session';
+import { loadDraft, loadOpenedAt, loadPickedContact, loadSession, saveDraft, saveOpenedAt, savePickedContact, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
@@ -51,13 +53,6 @@ const moon = '#5E5CE6';
 const web = Platform.OS === 'web';
 const side = 32;
 const photoMaxWidth = web ? 320 : 280;
-
-function summaryAt(hour, minute = 0) {
-  const suffix = hour >= 12 ? 'pm' : 'am';
-  const shown = hour % 12 || 12;
-  if (!minute) return `${shown}${suffix}`;
-  return `${shown}:${String(minute).padStart(2, '0')}${suffix}`;
-}
 
 function useKeyboardInset() {
   const [keyboard, setKeyboard] = useState(0);
@@ -351,6 +346,7 @@ function ChatScreen({
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
   const [pickedId, setPickedId] = useState(null);
+  const [openedAt, setOpenedAt] = useState(null);
   const focusRequest = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
@@ -363,6 +359,7 @@ function ChatScreen({
       if (id) setPickedId(id);
     });
     loadDraft().then(setDraft);
+    loadOpenedAt().then(setOpenedAt);
   }, []);
 
   useEffect(() => {
@@ -380,10 +377,26 @@ function ChatScreen({
   const contacts = inbox?.contacts ?? [];
   const selectedContactId =
     normalizeCode(pickedId) || normalizeCode(contacts[0]?.id) || null;
+  const openedLoaded = openedAt != null;
 
   useEffect(() => {
     threadRef.current?.scrollToEnd({ animated: false });
   }, [selectedContactId]);
+
+  useEffect(() => {
+    if (!openedLoaded) return;
+    setOpenedAt((current) => {
+      const next = syncOpenedAt(
+        current || {},
+        contacts,
+        state?.messages,
+        panel === 'chat' ? selectedContactId : null
+      );
+      if (next !== current) saveOpenedAt(next).catch(() => {});
+      return next;
+    });
+  }, [openedLoaded, contacts, state?.messages, selectedContactId, panel]);
+
   const contact = contacts.find((item) => normalizeCode(item.id) === selectedContactId) ?? null;
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
@@ -398,7 +411,8 @@ function ChatScreen({
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
-  const summaryTime = mode !== 'relaxed' ? summaryAt(dailyClock(state).hour, dailyClock(state).minute) : '';
+  const clock = dailyClock(state);
+  const summaryTime = mode !== 'relaxed' ? dayPhrase(clock.hour, clock.minute).replace(/ /g, '') : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
   const columns = scheduledColumns(now);
@@ -723,9 +737,17 @@ function ChatScreen({
           style={[styles.contactStrip, hideChrome && styles.chromeGone]}
         >
           {contacts.map((item) => {
-            const selected = normalizeCode(item.id) === selectedContactId;
+            const id = normalizeCode(item.id);
+            const selected = id === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
             const ring = panel !== 'add' && selected;
+            const glow =
+              openedAt &&
+              !pending &&
+              !selected &&
+              contactUnread(state?.messages, id, openedAt[id])
+                ? styles.avatarHalo
+                : null;
             return (
               <Pressable
                 key={item.id}
@@ -744,14 +766,14 @@ function ChatScreen({
                 style={styles.contact}
               >
                 {pending ? (
-                  <View style={[styles.avatarShell, styles.avatarDashed, ring && styles.circleOn]}>
+                  <View style={[styles.avatarShell, styles.avatarDashed, ring && styles.circleOn, glow]}>
                     <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatarFill} />
                   </View>
                 ) : (
                   <Image
                     source={PERSON_AVATAR}
                     resizeMode="cover"
-                    style={[styles.avatar, ring && styles.circleOn]}
+                    style={[styles.avatar, ring && styles.circleOn, glow]}
                   />
                 )}
                 <Text numberOfLines={1} style={styles.contactLabel}>
@@ -1384,6 +1406,13 @@ const styles = StyleSheet.create({
   },
   avatarDashed: { borderStyle: 'dashed' },
   avatarFill: { width: 46, height: 46, borderRadius: 23 },
+  avatarHalo: {
+    borderColor: 'rgba(72, 158, 118, 0.7)',
+    shadowColor: '#3f9a6e',
+    shadowOpacity: 0.5,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 0 },
+  },
   circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
