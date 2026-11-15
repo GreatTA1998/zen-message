@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { applyCropDrag, clampCrop, hasDrawnInk, inkBounds, paintStrokes, STROKE_WIDTH } from './stickerExport.js';
+import { applyCropDrag, clampCrop, hasDrawnInk, paintStrokes, STROKE_WIDTH } from './stickerExport.js';
 
 const ink = '#1c1c1c';
 const paper = '#fff';
@@ -22,8 +22,9 @@ function pointsToPath(points) {
   return d;
 }
 
-function seedCrop(strokes, size) {
-  return clampCrop(inkBounds(strokes), size.width, size.height);
+/** Full-canvas crop; user shrinks with handles — never seed from ink. */
+function fullCrop(size) {
+  return clampCrop({ x: 0, y: 0, width: size.width, height: size.height }, size.width, size.height);
 }
 
 function DrawSurface({ width, height, strokes, onStrokeEnd }) {
@@ -196,7 +197,7 @@ export function DrawModal({ visible, onCancel, onDone }) {
   const commitStrokes = useCallback(
     (next) => {
       setStrokes(next);
-      setCrop(seedCrop(next, size));
+      setCrop((prev) => prev ?? fullCrop(size));
     },
     [size],
   );
@@ -285,7 +286,10 @@ export function DrawModal({ visible, onCancel, onDone }) {
           const { width, height } = event.nativeEvent.layout;
           if (width > 0 && height > 0) {
             setSize({ width, height });
-            if (strokes.length) setCrop(seedCrop(strokes, { width, height }));
+            setCrop((prev) => {
+              if (prev) return clampCrop(prev, width, height);
+              return strokes.length ? fullCrop({ width, height }) : null;
+            });
           }
         }}
       >
