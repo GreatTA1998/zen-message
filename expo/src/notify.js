@@ -1,8 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
-const DIGEST_ID = 'zen-digest';
-
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const quiet = notification?.request?.content?.data?.quiet === true;
@@ -28,10 +26,6 @@ function contentFrom(plan) {
   };
 }
 
-function log(entry) {
-  console.info(`[zen-notify] ${JSON.stringify(entry)}`);
-}
-
 export async function prepareNotifications() {
   try {
     if (Platform.OS === 'android') {
@@ -51,64 +45,23 @@ export async function prepareNotifications() {
     if (current.status !== 'granted') {
       await Notifications.requestPermissionsAsync();
     }
-  } catch (error) {
-    log({ action: 'prepare', error: error?.message ?? String(error) });
+  } catch {
+    // Permissions or channels can fail on web / simulators.
   }
 }
 
 export async function presentNow(plan) {
   const channelId = plan.quiet ? 'zen-quiet' : 'zen-normal';
   const trigger = Platform.OS === 'android' ? { channelId } : null;
+  const id = plan.data?.messageIds?.[0];
   try {
-    const id = await Notifications.scheduleNotificationAsync({
+    await Notifications.scheduleNotificationAsync({
+      ...(id ? { identifier: String(id).slice(0, 64) } : {}),
       content: contentFrom(plan),
       trigger,
     });
-    log({ action: 'present', kind: plan.data.kind, quiet: plan.quiet, id });
-    return { ok: true, id };
-  } catch (error) {
-    log({ action: 'present', kind: plan.data.kind, quiet: plan.quiet, error: error?.message ?? String(error) });
-    return { ok: false };
-  }
-}
-
-export async function scheduleDigest(at, plan) {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(DIGEST_ID);
-  } catch {
-    // Replacing a digest that was never scheduled, or scheduling on web.
-  }
-  try {
-    const id = await Notifications.scheduleNotificationAsync({
-      identifier: DIGEST_ID,
-      content: contentFrom(plan),
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: new Date(at),
-        channelId: 'zen-normal',
-      },
-    });
-    log({ action: 'schedule-digest', kind: 'digest', quiet: false, at, id });
-    return { ok: true, id };
-  } catch (error) {
-    log({
-      action: 'schedule-digest',
-      kind: 'digest',
-      quiet: false,
-      at,
-      error: error?.message ?? String(error),
-    });
-    return { ok: false };
-  }
-}
-
-export async function cancelDigest() {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(DIGEST_ID);
-    log({ action: 'cancel-digest' });
     return { ok: true };
-  } catch (error) {
-    log({ action: 'cancel-digest', error: error?.message ?? String(error) });
+  } catch {
     return { ok: false };
   }
 }
@@ -120,16 +73,7 @@ export function listenForDigest(onDigest) {
 }
 
 export async function runNotificationEffects(effects) {
-  let scheduled = false;
   for (const effect of effects) {
-    if (effect.type === 'present') {
-      await presentNow(effect.plan);
-    } else if (effect.type === 'schedule-digest') {
-      const result = await scheduleDigest(effect.at, effect.plan);
-      scheduled = result.ok;
-    } else if (effect.type === 'cancel-digest') {
-      await cancelDigest();
-    }
+    if (effect.type === 'present') await presentNow(effect.plan);
   }
-  return { scheduled };
 }

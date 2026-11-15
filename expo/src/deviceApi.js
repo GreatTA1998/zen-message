@@ -272,13 +272,19 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     await store.setItem(STORE_KEY, JSON.stringify(state));
   }
 
+  function holdEffects(person, effects) {
+    person.pendingEffects = person.pushToken
+      ? effects.filter((effect) => effect.type !== 'present')
+      : effects;
+  }
+
   function releaseDueAlerts(state, now) {
     const queued = [];
     for (const person of Object.values(state.users)) {
       const released = releaseDue(person, now);
       if (!released.effects.length) continue;
       adopt(person, released.state);
-      person.pendingEffects = released.effects;
+      holdEffects(person, released.effects);
       queued.push({ recipient: person, effects: released.effects });
     }
     return queued;
@@ -448,7 +454,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       adopt(user, result.sender);
       adopt(recipient, result.recipient);
       linkIncomingContacts(state, recipient);
-      if (result.recipientEffects.length) recipient.pendingEffects = result.recipientEffects;
+      if (result.recipientEffects.length) holdEffects(recipient, result.recipientEffects);
       await commit(store, state);
       if (typeof store.onDeliver === 'function') store.onDeliver(recipient, result.recipientEffects);
       return inbox(state, user);
