@@ -587,19 +587,6 @@ function ChatScreen({
     }
   }
 
-  async function attachStickerFromPhoto() {
-    if (attachBusy.current) return;
-    attachBusy.current = true;
-    try {
-      setPhoto(null);
-      setStickerTrayOpen(false);
-      const next = await pickLibraryPhoto();
-      if (next) await adoptSticker(next);
-    } finally {
-      attachBusy.current = false;
-    }
-  }
-
   function onInputSize(event) {
     const measured = event.nativeEvent.contentSize.height;
     setInputHeight(Math.max(44, Math.min(Math.ceil(measured), 176)));
@@ -627,7 +614,6 @@ function ChatScreen({
       Keyboard.dismiss();
       setDrawStickerOpen(true);
     },
-    onPhotoSticker: () => attachStickerFromPhoto(),
     draft,
     onChangeDraft: (value) => {
       setDraft(value);
@@ -982,7 +968,6 @@ function ComposerFooter({
   stickerLibrary,
   onPickLibrarySticker,
   onDrawSticker,
-  onPhotoSticker,
   draft,
   onChangeDraft,
   onInputSize,
@@ -1072,16 +1057,6 @@ function ComposerFooter({
               >
                 <MaterialCommunityIcons name="draw-pen" size={22} color={ink} />
                 <Text style={styles.stickerTrayLabel}>Draw</Text>
-              </Pressable>
-              <Pressable
-                testID={showIds ? 'sticker-new-photo' : undefined}
-                accessibilityRole="button"
-                accessibilityLabel="Sticker from photo"
-                onPress={onPhotoSticker}
-                style={styles.stickerTrayAction}
-              >
-                <Feather name="image" size={20} color={ink} />
-                <Text style={styles.stickerTrayLabel}>Photo</Text>
               </Pressable>
               {stickerLibrary.map((item, index) => (
                 <Pressable
