@@ -13,3 +13,4 @@ export function bubbleTone(intent) {
 }
 
 export const ZEN_FILL = '#d4ecd9';
+export const ZEN_LINE = '#2f7a52';
