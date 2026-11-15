@@ -19,10 +19,11 @@ function message(overrides = {}) {
 }
 
 test('a browser push is reduced to one Expo message', () => {
-  const messages = sanitizePushMessages([message()]);
+  const messages = sanitizePushMessages([message({ collapseId: 'm1' })]);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].to, TOKEN);
   assert.equal(messages[0].data.kind, 'realtime');
+  assert.equal(messages[0].collapseId, 'm1');
   assert.equal(messages[0].data.extra, undefined);
   assert.equal(JSON.stringify(messages).includes('relax'), false);
   assert.equal(JSON.stringify(messages).includes('batched'), false);

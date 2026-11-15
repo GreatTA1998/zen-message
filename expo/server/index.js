@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { createState, reduce } from '../src/delivery.js';
 import { CODE_ALPHABET, CODE_LENGTH, hasConfusingCharacter, isCode, normalizeCode } from '../src/people.js';
 import { changeMode, changeSchedule, deliverMessage, releaseDue } from './deliver.js';
-import { sendExpoPushes } from './push.js';
+import { pushesFor, sendExpoPushes } from './push.js';
 
 const users = new Map();
 const sessions = new Map();
@@ -93,26 +93,12 @@ async function notify(user, effects) {
     return;
   }
   if (user.pushToken) {
-    const pushes = effects
-      .filter((effect) => effect.type === 'present')
-      .map((effect) => ({
-        to: user.pushToken,
-        title: effect.plan.title,
-        body: effect.plan.body,
-        sound: effect.plan.quiet ? null : 'default',
-        priority: effect.plan.quiet ? 'default' : 'high',
-        interruptionLevel: effect.plan.quiet ? 'passive' : 'active',
-        channelId: effect.plan.quiet ? 'zen-quiet' : 'zen-normal',
-        data: effect.plan.data,
-      }));
-    if (pushes.length) {
-      try {
-        await sendExpoPushes(pushes);
-      } catch (error) {
-        console.info(`[zen-push] ${error?.message ?? error}`);
-      }
+    try {
+      await sendExpoPushes(pushesFor(effects, user.pushToken));
+    } catch {
+      // Inbox refresh still delivers the message.
     }
-    user.pendingEffects = effects.filter((effect) => effect.type === 'cancel-digest');
+    user.pendingEffects = effects.filter((effect) => effect.type !== 'present');
     return;
   }
   user.pendingEffects = effects;

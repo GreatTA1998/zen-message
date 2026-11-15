@@ -1,12 +1,16 @@
 import { reduce } from '../src/delivery.js';
 import { pushesFor } from './push.js';
 
+function displayName(person) {
+  return person.firstName || person.id;
+}
+
 export function deliverMessage(sender, recipient, action) {
   const outgoing = reduce(sender, {
     type: 'outgoing',
     id: action.id,
     contactId: recipient.id,
-    contactName: recipient.id,
+    contactName: displayName(recipient),
     body: action.body,
     photo: action.photo,
     sticker: action.sticker,
@@ -17,7 +21,7 @@ export function deliverMessage(sender, recipient, action) {
     type: 'send',
     id: action.id,
     contactId: sender.id,
-    contactName: sender.id,
+    contactName: displayName(sender),
     body: action.body,
     photo: action.photo,
     sticker: action.sticker,
