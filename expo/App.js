@@ -966,7 +966,7 @@ function ComposerFooter({
     setTimesOpen(id === 'scheduled');
   }
 
-  function choiceCell(at, index, first) {
+  function choiceCell(at, index) {
     const on = (choiceAt ?? selectedAt?.getTime()) === at.getTime();
     return (
       <Pressable
@@ -975,7 +975,7 @@ function ComposerFooter({
         accessibilityRole="button"
         accessibilityState={{ selected: on }}
         onPress={() => { onChoice(at.getTime()); setTimesOpen(false); }}
-        style={[styles.choiceRow, first && styles.choiceRowFirst, on && styles.choiceRowOn]}
+        style={[styles.choiceRow, on && styles.choiceRowOn]}
       >
         <Text numberOfLines={1} style={[styles.choiceText, on && styles.choiceTextOn]}>
           {dayPhrase(at.getHours()).replace(' ', '')}
@@ -990,12 +990,12 @@ function ComposerFooter({
         {timesOpen ? (
           <View testID={showIds ? 'scheduled-choices' : undefined} style={[styles.choicePopover, web && styles.webChoices]}>
             <View style={styles.choiceColumns}>
-              <ScrollView style={styles.choiceCol} keyboardShouldPersistTaps="handled">
-                {columns.today.map((at, i) => choiceCell(at, i, !i))}
-              </ScrollView>
-              <ScrollView style={[styles.choiceCol, styles.choiceColRight]} keyboardShouldPersistTaps="handled">
-                {columns.tomorrow.map((at, i) => choiceCell(at, columns.today.length + i, !i))}
-              </ScrollView>
+              {[['Today', columns.today, 0], ['Tomorrow', columns.tomorrow, columns.today.length]].map(([title, slots, offset], col) => (
+                <View key={title} style={[styles.choiceCol, col > 0 && styles.choiceColRight]}>
+                  <Text style={[styles.choiceText, styles.choiceTextOn, styles.choiceRow, styles.choiceRowFirst]}>{title}</Text>
+                  <ScrollView keyboardShouldPersistTaps="handled">{slots.map((at, i) => choiceCell(at, offset + i))}</ScrollView>
+                </View>
+              ))}
             </View>
           </View>
         ) : null}
@@ -1494,7 +1494,7 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   choiceColumns: { flexDirection: 'row' },
-  choiceCol: { flex: 1, maxHeight: 220 },
+  choiceCol: { flex: 1, maxHeight: 260 },
   choiceColRight: { borderLeftWidth: 1, borderLeftColor: ink },
   choiceRow: { paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: ink },
   choiceRowFirst: { borderTopWidth: 0 },
