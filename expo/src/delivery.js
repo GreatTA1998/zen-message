@@ -310,7 +310,7 @@ function setSchedule(state, hour, minute, now, offsetMinutes) {
   const dayHour = clampHour(hour, 19);
   const dayMinute = clampMinute(minute);
   const clock = dailyClock(state);
-  if (dayHour === clock.hour && dayMinute === clock.minute && state.dayHour === dayHour) {
+  if (dayHour === clock.hour && dayMinute === clock.minute) {
     return { state, effects: [] };
   }
   const at = nextDaily(new Date(now), dayHour, dayMinute, offsetMinutes).getTime();
