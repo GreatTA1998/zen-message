@@ -22,7 +22,6 @@ function pointsToPath(points) {
   return d;
 }
 
-/** Full-canvas crop; user shrinks with handles — never seed from ink. */
 function fullCrop(size) {
   return clampCrop({ x: 0, y: 0, width: size.width, height: size.height }, size.width, size.height);
 }
@@ -139,7 +138,6 @@ function CropOverlay({ crop, canvas, onChange }) {
         <View style={[styles.gridLine, { top: height / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
         <View style={[styles.gridLine, { top: (height * 2) / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
       </View>
-      {/* Rim only moves the crop — interior stays drawable. */}
       <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x, top: y - rim / 2, width, height: rim, zIndex: 5 }} {...move} />
       <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x, top: y + height - rim / 2, width, height: rim, zIndex: 5 }} {...move} />
       <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x - rim / 2, top: y, width: rim, height, zIndex: 5 }} {...move} />
@@ -177,7 +175,7 @@ export async function exportDrawnSticker(strokes, captureView, size, crop) {
     canvas.height = Math.max(1, Math.round(rect.height));
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    paintStrokes(ctx, strokes, canvas.width, canvas.height, null, rect);
+    paintStrokes(ctx, strokes, canvas.width, canvas.height, rect);
     return canvas.toDataURL('image/png');
   }
 

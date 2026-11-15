@@ -358,9 +358,6 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     }
 
     if (method === 'GET' && url.pathname === '/v1/inbox') {
-      // Polls used to rewrite the entire Firestore JSON blob every 4s (including
-      // inline photo data URIs). Only persist when something actually changed so
-      // /v1/open on avatar tap is not stuck behind a fat write.
       const linked = linkIncomingContacts(state, user);
       await commit(store, state, { force: linked || clockDirty });
       return inbox(state, user);

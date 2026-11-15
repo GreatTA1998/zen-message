@@ -150,6 +150,35 @@ export function threadMessages(messages, contactId) {
   );
 }
 
+function latestInboundAt(messages, contactId) {
+  let latest = 0;
+  for (const item of threadMessages(messages, contactId)) {
+    if (item?.direction !== 'in') continue;
+    const at = Number(item.createdAt) || 0;
+    if (at > latest) latest = at;
+  }
+  return latest;
+}
+
+export function contactUnread(messages, contactId, openedAt) {
+  const latest = latestInboundAt(messages, contactId);
+  return latest > 0 && latest > (Number(openedAt) || 0);
+}
+
+export function syncOpenedAt(openedAt, contacts, messages, selectedId) {
+  let next = null;
+  const touch = (id, at) => {
+    if (!id || (id in (next || openedAt) && (Number((next || openedAt)[id]) || 0) >= at)) return;
+    (next ??= { ...openedAt })[id] = at;
+  };
+  for (const item of contacts || []) {
+    const id = String(item?.id ?? '').replace(/\s+/g, '').toUpperCase();
+    if (id && !(id in (next || openedAt))) touch(id, latestInboundAt(messages, id));
+  }
+  if (selectedId) touch(selectedId, latestInboundAt(messages, selectedId) || Date.now());
+  return next || openedAt;
+}
+
 export function photoFromPickerAsset(asset) {
   if (!asset || asset.type === 'video' || String(asset.mimeType || '').startsWith('video/')) return null;
   const rawBase64 = typeof asset.base64 === 'string' ? asset.base64.replace(/\s+/g, '') : '';
