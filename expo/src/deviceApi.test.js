@@ -459,6 +459,31 @@ test('opening a contact accepts a normalized id and delivering uses the same id'
   );
 });
 
+test('inbox polls skip store writes when nothing changed', async () => {
+  const values = new Map();
+  let writes = 0;
+  const storage = {
+    async getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    async setItem(key, value) {
+      writes += 1;
+      values.set(key, value);
+    },
+  };
+  const api = createDeviceApi(storage, (length) => new Uint8Array(length).fill(9));
+  const session = await api('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-poll-light' },
+  });
+  const afterSession = writes;
+  assert.equal(afterSession >= 1, true);
+  await api('/v1/inbox?offset=0', { token: session.token });
+  await api('/v1/inbox?offset=0', { token: session.token });
+  await api('/v1/inbox?offset=0', { token: session.token });
+  assert.equal(writes, afterSession);
+});
+
 test('opening switches between contacts even when a poll still has the previous id', async () => {
   const storage = sharedStore();
   const left = createDeviceApi(storage, (length) => new Uint8Array(length).fill(6));

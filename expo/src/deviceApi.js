@@ -284,12 +284,15 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     return queued;
   }
 
-  async function commit(store, state) {
+  async function commit(store, state, { force = true } = {}) {
     const due = releaseDueAlerts(state, Date.now());
-    await save(store, state);
+    if (force || due.length) {
+      await save(store, state);
+    }
     if (typeof store.onDeliver === 'function') {
       for (const item of due) store.onDeliver(item.recipient, item.effects);
     }
+    return due;
   }
 
   return function request(path, { token, method = 'GET', body } = {}) {
@@ -337,7 +340,9 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     const user = userFrom(state, token);
     if (!user) fail('sign_in_required');
     const offset = method === 'GET' ? Number(url.searchParams.get('offset')) : body?.offsetMinutes;
+    const priorOffset = user.offsetMinutes;
     applyClock(user, offset);
+    const clockDirty = user.offsetMinutes !== priorOffset;
 
     if (method === 'GET' && url.pathname === '/v1/person') {
       const code = normalizeCode(url.searchParams.get('code'));
@@ -347,8 +352,11 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     }
 
     if (method === 'GET' && url.pathname === '/v1/inbox') {
-      linkIncomingContacts(state, user);
-      await commit(store, state);
+      // Polls used to rewrite the entire Firestore JSON blob every 4s (including
+      // inline photo data URIs). Only persist when something actually changed so
+      // /v1/open on avatar tap is not stuck behind a fat write.
+      const linked = linkIncomingContacts(state, user);
+      await commit(store, state, { force: linked || clockDirty });
       return inbox(state, user);
     }
 

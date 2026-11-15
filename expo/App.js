@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
+  InteractionManager,
   Keyboard,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR } from './src/contacts';
 import {
   mergeInboxPreservingSelection,
+  mergeOpenInbox,
   resolveSelectedContactId,
 } from './src/contactSelection';
 import {
@@ -236,7 +238,7 @@ function Root() {
   const applyInbox = useCallback((next) => {
     setInbox((current) => {
       const payload = typeof next === 'function' ? next(current) : next;
-      return mergeInboxPreservingSelection(payload, selectedContactRef.current);
+      return mergeInboxPreservingSelection(payload, selectedContactRef.current, current);
     });
   }, []);
 
@@ -591,10 +593,12 @@ function ChatScreen({
     if (normalizeCode(state?.contactId) === id) return;
     const requestId = openContactSync.current + 1;
     openContactSync.current = requestId;
+    // Fire-and-forget server sync. Do not replace the whole message list with a
+    // freshly parsed inbox (inline photo data URIs would remount and re-decode).
     api('/v1/open', { token, method: 'POST', body: { contactId: id } })
       .then((next) => {
         if (openContactSync.current !== requestId) return;
-        onInbox(next);
+        onInbox((current) => mergeOpenInbox(current, next, selectedContactRef.current));
       })
       .catch(() => {});
   }
@@ -1549,10 +1553,17 @@ function TextBubble({ message, incoming }) {
   );
 }
 
-function StickerBubble({ message, incoming, onOpenPhoto }) {
+const StickerBubble = memo(function StickerBubble({ message, incoming, onOpenPhoto }) {
   const [aspect, setAspect] = useState(1);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (!message.sticker) return;
+    const task = InteractionManager.runAfterInteractions(() => setReady(true));
+    return () => {
+      if (typeof task?.cancel === 'function') task.cancel();
+    };
+  }, [message.id]);
+  useEffect(() => {
+    if (!ready || !message.sticker) return;
     Image.getSize(
       message.sticker,
       (width, height) => {
@@ -1560,7 +1571,7 @@ function StickerBubble({ message, incoming, onOpenPhoto }) {
       },
       () => {},
     );
-  }, [message.sticker]);
+  }, [ready, message.sticker]);
   return (
     <Pressable
       testID={incoming ? 'sticker-in' : 'sticker-out'}
@@ -1574,15 +1585,27 @@ function StickerBubble({ message, incoming, onOpenPhoto }) {
         { width: photoMaxWidth, aspectRatio: aspect },
       ]}
     >
-      <Image testID="bubble-sticker" source={{ uri: message.sticker }} resizeMode="contain" style={styles.stickerImage} />
+      {ready ? (
+        <Image testID="bubble-sticker" source={{ uri: message.sticker }} resizeMode="contain" style={styles.stickerImage} />
+      ) : (
+        <View testID="sticker-placeholder" style={styles.mediaPlaceholder} />
+      )}
     </Pressable>
   );
-}
+});
 
-function PhotoBubble({ message, incoming, onOpenPhoto }) {
+const PhotoBubble = memo(function PhotoBubble({ message, incoming, onOpenPhoto }) {
   const [aspect, setAspect] = useState(4 / 3);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (!message.photo) return;
+    // Text/composer/ring paint first; decode the inline data-URI after interactions.
+    const task = InteractionManager.runAfterInteractions(() => setReady(true));
+    return () => {
+      if (typeof task?.cancel === 'function') task.cancel();
+    };
+  }, [message.id]);
+  useEffect(() => {
+    if (!ready || !message.photo) return;
     Image.getSize(
       message.photo,
       (width, height) => {
@@ -1590,7 +1613,7 @@ function PhotoBubble({ message, incoming, onOpenPhoto }) {
       },
       () => {},
     );
-  }, [message.photo]);
+  }, [ready, message.photo]);
   return (
     <Pressable
       testID={incoming ? 'photo-in' : 'photo-out'}
@@ -1604,10 +1627,14 @@ function PhotoBubble({ message, incoming, onOpenPhoto }) {
         { width: photoMaxWidth, aspectRatio: aspect },
       ]}
     >
-      <Image testID="bubble-photo" source={{ uri: message.photo }} resizeMode="cover" style={styles.photoImage} />
+      {ready ? (
+        <Image testID="bubble-photo" source={{ uri: message.photo }} resizeMode="cover" style={styles.photoImage} />
+      ) : (
+        <View testID="photo-placeholder" style={styles.mediaPlaceholder} />
+      )}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   boot: { flex: 1, backgroundColor: paper },
@@ -1848,6 +1875,7 @@ const styles = StyleSheet.create({
   photoBubbleOut: { alignSelf: 'flex-end' },
   photoBubbleWeb: { maxWidth: 'min(320px, 84%)' },
   photoImage: { width: '100%', height: '100%' },
+  mediaPlaceholder: { flex: 1, backgroundColor: '#ececec' },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',
