@@ -1006,9 +1006,6 @@ function ComposerFooter({
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
-  useEffect(() => {
-    if (intent !== 'scheduled') setTimesOpen(false);
-  }, [intent]);
 
   function chooseIntent(id) {
     onIntent(id);
@@ -1028,7 +1025,7 @@ function ComposerFooter({
                   testID={showIds ? `choice-${index}` : undefined}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
-                  onPress={() => onChoice(index)}
+                  onPress={() => { onChoice(index); setTimesOpen(false); }}
                   style={[styles.choiceRow, index === 0 && styles.choiceRowFirst, selected && styles.choiceRowOn]}
                 >
                   <Text numberOfLines={1} style={[styles.choiceText, selected && styles.choiceTextOn]}>
@@ -1058,7 +1055,7 @@ function ComposerFooter({
                       testID={showIds ? `custom-hour-${hour}` : undefined}
                       accessibilityRole="button"
                       accessibilityLabel={dayPhrase(hour)}
-                      onPress={() => onCustomHour(hour)}
+                      onPress={() => { onCustomHour(hour); setTimesOpen(false); }}
                       style={[styles.hourChip, selected && styles.hourChipOn]}
                     >
                       <Text style={[styles.hourChipText, selected && styles.hourChipTextOn]}>{dayPhrase(hour)}</Text>
