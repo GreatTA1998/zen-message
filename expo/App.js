@@ -36,7 +36,7 @@ import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
-import { loadPickedContact, loadSession, savePickedContact, saveSession } from './src/session';
+import { loadDraft, loadPickedContact, loadSession, saveDraft, savePickedContact, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
@@ -246,6 +246,7 @@ function Root() {
   async function onLogout() {
     await saveSession(null);
     await savePickedContact(null);
+    await saveDraft('');
     tokenRef.current = null;
     setToken(null);
     setUser(null);
@@ -367,6 +368,7 @@ function ChatScreen({
     loadPickedContact().then((id) => {
       if (id) setPickedId(id);
     });
+    loadDraft().then(setDraft);
   }, []);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
@@ -494,6 +496,7 @@ function ChatScreen({
     const createdAt = Date.now();
     const pendingId = `local-${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
     setDraft('');
+    saveDraft('').catch(() => {});
     setPhoto(null);
     setSticker(null);
     setInputHeight(44);
@@ -592,10 +595,6 @@ function ChatScreen({
     }
   }
 
-  function onChangeDraft(value) {
-    setDraft(value);
-  }
-
   function onInputSize(event) {
     const measured = event.nativeEvent.contentSize.height;
     setInputHeight(Math.max(44, Math.min(Math.ceil(measured), 176)));
@@ -625,7 +624,10 @@ function ChatScreen({
     },
     onPhotoSticker: () => attachStickerFromPhoto(),
     draft,
-    onChangeDraft,
+    onChangeDraft: (value) => {
+      setDraft(value);
+      saveDraft(value).catch(() => {});
+    },
     onInputSize,
     inputHeight,
     contactId: selectedContactId || contact?.id,
