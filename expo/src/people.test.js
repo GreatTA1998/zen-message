@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CODE_LENGTH, accountCode, firstName, hasConfusingCharacter, isCode, normalizeCode } from './people.js';
+import {
+  CODE_LENGTH,
+  accountCode,
+  avatarGlyph,
+  avatarSeed,
+  avatarTone,
+  firstName,
+  hasConfusingCharacter,
+  isCode,
+  normalizeCode,
+} from './people.js';
 
 test('ids are 3 characters, digits and letters, either case', () => {
   assert.equal(CODE_LENGTH, 3);
@@ -29,4 +39,9 @@ test('an account keeps the same 3-character ID', () => {
   assert.equal(isCode(first), true);
   assert.equal(firstName('Ada Lovelace'), 'Ada');
   assert.equal(firstName('  '), '');
+  assert.equal(avatarSeed('K7M'), avatarSeed('K7M'));
+  assert.notEqual(avatarSeed('K7M'), avatarSeed('ABC'));
+  assert.deepEqual(avatarTone('K7M'), avatarTone('K7M'));
+  assert.equal(avatarGlyph('Ada', 'K7M'), 'AD');
+  assert.equal(avatarGlyph('', 'k7m'), 'K7');
 });

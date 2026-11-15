@@ -40,12 +40,17 @@ function isActiveContact(contacts, id) {
   return contacts.some((item) => item.id === id && contactKind(item) === 'active');
 }
 
+function avatarOf(user) {
+  return typeof user?.avatar === 'string' && user.avatar ? user.avatar : null;
+}
+
 function publicUser(user) {
   const onboarded = user.onboarded ?? Boolean(user.firstName);
   return {
     id: user.id,
     provider: user.provider,
     firstName: user.firstName || '',
+    avatar: avatarOf(user),
     onboarded,
   };
 }
@@ -61,6 +66,7 @@ function contactCard(users, contact) {
   return {
     id: contact.id,
     firstName: person?.firstName || '',
+    avatar: avatarOf(person),
     status: contactKind(contact),
     dayHour: Number.isInteger(person?.dayHour) ? person.dayHour : 19,
     dayMinute: Number.isInteger(person?.dayMinute) ? person.dayMinute : 0,
@@ -88,6 +94,7 @@ function keepAccount(user) {
   return {
     id: user.id,
     firstName: user.firstName || '',
+    avatar: avatarOf(user),
     onboarded: user.onboarded ?? Boolean(user.firstName),
     contacts: user.contacts,
     pushToken: user.pushToken,

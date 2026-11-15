@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { normalizeCode } from './people.js';
 
 const S = 'zen-message.session';
 const P = 'zen-message.picked-contact';
@@ -20,16 +21,9 @@ async function put(key, value) {
 
 export const loadSession = () => get(S);
 export const saveSession = (token) => put(S, token || null);
-
-export async function loadPickedContact() {
-  return String((await get(P, '')) || '').replace(/\s+/g, '').toUpperCase() || null;
-}
-export const savePickedContact = (id) =>
-  put(P, String(id ?? '').replace(/\s+/g, '').toUpperCase() || null);
-
-export async function loadDraft() {
-  return (await get(D, '')) || '';
-}
+export const loadPickedContact = async () => normalizeCode(await get(P, '')) || null;
+export const savePickedContact = (id) => put(P, normalizeCode(id) || null);
+export const loadDraft = async () => (await get(D, '')) || '';
 export const saveDraft = (text) => put(D, text || null);
 
 export async function loadOpenedAt() {
