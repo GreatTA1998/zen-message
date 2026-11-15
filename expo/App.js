@@ -880,6 +880,7 @@ function ChatScreen({
                 key={message.id}
                 message={message}
                 onOpenPhoto={(uri) => {
+                  Keyboard.dismiss();
                   setScheduleOpen(false);
                   setAccountOpen(false);
                   setContactMenuId(null);
@@ -1565,7 +1566,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
   },
-  stickerBubble: { width: 148, height: 148, backgroundColor: 'transparent', borderWidth: 0 },
+  stickerBubble: { width: 148, height: 148, aspectRatio: 1, backgroundColor: 'transparent', borderWidth: 0 },
   mediaBubbleIn: { alignSelf: 'flex-start' },
   mediaBubbleOut: { alignSelf: 'flex-end' },
   mediaImage: { width: '100%', height: '100%' },
