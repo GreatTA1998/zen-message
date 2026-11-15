@@ -6,3 +6,8 @@ export function messageBubbleParts(message) {
   if (message?.body?.trim()) parts.push('text');
   return parts;
 }
+
+/** @returns {'zen'|'scheduled'|'normal'} */
+export function bubbleTone(intent) {
+  return intent === 'scheduled' ? 'scheduled' : intent === 'anytime' || intent === 'timely' ? 'zen' : 'normal';
+}

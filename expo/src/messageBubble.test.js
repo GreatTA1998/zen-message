@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { messageBubbleParts } from './messageBubble.js';
+import { bubbleTone, messageBubbleParts } from './messageBubble.js';
 
 test('a photo-only message is its own bubble part', () => {
   assert.deepEqual(messageBubbleParts({ body: '', photo: 'data:image/png;base64,aa' }), ['photo']);
@@ -27,4 +27,8 @@ test('sticker beats photo when both are present', () => {
     messageBubbleParts({ body: '', sticker: 'data:image/png;base64,aa', photo: 'data:image/png;base64,bb' }),
     ['sticker'],
   );
+});
+
+test('bubbleTone: zen for anytime/timely, scheduled apart, else normal', () => {
+  assert.deepEqual(['anytime', 'timely', 'scheduled', 'realtime'].map(bubbleTone), ['zen', 'zen', 'scheduled', 'normal']);
 });

@@ -36,7 +36,7 @@ import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
-import { messageBubbleParts } from './src/messageBubble';
+import { bubbleTone, messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -50,6 +50,8 @@ import { DrawModal } from './src/DrawModal';
 const ink = '#1c1c1c';
 const paper = '#fff';
 const moon = '#5E5CE6';
+const sage = '#f3f9f5';
+const grass = '#5f9a76';
 const web = Platform.OS === 'web';
 const side = 32;
 const photoMaxWidth = web ? 320 : 280;
@@ -1274,16 +1276,22 @@ function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming
 }
 
 function TextBubble({ message, incoming }) {
+  const tone = bubbleTone(message.intent);
+  const fill = tone === 'zen' ? sage : paper;
   return (
-    <View testID={incoming ? 'bubble-in' : 'bubble-out'} style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, web && styles.bubbleRead]}>
+    <View
+      testID={incoming ? 'bubble-in' : 'bubble-out'}
+      style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, tone === 'zen' && styles.bubbleZen, tone === 'scheduled' && styles.bubbleScheduled, web && styles.bubbleRead]}
+    >
       <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut]}>
         <View style={styles.tailStem} />
-        <View style={styles.tailFill} />
-        <View style={styles.tailJoin} />
+        <View style={[styles.tailFill, { borderBottomColor: fill }]} />
+        <View style={[styles.tailJoin, { backgroundColor: fill }]} />
         <View style={styles.tailClip}>
           <View style={styles.tailEdge} />
         </View>
       </View>
+      {tone === 'zen' ? <Ionicons name="leaf-outline" size={12} color={grass} style={styles.zenMark} /> : null}
       <Text style={styles.bubbleText}>{message.body}</Text>
     </View>
   );
@@ -1463,13 +1471,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   bubbleOut: { borderBottomRightRadius: 2 },
-  bubbleIn: {
-    alignSelf: 'flex-start',
-    maxWidth: '78%',
-    marginTop: 10,
-    marginBottom: 0,
-    borderTopLeftRadius: 2,
-  },
+  bubbleIn: { alignSelf: 'flex-start', maxWidth: '78%', marginTop: 10, marginBottom: 0, borderTopLeftRadius: 2 },
+  bubbleZen: { backgroundColor: sage, borderColor: grass, shadowColor: grass, shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
+  bubbleScheduled: { borderStyle: 'dashed' },
   bubbleRead: { maxWidth: 'min(560px, 100%)' },
   tail: { position: 'absolute', width: 24, height: 20 },
   tailIn: { left: -1, top: -12 },
@@ -1499,6 +1503,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '36deg' }],
   },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
+  zenMark: { position: 'absolute', right: 8, bottom: 7, opacity: 0.38 },
   footer: { backgroundColor: paper },
   composerWrap: { position: 'relative', zIndex: 2 },
   intentSlot: {
