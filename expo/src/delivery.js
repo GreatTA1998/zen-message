@@ -2,7 +2,7 @@ export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
 export const CHECKPOINT_HOURS = [12, 19];
 export const DAY_HOURS = Array.from({ length: 24 }, (_item, hour) => hour);
 
-export const INTENTS = ['anytime', 'scheduled', 'realtime'].map((id) => ({ id, label: id }));
+export const INTENTS = ['anytime', 'scheduled', 'realtime'].map((id) => ({ id, label: id === 'anytime' ? 'zen' : id }));
 
 const INTENT_IDS = new Set([...INTENTS.map((item) => item.id), 'timely']);
 
