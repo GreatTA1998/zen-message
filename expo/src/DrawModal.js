@@ -134,10 +134,11 @@ function CropOverlay({ crop, canvas, onChange }) {
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: y, width: x, height, backgroundColor: dim }} />
       <View pointerEvents="none" style={{ position: 'absolute', left: x + width, top: y, right: 0, height, backgroundColor: dim }} />
       <View pointerEvents="none" style={[styles.cropFrame, { left: x, top: y, width, height }]}>
-        <View style={[styles.gridLine, { left: width / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
-        <View style={[styles.gridLine, { left: (width * 2) / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
-        <View style={[styles.gridLine, { top: height / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
-        <View style={[styles.gridLine, { top: (height * 2) / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
+        <View style={styles.cropFrameInner} />
+        <View style={[styles.gridLine, { left: width / 3, top: 0, bottom: 0, width: 1 }]} />
+        <View style={[styles.gridLine, { left: (width * 2) / 3, top: 0, bottom: 0, width: 1 }]} />
+        <View style={[styles.gridLine, { top: height / 3, left: 0, right: 0, height: 1 }]} />
+        <View style={[styles.gridLine, { top: (height * 2) / 3, left: 0, right: 0, height: 1 }]} />
       </View>
       {/* Rim only moves the crop — interior stays drawable. */}
       <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x, top: y - rim / 2, width, height: rim, zIndex: 5 }} {...move} />
@@ -236,7 +237,6 @@ export function DrawModal({ visible, onCancel, onDone }) {
     size.width > 0 && size.height > 0 ? (
       <View style={styles.canvasInner}>
         <DrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={commitStrokes} />
-        <CropOverlay crop={crop} canvas={size} onChange={setCrop} />
         {Platform.OS !== 'web' && crop ? (
           <View
             ref={captureRefView}
@@ -293,7 +293,8 @@ export function DrawModal({ visible, onCancel, onDone }) {
           }
         }}
       >
-        {surface}
+        <View style={styles.canvasClip}>{surface}</View>
+        <CropOverlay crop={crop} canvas={size} onChange={setCrop} />
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={finish} style={styles.done}>
         <Text style={styles.doneText}>Done</Text>
@@ -328,12 +329,14 @@ const styles = StyleSheet.create({
   headerAction: { color: ink, fontSize: 16, lineHeight: 22 },
   headerActionRight: { textAlign: 'right' },
   headerTitle: { color: ink, fontSize: 17, fontWeight: '600' },
-  canvasFrame: { flex: 1, margin: pad, borderRadius: 18, overflow: 'hidden', backgroundColor: paper },
+  canvasFrame: { flex: 1, margin: pad, overflow: 'visible' },
+  canvasClip: { flex: 1, borderRadius: 18, overflow: 'hidden', backgroundColor: paper },
   canvasInner: { flex: 1, backgroundColor: paper },
-  cropFrame: { position: 'absolute', borderWidth: 2, borderColor: '#fff', zIndex: 4 },
-  gridLine: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.7)' },
+  cropFrame: { position: 'absolute', borderWidth: 2, borderColor: ink, zIndex: 4 },
+  cropFrameInner: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 1, borderColor: '#fff' },
+  gridLine: { position: 'absolute', backgroundColor: 'rgba(28,28,28,0.45)' },
   cropHit: { position: 'absolute', width: hit, height: hit, alignItems: 'center', justifyContent: 'center', zIndex: 6 },
-  cropKnob: { backgroundColor: '#fff', borderRadius: 1 },
+  cropKnob: { backgroundColor: '#fff', borderWidth: 1, borderColor: ink, borderRadius: 1 },
   cropKnobCorner: { width: 16, height: 16 },
   cropKnobEdgeH: { width: 24, height: 5 },
   cropKnobEdgeV: { width: 5, height: 24 },
