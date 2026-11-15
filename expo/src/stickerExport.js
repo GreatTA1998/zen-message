@@ -6,28 +6,6 @@ export function hasDrawnInk(strokes) {
   return strokes.some((stroke) => stroke.length > 1);
 }
 
-/** Tight bounds around ink, including stroke radius. */
-export function inkBounds(strokes, strokeWidth = STROKE_WIDTH) {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  let found = false;
-  for (const stroke of strokes) {
-    if (!stroke || stroke.length < 2) continue;
-    for (const { x, y } of stroke) {
-      found = true;
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    }
-  }
-  if (!found) return null;
-  const p = strokeWidth / 2 + 2;
-  return { x: minX - p, y: minY - p, width: maxX - minX + p * 2, height: maxY - minY + p * 2 };
-}
-
 export function clampCrop(crop, canvasWidth, canvasHeight) {
   if (!crop || canvasWidth <= 0 || canvasHeight <= 0) return null;
   const width = Math.min(Math.max(1, crop.width), canvasWidth);
