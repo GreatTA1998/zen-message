@@ -167,7 +167,7 @@ export function messageSticker(value) {
 }
 
 function noticeText(body, photo, sticker) {
-  return body || (sticker ? 'Sticker' : photo ? 'Photo' : '');
+  return body || (sticker ? 'Drawing' : photo ? 'Photo' : '');
 }
 
 function readContent(action) {

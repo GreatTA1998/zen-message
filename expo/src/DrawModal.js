@@ -186,7 +186,7 @@ export async function exportDrawnSticker(strokes, captureView, size, crop) {
   return typeof base64 === 'string' && base64 ? `data:image/png;base64,${base64}` : null;
 }
 
-export function StickerDrawModal({ visible, onCancel, onDone }) {
+export function DrawModal({ visible, onCancel, onDone }) {
   const [strokes, setStrokes] = useState([]);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [crop, setCrop] = useState(null);
@@ -266,7 +266,7 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
         <Pressable accessibilityRole="button" accessibilityLabel="Cancel drawing" onPress={onCancel} style={styles.headerButton}>
           <Text style={styles.headerAction}>Cancel</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Draw sticker</Text>
+        <Text style={styles.headerTitle}>Draw</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Clear drawing"

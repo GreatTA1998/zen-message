@@ -249,7 +249,7 @@ test('a sticker uses the same delivery as a photo', () => {
   const batched = send(createState(), { id: 's', body: '', sticker, intent: 'anytime' }, at(10, 15));
   assert.equal(batched.state.messages[0].visible, false);
   assert.equal(batched.state.messages[0].sticker, sticker);
-  assert.equal(batched.effects[0].plan.body, 'Wren: Sticker');
+  assert.equal(batched.effects[0].plan.body, 'Wren: Drawing');
 
   const relaxed = reduce(createState(), { type: 'set-mode', mode: 'relaxed' });
   const shown = send(relaxed.state, { id: 's2', body: '', sticker, intent: 'realtime' }, at(10, 15));

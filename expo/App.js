@@ -43,8 +43,7 @@ import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
 import { photoFromPickerAsset, pickLibraryPhoto } from './src/pickPhoto';
-import { loadStickerLibrary, rememberSticker } from './src/stickerLibrary';
-import { StickerDrawModal } from './src/StickerDraw';
+import { DrawModal } from './src/DrawModal';
 
 const ink = '#1c1c1c';
 const paper = '#fff';
@@ -345,9 +344,7 @@ function ChatScreen({
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
   const [sticker, setSticker] = useState(null);
-  const [stickerTrayOpen, setStickerTrayOpen] = useState(false);
-  const [stickerLibrary, setStickerLibrary] = useState([]);
-  const [drawStickerOpen, setDrawStickerOpen] = useState(false);
+  const [drawOpen, setDrawOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
   const [intent, setIntent] = useState('anytime');
   const [choice, setChoice] = useState(0);
@@ -400,10 +397,6 @@ function ChatScreen({
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
   const canSend =
     contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
-
-  useEffect(() => {
-    loadStickerLibrary().then(setStickerLibrary).catch(() => {});
-  }, [token]);
 
   function onToggleFocus() {
     const next = focused ? 'relaxed' : 'batched';
@@ -478,16 +471,11 @@ function ChatScreen({
     ]);
   }
 
-  async function adoptSticker(dataUri, remember = true) {
+  function adoptSticker(dataUri) {
     const next = messageSticker(dataUri);
     if (!next) return;
     setPhoto(null);
     setSticker(next);
-    setStickerTrayOpen(false);
-    if (remember) {
-      const library = await rememberSticker(next);
-      setStickerLibrary(library);
-    }
   }
 
   function send(text = draft) {
@@ -605,14 +593,9 @@ function ChatScreen({
     onClearPhoto: () => setPhoto(null),
     sticker,
     onClearSticker: () => setSticker(null),
-    stickerTrayOpen,
-    onToggleStickerTray: () => setStickerTrayOpen((current) => !current),
-    stickerLibrary,
-    onPickLibrarySticker: (dataUri) => adoptSticker(dataUri, false),
-    onDrawSticker: () => {
-      setStickerTrayOpen(false);
+    onDraw: () => {
       Keyboard.dismiss();
-      setDrawStickerOpen(true);
+      setDrawOpen(true);
     },
     draft,
     onChangeDraft: (value) => {
@@ -892,12 +875,12 @@ function ChatScreen({
         )}
         </View>
         ) : null}
-        <StickerDrawModal
-          visible={drawStickerOpen}
-          onCancel={() => setDrawStickerOpen(false)}
-          onDone={async (dataUri) => {
-            setDrawStickerOpen(false);
-            await adoptSticker(dataUri);
+        <DrawModal
+          visible={drawOpen}
+          onCancel={() => setDrawOpen(false)}
+          onDone={(dataUri) => {
+            setDrawOpen(false);
+            adoptSticker(dataUri);
           }}
         />
         <Modal
@@ -963,11 +946,7 @@ function ComposerFooter({
   onClearPhoto,
   sticker,
   onClearSticker,
-  stickerTrayOpen,
-  onToggleStickerTray,
-  stickerLibrary,
-  onPickLibrarySticker,
-  onDrawSticker,
+  onDraw,
   draft,
   onChangeDraft,
   onInputSize,
@@ -981,7 +960,7 @@ function ComposerFooter({
   const inputRef = useRef(null);
   const [timesOpen, setTimesOpen] = useState(false);
   const showIds = testID === 'composer';
-  const stickersEnabled = Platform.OS === 'web' || Platform.OS === 'ios';
+  const drawEnabled = Platform.OS === 'web' || Platform.OS === 'ios';
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
@@ -1045,34 +1024,6 @@ function ComposerFooter({
             ) : null}
           </View>
         ) : null}
-        {stickersEnabled && stickerTrayOpen ? (
-          <View testID={showIds ? 'sticker-tray' : undefined} style={[styles.stickerTray, web && styles.stickerTrayWeb]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerTrayScroll}>
-              <Pressable
-                testID={showIds ? 'sticker-new-draw' : undefined}
-                accessibilityRole="button"
-                accessibilityLabel="Draw sticker"
-                onPress={onDrawSticker}
-                style={styles.stickerTrayAction}
-              >
-                <MaterialCommunityIcons name="draw-pen" size={22} color={ink} />
-                <Text style={styles.stickerTrayLabel}>Draw</Text>
-              </Pressable>
-              {stickerLibrary.map((item, index) => (
-                <Pressable
-                  key={`${index}-${item.slice(0, 32)}`}
-                  testID={showIds ? `sticker-saved-${index}` : undefined}
-                  accessibilityRole="button"
-                  accessibilityLabel="Saved sticker"
-                  onPress={() => onPickLibrarySticker?.(item)}
-                  style={styles.stickerTrayThumbWrap}
-                >
-                  <Image source={{ uri: item }} resizeMode="contain" style={styles.stickerTrayThumb} />
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
         <View testID={showIds ? 'composer-bar' : undefined} style={[styles.composer, web && styles.webComposer]}>
           {photo ? (
             <View style={styles.previewWrap}>
@@ -1091,15 +1042,15 @@ function ComposerFooter({
           {!photo && sticker ? (
             <View style={styles.previewWrap}>
               <Image
-                testID={showIds ? 'sticker-preview' : undefined}
+                testID={showIds ? 'draw-preview' : undefined}
                 source={{ uri: sticker }}
                 resizeMode="contain"
                 style={styles.stickerPreview}
               />
               <Pressable
-                testID={showIds ? 'sticker-clear' : undefined}
+                testID={showIds ? 'draw-clear' : undefined}
                 accessibilityRole="button"
-                accessibilityLabel="Remove sticker"
+                accessibilityLabel="Remove drawing"
                 onPress={onClearSticker}
                 style={styles.previewClear}
               >
@@ -1121,16 +1072,15 @@ function ComposerFooter({
             style={[styles.input, { height: inputHeight }]}
           />
           <View style={styles.boxTools}>
-            {stickersEnabled ? (
+            {drawEnabled ? (
               <Pressable
-                testID={showIds ? 'attach-sticker' : undefined}
+                testID={showIds ? 'attach-draw' : undefined}
                 accessibilityRole="button"
-                accessibilityLabel="Stickers"
-                accessibilityState={{ expanded: stickerTrayOpen }}
-                onPress={onToggleStickerTray}
+                accessibilityLabel="Draw"
+                onPress={onDraw}
                 style={styles.photoButton}
               >
-                <MaterialCommunityIcons name="sticker-emoji" size={22} color={ink} />
+                <MaterialCommunityIcons name="draw-pen" size={22} color={ink} />
               </Pressable>
             ) : null}
             <Pressable
@@ -1335,7 +1285,7 @@ function MediaBubble({ kind, uri, incoming, onOpenPhoto }) {
     <Pressable
       testID={incoming ? `${kind}-in` : `${kind}-out`}
       accessibilityRole="button"
-      accessibilityLabel={sticker ? 'View sticker' : 'View photo'}
+      accessibilityLabel={sticker ? 'View drawing' : 'View photo'}
       onPress={() => onOpenPhoto?.(uri)}
       style={[styles.mediaBubble, sticker && styles.stickerBubble, incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut]}
     >
@@ -1482,43 +1432,6 @@ const styles = StyleSheet.create({
   messageStack: { gap: 6, maxWidth: '100%' },
   messageStackIn: { alignSelf: 'flex-start', marginTop: 10 },
   messageStackOut: { alignSelf: 'flex-end' },
-  stickerTray: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: '100%',
-    marginBottom: 6,
-    backgroundColor: paper,
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 16,
-    zIndex: 6,
-    maxHeight: 112,
-  },
-  stickerTrayWeb: { left: 56, right: 56 },
-  stickerTrayScroll: { flexDirection: 'row', padding: 10, gap: 10, alignItems: 'center' },
-  stickerTrayAction: {
-    width: 72,
-    height: 72,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: '#f8f8f8',
-  },
-  stickerTrayLabel: { color: ink, fontSize: 12, lineHeight: 14 },
-  stickerTrayThumbWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#d8d8d8',
-    overflow: 'hidden',
-    backgroundColor: '#fafafa',
-  },
-  stickerTrayThumb: { width: '100%', height: '100%' },
   stickerPreview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#fafafa' },
   mediaBubble: {
     width: photoMaxWidth,
