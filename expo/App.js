@@ -707,12 +707,13 @@ function ChatScreen({
               accessibilityRole="button"
               accessibilityLabel="Account settings"
               accessibilityState={{ expanded: accountOpen }}
+              hitSlop={6}
               onPress={() => {
                 setScheduleOpen(false);
                 setAccountOpen((current) => !current);
               }}
             >
-              <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatar} />
+              <Image source={PERSON_AVATAR} resizeMode="cover" style={[styles.avatar, { width: 32, height: 32, borderRadius: 16 }]} />
             </Pressable>
             {accountOpen ? (
               <View testID="account-popover" style={styles.popover}>
@@ -1416,7 +1417,6 @@ const styles = StyleSheet.create({
     right: 0,
     marginTop: 8,
     width: 168,
-    maxHeight: 280,
     backgroundColor: paper,
     borderWidth: 1,
     borderColor: ink,
