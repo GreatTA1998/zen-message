@@ -14,7 +14,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR } from './src/contacts';
 import {
@@ -70,12 +70,13 @@ function scheduleSummaryTime(state) {
 }
 
 function useKeyboardInset() {
-  const [inset, setInset] = useState(0);
+  const [keyboard, setKeyboard] = useState(0);
+  const { bottom: safeBottom } = useSafeAreaInsets();
   useEffect(() => {
     if (Platform.OS === 'web') {
       const update = () => {
         const viewport = window.visualViewport;
-        setInset(
+        setKeyboard(
           viewport
             ? Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))
             : 0
@@ -92,15 +93,17 @@ function useKeyboardInset() {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const show = Keyboard.addListener(showEvent, (event) => {
-      setInset(Math.max(0, Math.round(event?.endCoordinates?.height ?? 0)));
+      setKeyboard(Math.max(0, Math.round(event?.endCoordinates?.height ?? 0)));
     });
-    const hide = Keyboard.addListener(hideEvent, () => setInset(0));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboard(0));
     return () => {
       show.remove();
       hide.remove();
     };
   }, []);
-  return inset;
+  // Phone already sits in SafeAreaView — don't double-count the home indicator.
+  if (Platform.OS === 'web' || keyboard === 0) return keyboard;
+  return Math.max(0, keyboard - safeBottom);
 }
 
 const MISSING = {
