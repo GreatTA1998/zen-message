@@ -11,6 +11,7 @@ import {
   reduce,
   sanitize,
   scheduledChoices,
+  scheduledColumns,
   threadMessages,
 } from './delivery.js';
 
@@ -39,16 +40,14 @@ test('the daily summary is 7:00 pm and is strictly after now', () => {
   assert.equal(nextDaily(at(20, 0), 8, 0).getTime(), at(8, 0, 18).getTime());
 });
 
-test('scheduled checkpoints are the next 12:00 pm and 7:00 pm, soonest first', () => {
-  const morning = scheduledChoices(at(10, 0));
-  assert.equal(morning[0].getTime(), at(12, 0).getTime());
-  assert.equal(morning[1].getTime(), at(19, 0).getTime());
-  const afternoon = scheduledChoices(at(16, 0));
-  assert.equal(afternoon[0].getTime(), at(19, 0).getTime());
-  assert.equal(afternoon[1].getTime(), at(12, 0, 18).getTime());
-  const evening = scheduledChoices(at(19, 0));
-  assert.equal(evening[0].getTime(), at(12, 0, 18).getTime());
-  assert.equal(evening[1].getTime(), at(19, 0, 18).getTime());
+test('scheduled columns are remaining today hours and tomorrow from 8am', () => {
+  const morning = scheduledColumns(at(10, 0));
+  assert.equal(morning.today[0].getTime(), at(11, 0).getTime());
+  assert.equal(morning.today.at(-1).getTime(), at(23, 0).getTime());
+  assert.equal(morning.tomorrow[0].getTime(), at(8, 0, 18).getTime());
+  assert.equal(scheduledChoices(at(16, 0))[0].getTime(), at(17, 0).getTime());
+  assert.equal(scheduledColumns(at(19, 0)).today[0].getTime(), at(20, 0).getTime());
+  assert.equal(scheduledColumns(at(23, 30)).today.length, 0);
 });
 
 test('anytime batched stays hidden and joins one digest', () => {
