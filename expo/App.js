@@ -26,7 +26,6 @@ import {
   receiptPhrase,
   messageSticker,
   scheduledChoices,
-  heldThreadMessages,
   threadMessages,
 } from './src/delivery';
 import { FriendRequestView } from './src/FriendRequestView';
@@ -65,11 +64,6 @@ function scheduleLabel(mode, state) {
   return `receiving summary at ${summaryAt(clock.hour, clock.minute)}`;
 }
 
-function scheduleSummaryTime(state) {
-  const clock = dailyClock(state);
-  return summaryAt(clock.hour, clock.minute);
-}
-
 function useKeyboardInset() {
   const [keyboard, setKeyboard] = useState(0);
   const { bottom: safeBottom } = useSafeAreaInsets();
@@ -102,7 +96,6 @@ function useKeyboardInset() {
       hide.remove();
     };
   }, []);
-  // Phone already sits in SafeAreaView — don't double-count the home indicator.
   if (Platform.OS === 'web' || keyboard === 0) return keyboard;
   return Math.max(0, keyboard - safeBottom);
 }
@@ -131,57 +124,22 @@ function Root() {
   const [user, setUser] = useState(null);
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
-  // Selection lives above ChatScreen so remounts cannot fall back to contacts[0] (S36).
-  const [pickedId, setPickedId] = useState(null);
   const tokenRef = useRef(null);
-  const lookupCacheRef = useRef(new Map());
-  const pickedSeededRef = useRef(false);
-
-  const applyInbox = useCallback((next) => {
-    setInbox((current) => (typeof next === 'function' ? next(current) : next));
-  }, []);
-
-  const chooseContact = useCallback((rawId) => {
-    const id = normalizeCode(rawId) || null;
-    setPickedId(id);
-    savePickedContact(id).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (inbox?.user) setUser(inbox.user);
   }, [inbox?.user]);
 
-  // One-shot restore: local pick first, else last server open. Never re-seed from polls.
-  useEffect(() => {
-    if (pickedSeededRef.current || !inbox?.contacts?.length) return;
-    let alive = true;
-    (async () => {
-      const contacts = inbox.contacts;
-      const local = await loadPickedContact();
-      if (!alive || pickedSeededRef.current) return;
-      const server = normalizeCode(inbox.state?.contactId);
-      const pick =
-        (local && contacts.some((item) => normalizeCode(item.id) === local) && local) ||
-        (server && contacts.some((item) => normalizeCode(item.id) === server) && server) ||
-        null;
-      pickedSeededRef.current = true;
-      if (pick) setPickedId(pick);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [inbox]);
-
   const refresh = useCallback(async () => {
     const current = tokenRef.current;
     if (!current) return null;
     const next = await api(inboxPath(), { token: current });
-    applyInbox(next);
+    setInbox(next);
     if (next.effects?.length) {
       await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
     }
     return next;
-  }, [applyInbox]);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -241,11 +199,11 @@ function Root() {
       const current = tokenRef.current;
       if (!current) return;
       api('/v1/shown', { token: current, method: 'POST', body: {} })
-        .then(applyInbox)
+        .then(setInbox)
         .catch(() => {});
     });
     return () => subscription.remove();
-  }, [applyInbox]);
+  }, []);
 
   async function onSubject(result) {
     if (result.missing) {
@@ -278,16 +236,10 @@ function Root() {
   const onLookup = useCallback(async (raw) => {
     const code = normalizeCode(raw);
     if (!isCode(code) || code === user?.id) return { found: false };
-    const cached = lookupCacheRef.current.get(code);
-    if (cached) return cached;
     try {
-      const result = await api(`/v1/person?code=${encodeURIComponent(code)}`, { token: tokenRef.current });
-      lookupCacheRef.current.set(code, result);
-      return result;
+      return await api(`/v1/person?code=${encodeURIComponent(code)}`, { token: tokenRef.current });
     } catch {
-      const miss = { found: false };
-      lookupCacheRef.current.set(code, miss);
-      return miss;
+      return { found: false };
     }
   }, [user?.id]);
 
@@ -295,11 +247,9 @@ function Root() {
     await saveSession(null);
     await savePickedContact(null);
     tokenRef.current = null;
-    pickedSeededRef.current = false;
     setToken(null);
     setUser(null);
     setInbox(null);
-    setPickedId(null);
   }
 
   async function onDeleteAccount() {
@@ -328,7 +278,7 @@ function Root() {
     if (code === user?.id) return 'That is your ID.';
     try {
       const next = await api('/v1/contacts', { token, method: 'POST', body: { code } });
-      applyInbox(next);
+      setInbox(next);
       return '';
     } catch (error) {
       if (error.code === 'code_invalid') return '1, I, and L are not used.';
@@ -345,7 +295,6 @@ function Root() {
 
   if (!ready) return <View style={styles.boot} />;
 
-  // Prefer inbox.user on the same render as a fresh inbox so onboarding does not flash ChatScreen.
   const sessionUser = user ?? inbox?.user ?? null;
 
   let body = null;
@@ -364,13 +313,11 @@ function Root() {
       <ChatScreen
         token={token}
         inbox={inbox}
-        onInbox={applyInbox}
+        onInbox={setInbox}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
         onDeleteAccount={onDeleteAccount}
-        pickedId={pickedId}
-        onPickContact={chooseContact}
       />
     );
   }
@@ -390,8 +337,6 @@ function ChatScreen({
   onLookup,
   onLogout,
   onDeleteAccount,
-  pickedId,
-  onPickContact,
 }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
@@ -412,10 +357,17 @@ function ChatScreen({
   const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
+  const [pickedId, setPickedId] = useState(null);
   const focusRequest = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
+
+  useEffect(() => {
+    loadPickedContact().then((id) => {
+      if (id) setPickedId(id);
+    });
+  }, []);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
   const selectedContactId =
@@ -432,26 +384,16 @@ function ChatScreen({
     );
     return pending.length ? [...base, ...pending] : base;
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
-  const heldCount = useMemo(() => {
-    if (!selectedContactId || !contact || !contactActive) return 0;
-    return heldThreadMessages(state?.messages, selectedContactId).length;
-  }, [selectedContactId, contact, state?.messages, contactActive]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
-  const summaryTime = mode !== 'relaxed' ? scheduleSummaryTime(state) : '';
+  const summaryTime = mode !== 'relaxed' ? summaryAt(dailyClock(state).hour, dailyClock(state).minute) : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
   const choices = scheduledChoices(now);
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
   const canSend =
     contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
-  const focusHoldCopy =
-    messages.length === 0 && heldCount > 0 && summaryTime
-      ? heldCount === 1
-        ? `1 message arrives at ${summaryTime}`
-        : `${heldCount} messages arrive at ${summaryTime}`
-      : '';
 
   useEffect(() => {
     loadStickerLibrary().then(setStickerLibrary).catch(() => {});
@@ -483,9 +425,9 @@ function ChatScreen({
   function pickContact(item) {
     const id = normalizeCode(item.id);
     if (!id) return;
-    onPickContact(id);
+    setPickedId(id);
+    savePickedContact(id).catch(() => {});
     setPanel(item.status === 'pending-in' ? 'request' : 'chat');
-    // Persist server-side only; ignore response so poll/open cannot rewrite UI selection.
     api('/v1/open', { token, method: 'POST', body: { contactId: id } }).catch(() => {});
   }
 
@@ -509,7 +451,9 @@ function ChatScreen({
         const next = await api('/v1/block', { token, method: 'POST', body: { contactId: targetId } });
         onInbox(next);
         if (normalizeCode(pickedId) === normalizeCode(targetId)) {
-          onPickContact(normalizeCode(next?.contacts?.[0]?.id) || null);
+          const nextId = normalizeCode(next?.contacts?.[0]?.id) || null;
+          setPickedId(nextId);
+          savePickedContact(nextId).catch(() => {});
         }
         setPanel('chat');
         flashNotice('Contact blocked.');
@@ -804,7 +748,6 @@ function ChatScreen({
             const selected = normalizeCode(item.id) === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
             const ring = panel !== 'add' && selected;
-            const dim = ring ? styles.circleOn : styles.circleDim;
             return (
               <Pressable
                 key={item.id}
@@ -823,14 +766,14 @@ function ChatScreen({
                 style={styles.contact}
               >
                 {pending ? (
-                  <View style={[styles.avatarShell, styles.avatarDashed, dim]}>
+                  <View style={[styles.avatarShell, styles.avatarDashed, ring && styles.circleOn]}>
                     <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatarFill} />
                   </View>
                 ) : (
                   <Image
                     source={PERSON_AVATAR}
                     resizeMode="cover"
-                    style={[styles.avatar, dim]}
+                    style={[styles.avatar, ring && styles.circleOn]}
                   />
                 )}
                 <Text numberOfLines={1} style={styles.contactLabel}>
@@ -847,7 +790,7 @@ function ChatScreen({
             onPress={() => setPanel((current) => (current === 'add' ? 'chat' : 'add'))}
             style={styles.contact}
           >
-            <View style={[styles.plus, panel === 'add' ? styles.circleOn : styles.circleDim]}>
+            <View style={[styles.plus, panel === 'add' && styles.circleOn]}>
               <Text style={styles.plusMark}>+</Text>
             </View>
             <Text numberOfLines={1} style={styles.contactLabel}>
@@ -896,7 +839,9 @@ function ChatScreen({
                 const declinedId = contact.id;
                 const next = await mutate('/v1/friend-request/decline', { contactId: declinedId });
                 if (normalizeCode(pickedId) === normalizeCode(declinedId)) {
-                  onPickContact(normalizeCode(next?.contacts?.[0]?.id) || null);
+                  const nextId = normalizeCode(next?.contacts?.[0]?.id) || null;
+                  setPickedId(nextId);
+                  savePickedContact(nextId).catch(() => {});
                 }
                 setPanel('chat');
               } finally {
@@ -914,11 +859,6 @@ function ChatScreen({
         ) : (
         <>
         <View style={[styles.thread, web && styles.webFill]}>
-          {focusHoldCopy ? (
-            <View testID="focus-hold-empty" style={styles.pendingMain}>
-              <Text style={styles.pendingText}>{focusHoldCopy}</Text>
-            </View>
-          ) : (
           <ScrollView
             ref={threadRef}
             style={styles.thread}
@@ -946,7 +886,6 @@ function ChatScreen({
               />
             ))}
           </ScrollView>
-          )}
         </View>
 
         {contactActive ? <ComposerFooter testID="composer" {...composerProps} /> : null}
@@ -1578,8 +1517,7 @@ const styles = StyleSheet.create({
   },
   avatarDashed: { borderStyle: 'dashed' },
   avatarFill: { width: 46, height: 46, borderRadius: 23 },
-  circleOn: { opacity: 1, borderWidth: 2, borderColor: ink },
-  circleDim: { opacity: 0.55 },
+  circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
   contactLabel: { marginTop: 4, maxWidth: 76, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
