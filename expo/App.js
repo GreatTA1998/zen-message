@@ -352,6 +352,7 @@ function ChatScreen({
   const [pickedId, setPickedId] = useState(null);
   const [openedAt, setOpenedAt] = useState(null);
   const focusRequest = useRef(0);
+  const scheduleRequest = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
@@ -437,6 +438,22 @@ function ChatScreen({
     mutate('/v1/mode', { mode: next }).finally(() => {
       if (focusRequest.current === request) setPendingMode(null);
     });
+  }
+
+  function onChooseSchedule(dayHour, dayMinute) {
+    setScheduleOpen(false);
+    const request = scheduleRequest.current + 1;
+    scheduleRequest.current = request;
+    setPendingClock({ hour: dayHour, minute: dayMinute });
+    api('/v1/schedule', {
+      token,
+      method: 'POST',
+      body: { dayHour, dayMinute, offsetMinutes: new Date().getTimezoneOffset() },
+    })
+      .then((next) => onInbox(next).catch(() => {}))
+      .catch(() => {
+        if (scheduleRequest.current === request) setPendingClock(null);
+      });
   }
 
   async function mutate(path, body) {
@@ -696,11 +713,7 @@ function ChatScreen({
                     <ScheduleSettings
                       hour={clock.hour}
                       minute={clock.minute}
-                      onChoose={(dayHour, dayMinute) => {
-                        setScheduleOpen(false);
-                        setPendingClock({ hour: dayHour, minute: dayMinute });
-                        mutate('/v1/schedule', { dayHour, dayMinute }).catch(() => setPendingClock(null));
-                      }}
+                      onChoose={onChooseSchedule}
                     />
                   </View>
                 ) : null}
