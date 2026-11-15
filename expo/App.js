@@ -1490,8 +1490,8 @@ const styles = StyleSheet.create({
   menuTextSelected: { fontWeight: '700' },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3 },
   contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
-  contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 18 },
-  contact: { width: 76, alignItems: 'center' },
+  contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 8 },
+  contact: { alignItems: 'center' },
   avatar: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, backgroundColor: paper },
   avatarShell: {
     width: 54,
@@ -1508,7 +1508,7 @@ const styles = StyleSheet.create({
   circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
-  contactLabel: { marginTop: 4, maxWidth: 76, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
+  contactLabel: { marginTop: 4, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
   plus: {
     width: 54,
     height: 54,
