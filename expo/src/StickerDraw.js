@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { clampCrop, hasDrawnInk, inkBounds, paintStrokes, STROKE_WIDTH } from './stickerExport.js';
+import { applyCropDrag, clampCrop, hasDrawnInk, inkBounds, paintStrokes, STROKE_WIDTH } from './stickerExport.js';
 
 const ink = '#1c1c1c';
 const paper = '#fff';
 const pad = 20;
+const hit = 44;
 const pathProps = {
   stroke: ink,
   strokeWidth: STROKE_WIDTH,
@@ -21,10 +22,8 @@ function pointsToPath(points) {
   return d;
 }
 
-function cropFor(strokes, size, nudge) {
-  const bounds = inkBounds(strokes);
-  if (!bounds || !size.width) return null;
-  return clampCrop({ ...bounds, x: bounds.x + nudge.x, y: bounds.y + nudge.y }, size.width, size.height);
+function seedCrop(strokes, size) {
+  return clampCrop(inkBounds(strokes), size.width, size.height);
 }
 
 function DrawSurface({ width, height, strokes, onStrokeEnd }) {
@@ -75,6 +74,94 @@ function DrawSurface({ width, height, strokes, onStrokeEnd }) {
   );
 }
 
+function useCropDrag(crop, canvas, onChange) {
+  const drag = useRef(null);
+  return (mode) => ({
+    onStartShouldSetResponder: () => true,
+    onMoveShouldSetResponder: () => true,
+    onResponderTerminationRequest: () => false,
+    onResponderGrant: (event) => {
+      drag.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, crop, mode };
+    },
+    onResponderMove: (event) => {
+      if (!drag.current) return;
+      onChange(
+        applyCropDrag(
+          drag.current.crop,
+          drag.current.mode,
+          event.nativeEvent.pageX - drag.current.x,
+          event.nativeEvent.pageY - drag.current.y,
+          canvas.width,
+          canvas.height,
+        ),
+      );
+    },
+    onResponderRelease: () => {
+      drag.current = null;
+    },
+    onResponderTerminate: () => {
+      drag.current = null;
+    },
+  });
+}
+
+function CropOverlay({ crop, canvas, onChange }) {
+  const bind = useCropDrag(crop, canvas, onChange);
+  if (!crop) return null;
+  const { x, y, width, height } = crop;
+  const dim = 'rgba(0,0,0,0.45)';
+  const midX = x + width / 2;
+  const midY = y + height / 2;
+  const handles = [
+    ['nw', x, y],
+    ['n', midX, y],
+    ['ne', x + width, y],
+    ['e', x + width, midY],
+    ['se', x + width, y + height],
+    ['s', midX, y + height],
+    ['sw', x, y + height],
+    ['w', x, midY],
+  ];
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, height: y, backgroundColor: dim }} />
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: y + height, right: 0, bottom: 0, backgroundColor: dim }} />
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: y, width: x, height, backgroundColor: dim }} />
+      <View pointerEvents="none" style={{ position: 'absolute', left: x + width, top: y, right: 0, height, backgroundColor: dim }} />
+      <View
+        accessibilityLabel="Crop frame"
+        style={[styles.cropFrame, { left: x, top: y, width, height }]}
+        {...bind('move')}
+      >
+        <View pointerEvents="none" style={[styles.gridLine, { left: width / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
+        <View pointerEvents="none" style={[styles.gridLine, { left: (width * 2) / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
+        <View pointerEvents="none" style={[styles.gridLine, { top: height / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
+        <View pointerEvents="none" style={[styles.gridLine, { top: (height * 2) / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
+      </View>
+      {handles.map(([mode, hx, hy]) => (
+        <View
+          key={mode}
+          accessibilityLabel={`Resize crop ${mode}`}
+          style={[styles.cropHit, { left: hx - hit / 2, top: hy - hit / 2 }]}
+          {...bind(mode)}
+        >
+          <View
+            style={[
+              styles.cropKnob,
+              mode.length > 1
+                ? styles.cropKnobCorner
+                : mode === 'n' || mode === 's'
+                  ? styles.cropKnobEdgeH
+                  : styles.cropKnobEdgeV,
+            ]}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export async function exportDrawnSticker(strokes, captureView, size, crop) {
   if (!hasDrawnInk(strokes)) return null;
   const rect = crop?.width > 0 && crop?.height > 0 ? crop : { x: 0, y: 0, width: size.width, height: size.height };
@@ -98,21 +185,22 @@ export async function exportDrawnSticker(strokes, captureView, size, crop) {
 export function StickerDrawModal({ visible, onCancel, onDone }) {
   const [strokes, setStrokes] = useState([]);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [nudge, setNudge] = useState({ x: 0, y: 0 });
+  const [crop, setCrop] = useState(null);
   const captureRefView = useRef(null);
-  const drag = useRef(null);
   const saving = useRef(false);
-  const crop = cropFor(strokes, size, nudge);
 
-  const commitStrokes = useCallback((next) => {
-    setNudge({ x: 0, y: 0 });
-    setStrokes(next);
-  }, []);
+  const commitStrokes = useCallback(
+    (next) => {
+      setStrokes(next);
+      setCrop(seedCrop(next, size));
+    },
+    [size],
+  );
 
   useEffect(() => {
     if (!visible) {
       setStrokes([]);
-      setNudge({ x: 0, y: 0 });
+      setCrop(null);
       saving.current = false;
     }
   }, [visible]);
@@ -143,35 +231,7 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
     size.width > 0 && size.height > 0 ? (
       <View style={styles.canvasInner}>
         <DrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={commitStrokes} />
-        {crop ? (
-          <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-            <View pointerEvents="none" style={[styles.cropFrame, crop]} />
-            <View
-              accessibilityRole="adjustable"
-              accessibilityLabel="Adjust crop"
-              style={[
-                styles.cropHandle,
-                { left: crop.x + crop.width / 2 - 18, top: Math.min(crop.y + crop.height - 6, size.height - 24) },
-              ]}
-              onStartShouldSetResponder={() => true}
-              onMoveShouldSetResponder={() => true}
-              onResponderTerminationRequest={() => false}
-              onResponderGrant={(event) => {
-                drag.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, nudge };
-              }}
-              onResponderMove={(event) => {
-                if (!drag.current) return;
-                setNudge({
-                  x: drag.current.nudge.x + event.nativeEvent.pageX - drag.current.x,
-                  y: drag.current.nudge.y + event.nativeEvent.pageY - drag.current.y,
-                });
-              }}
-              onResponderRelease={() => {
-                drag.current = null;
-              }}
-            />
-          </View>
-        ) : null}
+        <CropOverlay crop={crop} canvas={size} onChange={setCrop} />
         {Platform.OS !== 'web' && crop ? (
           <View
             ref={captureRefView}
@@ -208,7 +268,7 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
           accessibilityLabel="Clear drawing"
           onPress={() => {
             setStrokes([]);
-            setNudge({ x: 0, y: 0 });
+            setCrop(null);
           }}
           style={styles.headerButton}
         >
@@ -219,7 +279,10 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
         style={styles.canvasFrame}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
-          if (width > 0 && height > 0) setSize({ width, height });
+          if (width > 0 && height > 0) {
+            setSize({ width, height });
+            if (strokes.length) setCrop(seedCrop(strokes, { width, height }));
+          }
         }}
       >
         {surface}
@@ -259,8 +322,13 @@ const styles = StyleSheet.create({
   headerTitle: { color: ink, fontSize: 17, fontWeight: '600' },
   canvasFrame: { flex: 1, margin: pad, borderRadius: 18, overflow: 'hidden', backgroundColor: paper },
   canvasInner: { flex: 1, backgroundColor: paper },
-  cropFrame: { position: 'absolute', borderWidth: 2, borderColor: ink, zIndex: 3 },
-  cropHandle: { position: 'absolute', width: 36, height: 24, borderRadius: 12, backgroundColor: ink, zIndex: 5 },
+  cropFrame: { position: 'absolute', borderWidth: 2, borderColor: '#fff', zIndex: 4 },
+  gridLine: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.7)' },
+  cropHit: { position: 'absolute', width: hit, height: hit, alignItems: 'center', justifyContent: 'center', zIndex: 6 },
+  cropKnob: { backgroundColor: '#fff', borderRadius: 1 },
+  cropKnobCorner: { width: 16, height: 16 },
+  cropKnobEdgeH: { width: 24, height: 5 },
+  cropKnobEdgeV: { width: 5, height: 24 },
   exportCapture: { position: 'absolute', left: -10000, top: 0, backgroundColor: paper, overflow: 'hidden' },
   done: {
     marginHorizontal: pad,
@@ -273,4 +341,3 @@ const styles = StyleSheet.create({
   },
   doneText: { color: paper, fontSize: 17, fontWeight: '600' },
 });
-

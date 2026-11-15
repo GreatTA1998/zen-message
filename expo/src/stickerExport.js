@@ -1,5 +1,6 @@
 const ink = '#1c1c1c';
 export const STROKE_WIDTH = 4;
+export const MIN_CROP = 48;
 
 export function hasDrawnInk(strokes) {
   return strokes.some((stroke) => stroke.length > 1);
@@ -37,6 +38,28 @@ export function clampCrop(crop, canvasWidth, canvasHeight) {
     width,
     height,
   };
+}
+
+/** Move or resize a crop rect. mode: move | n|s|e|w|ne|nw|se|sw */
+export function applyCropDrag(crop, mode, dx, dy, canvasWidth, canvasHeight, minSize = MIN_CROP) {
+  if (!crop) return null;
+  let { x, y, width, height } = crop;
+  if (mode === 'move') {
+    return clampCrop({ x: x + dx, y: y + dy, width, height }, canvasWidth, canvasHeight);
+  }
+  if (mode.includes('w')) {
+    const next = Math.min(x + width - minSize, x + dx);
+    width += x - next;
+    x = next;
+  }
+  if (mode.includes('e')) width = Math.max(minSize, width + dx);
+  if (mode.includes('n')) {
+    const next = Math.min(y + height - minSize, y + dy);
+    height += y - next;
+    y = next;
+  }
+  if (mode.includes('s')) height = Math.max(minSize, height + dy);
+  return clampCrop({ x, y, width, height }, canvasWidth, canvasHeight);
 }
 
 function strokePath(ctx, stroke) {
