@@ -119,17 +119,31 @@ function dayNumber(parts) {
   return Math.floor(Date.UTC(parts.year, parts.month, parts.day) / 86400000);
 }
 
-export function threadMessages(messages, contactId) {
-  const id = String(contactId ?? '')
+function normalizeContactId(contactId) {
+  return String(contactId ?? '')
     .replace(/\s+/g, '')
     .toUpperCase();
+}
+
+export function threadMessages(messages, contactId) {
+  const id = normalizeContactId(contactId);
   if (!id) return [];
-  return messages.filter(
+  return (messages || []).filter(
     (item) =>
       item.visible &&
-      String(item.contactId ?? '')
-        .replace(/\s+/g, '')
-        .toUpperCase() === id
+      normalizeContactId(item.contactId) === id
+  );
+}
+
+/** Focus/scheduled holds for one contact — present in state but filtered out of the open thread. */
+export function heldThreadMessages(messages, contactId) {
+  const id = normalizeContactId(contactId);
+  if (!id) return [];
+  return (messages || []).filter(
+    (item) =>
+      !item.visible &&
+      normalizeContactId(item.contactId) === id &&
+      (item.intent === 'anytime' || item.intent === 'scheduled' || item.intent === 'timely')
   );
 }
 

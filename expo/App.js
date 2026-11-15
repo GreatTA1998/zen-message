@@ -26,6 +26,7 @@ import {
   receiptPhrase,
   messageSticker,
   scheduledChoices,
+  heldThreadMessages,
   threadMessages,
 } from './src/delivery';
 import { FriendRequestView } from './src/FriendRequestView';
@@ -36,7 +37,7 @@ import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
-import { loadSession, saveSession } from './src/session';
+import { loadPickedContact, loadSession, savePickedContact, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
@@ -130,16 +131,46 @@ function Root() {
   const [user, setUser] = useState(null);
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
+  // Selection lives above ChatScreen so remounts cannot fall back to contacts[0] (S36).
+  const [pickedId, setPickedId] = useState(null);
   const tokenRef = useRef(null);
   const lookupCacheRef = useRef(new Map());
+  const pickedSeededRef = useRef(false);
 
   const applyInbox = useCallback((next) => {
     setInbox((current) => (typeof next === 'function' ? next(current) : next));
   }, []);
 
+  const chooseContact = useCallback((rawId) => {
+    const id = normalizeCode(rawId) || null;
+    setPickedId(id);
+    savePickedContact(id).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (inbox?.user) setUser(inbox.user);
   }, [inbox?.user]);
+
+  // One-shot restore: local pick first, else last server open. Never re-seed from polls.
+  useEffect(() => {
+    if (pickedSeededRef.current || !inbox?.contacts?.length) return;
+    let alive = true;
+    (async () => {
+      const contacts = inbox.contacts;
+      const local = await loadPickedContact();
+      if (!alive || pickedSeededRef.current) return;
+      const server = normalizeCode(inbox.state?.contactId);
+      const pick =
+        (local && contacts.some((item) => normalizeCode(item.id) === local) && local) ||
+        (server && contacts.some((item) => normalizeCode(item.id) === server) && server) ||
+        null;
+      pickedSeededRef.current = true;
+      if (pick) setPickedId(pick);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [inbox]);
 
   const refresh = useCallback(async () => {
     const current = tokenRef.current;
@@ -262,10 +293,13 @@ function Root() {
 
   async function onLogout() {
     await saveSession(null);
+    await savePickedContact(null);
     tokenRef.current = null;
+    pickedSeededRef.current = false;
     setToken(null);
     setUser(null);
     setInbox(null);
+    setPickedId(null);
   }
 
   async function onDeleteAccount() {
@@ -335,6 +369,8 @@ function Root() {
         onLookup={onLookup}
         onLogout={onLogout}
         onDeleteAccount={onDeleteAccount}
+        pickedId={pickedId}
+        onPickContact={chooseContact}
       />
     );
   }
@@ -354,6 +390,8 @@ function ChatScreen({
   onLookup,
   onLogout,
   onDeleteAccount,
+  pickedId,
+  onPickContact,
 }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
@@ -374,8 +412,6 @@ function ChatScreen({
   const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
-  // One selected id. Only set on tap (and block/decline clear). Polls/open never touch it.
-  const [pickedId, setPickedId] = useState(null);
   const focusRequest = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
@@ -396,6 +432,10 @@ function ChatScreen({
     );
     return pending.length ? [...base, ...pending] : base;
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
+  const heldCount = useMemo(() => {
+    if (!selectedContactId || !contact || !contactActive) return 0;
+    return heldThreadMessages(state?.messages, selectedContactId).length;
+  }, [selectedContactId, contact, state?.messages, contactActive]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
@@ -406,6 +446,12 @@ function ChatScreen({
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
   const canSend =
     contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
+  const focusHoldCopy =
+    messages.length === 0 && heldCount > 0 && summaryTime
+      ? heldCount === 1
+        ? `1 message arrives at ${summaryTime}`
+        : `${heldCount} messages arrive at ${summaryTime}`
+      : '';
 
   useEffect(() => {
     loadStickerLibrary().then(setStickerLibrary).catch(() => {});
@@ -437,7 +483,7 @@ function ChatScreen({
   function pickContact(item) {
     const id = normalizeCode(item.id);
     if (!id) return;
-    setPickedId(id);
+    onPickContact(id);
     setPanel(item.status === 'pending-in' ? 'request' : 'chat');
     // Persist server-side only; ignore response so poll/open cannot rewrite UI selection.
     api('/v1/open', { token, method: 'POST', body: { contactId: id } }).catch(() => {});
@@ -463,7 +509,7 @@ function ChatScreen({
         const next = await api('/v1/block', { token, method: 'POST', body: { contactId: targetId } });
         onInbox(next);
         if (normalizeCode(pickedId) === normalizeCode(targetId)) {
-          setPickedId(normalizeCode(next?.contacts?.[0]?.id) || null);
+          onPickContact(normalizeCode(next?.contacts?.[0]?.id) || null);
         }
         setPanel('chat');
         flashNotice('Contact blocked.');
@@ -850,7 +896,7 @@ function ChatScreen({
                 const declinedId = contact.id;
                 const next = await mutate('/v1/friend-request/decline', { contactId: declinedId });
                 if (normalizeCode(pickedId) === normalizeCode(declinedId)) {
-                  setPickedId(normalizeCode(next?.contacts?.[0]?.id) || null);
+                  onPickContact(normalizeCode(next?.contacts?.[0]?.id) || null);
                 }
                 setPanel('chat');
               } finally {
@@ -868,6 +914,11 @@ function ChatScreen({
         ) : (
         <>
         <View style={[styles.thread, web && styles.webFill]}>
+          {focusHoldCopy ? (
+            <View testID="focus-hold-empty" style={styles.pendingMain}>
+              <Text style={styles.pendingText}>{focusHoldCopy}</Text>
+            </View>
+          ) : (
           <ScrollView
             ref={threadRef}
             style={styles.thread}
@@ -895,6 +946,7 @@ function ChatScreen({
               />
             ))}
           </ScrollView>
+          )}
         </View>
 
         {contactActive ? <ComposerFooter testID="composer" {...composerProps} /> : null}

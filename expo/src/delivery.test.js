@@ -10,6 +10,7 @@ import {
   sanitize,
   scheduledChoices,
   threadMessages,
+  heldThreadMessages,
 } from './delivery.js';
 
 function at(hour, minute, day = 17) {
@@ -360,4 +361,24 @@ test('tap selection cannot snap: thread follows last picked id, not poll contact
     threadMessages(messages, selected).map((item) => item.id),
     ['2']
   );
+});
+
+test('Focus hold: GHV thread looks empty while held anytime message exists', () => {
+  const messages = [
+    { id: '1', contactId: 'S36', body: 'elton', visible: true, intent: 'realtime' },
+    {
+      id: '2',
+      contactId: 'GHV',
+      body: 'from zjf',
+      visible: false,
+      intent: 'anytime',
+      releaseAt: 1,
+    },
+  ];
+  assert.deepEqual(threadMessages(messages, 'GHV'), []);
+  assert.deepEqual(
+    heldThreadMessages(messages, 'GHV').map((item) => item.id),
+    ['2']
+  );
+  assert.equal(heldThreadMessages(messages, 'S36').length, 0);
 });
