@@ -9,6 +9,9 @@ export function expoPushEndpoint() {
 }
 
 export function pushMessage(token, plan) {
+  const collapseId = String(plan.data?.messageIds?.[0] || plan.data?.kind || '')
+    .replace(/[^A-Za-z0-9_-]/g, '')
+    .slice(0, 64);
   return {
     to: token,
     title: plan.title,
@@ -17,6 +20,7 @@ export function pushMessage(token, plan) {
     priority: plan.quiet ? 'default' : 'high',
     interruptionLevel: plan.quiet ? 'passive' : 'active',
     channelId: plan.quiet ? 'zen-quiet' : 'zen-normal',
+    ...(collapseId ? { collapseId } : {}),
     data: plan.data,
   };
 }

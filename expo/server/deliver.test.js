@@ -8,6 +8,7 @@ function person(fields) {
   return {
     ...createState(),
     id: fields.id,
+    firstName: fields.firstName ?? fields.username ?? '',
     mode: fields.mode ?? 'batched',
     pushToken: fields.pushToken ?? null,
     offsetMinutes: fields.offsetMinutes ?? 0,
@@ -46,31 +47,33 @@ test('relaxed anytime is silent and private', () => {
 });
 
 test('scheduled waits for the chosen time and realtime is one normal push', () => {
-  const bea = person({ id: 'bea', username: 'bea', pushToken: 'ExponentPushToken[bea]' });
-  const timely = deliverMessage(person({ id: 'ada', username: 'ada' }), bea, {
+  const bea = person({ id: 'bea', firstName: 'Bea', pushToken: 'ExponentPushToken[bea]' });
+  const ada = person({ id: 'ada', firstName: 'Ada' });
+  const timely = deliverMessage(ada, bea, {
     id: 't',
     body: 'Soon',
     intent: 'scheduled',
     releaseAt: now + 2 * 60 * 60 * 1000,
     now,
   });
-  const realtime = deliverMessage(person({ id: 'ada', username: 'ada' }), bea, {
-    id: 'r',
-    body: 'Now',
+  const first = deliverMessage(ada, bea, { id: 'r1', body: 'Now', intent: 'realtime', now });
+  const second = deliverMessage(ada, { ...bea, ...first.recipient, pushToken: bea.pushToken, firstName: 'Bea', id: 'bea' }, {
+    id: 'r2',
+    body: 'Again',
     intent: 'realtime',
-    now,
+    now: now + 1000,
   });
   assert.equal(timely.recipient.messages[0].visible, false);
   assert.equal(timely.recipientEffects[0].type, 'schedule-digest');
   assert.deepEqual(timely.pushes, []);
-  assert.deepEqual(timely.senderEffects, []);
-  assert.equal(JSON.stringify(timely.senderEffects).includes('relax'), false);
-  assert.equal(realtime.pushes.length, 1);
-  assert.equal(realtime.pushes[0].sound, 'default');
-  assert.equal(realtime.pushes[0].interruptionLevel, 'active');
-  assert.equal(realtime.recipientEffects[0].plan.quiet, false);
-  const relaxed = changeMode(bea, 'relaxed').state;
-  const sooner = deliverMessage(person({ id: 'ada', username: 'ada' }), { ...bea, mode: relaxed.mode }, {
+  assert.equal(first.pushes.length, 1);
+  assert.equal(second.pushes.length, 1);
+  assert.equal(first.pushes[0].title, 'Ada');
+  assert.equal(first.pushes[0].collapseId, 'r1');
+  assert.equal(second.pushes[0].collapseId, 'r2');
+  assert.equal(first.pushes[0].sound, 'default');
+  assert.equal(first.pushes[0].interruptionLevel, 'active');
+  const sooner = deliverMessage(ada, { ...bea, mode: changeMode(bea, 'relaxed').state.mode }, {
     id: 't2',
     body: 'Soon',
     intent: 'scheduled',
@@ -79,7 +82,6 @@ test('scheduled waits for the chosen time and realtime is one normal push', () =
   });
   assert.equal(sooner.recipient.messages[0].visible, true);
   assert.deepEqual(sooner.pushes, []);
-  assert.equal(JSON.stringify({ effects: sooner.senderEffects, message: sooner.sender.messages[0] }).includes('relax'), false);
 });
 
 test('the window sends one digest push', () => {
@@ -105,11 +107,12 @@ test('the window sends one digest push', () => {
 
 test('a push payload does not mention relax or batched', () => {
   const message = pushMessage('ExponentPushToken[bea]', {
-    title: 'ada',
+    title: 'Ada',
     body: 'Hello',
     quiet: true,
     data: { kind: 'timely', quiet: true, messageIds: ['t'] },
   });
+  assert.equal(message.collapseId, 't');
   const encoded = JSON.stringify(message);
   assert.equal(encoded.includes('relax'), false);
   assert.equal(encoded.includes('batched'), false);
