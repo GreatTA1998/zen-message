@@ -1,11 +1,11 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { PERSON_AVATAR } from './contacts';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { PersonAvatar } from './contacts';
 
 export function FriendRequestView({ contact, onAccept, onDecline, busy }) {
   return (
     <View style={styles.screen}>
       <View style={styles.card}>
-        <Image source={PERSON_AVATAR} style={styles.avatar} resizeMode="cover" />
+        <PersonAvatar id={contact.id} name={contact.firstName} uri={contact.avatar} size={88} />
         <Text style={styles.name}>{contact.firstName || contact.id}</Text>
         <Text style={styles.id}>{contact.id}</Text>
         <Text style={styles.lead}>wants to be your contact</Text>
@@ -50,7 +50,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: { alignItems: 'center', gap: 8 },
-  avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 1, borderColor: ink },
   name: { color: ink, fontSize: 22, lineHeight: 28, fontWeight: '600' },
   id: { color: ink, fontSize: 16, lineHeight: 20, letterSpacing: 2 },
   lead: { color: ink, fontSize: 17, lineHeight: 22, marginTop: 4 },

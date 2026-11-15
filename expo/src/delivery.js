@@ -1,3 +1,5 @@
+import { normalizeCode } from './people.js';
+
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const DAY_HOURS = Array.from({ length: 24 }, (_item, hour) => hour);
 
@@ -138,16 +140,9 @@ function dayNumber(parts) {
 }
 
 export function threadMessages(messages, contactId) {
-  const id = String(contactId ?? '')
-    .replace(/\s+/g, '')
-    .toUpperCase();
+  const id = normalizeCode(contactId);
   if (!id) return [];
-  return (messages || []).filter(
-    (item) =>
-      String(item.contactId ?? '')
-        .replace(/\s+/g, '')
-        .toUpperCase() === id
-  );
+  return (messages || []).filter((item) => normalizeCode(item.contactId) === id);
 }
 
 function latestInboundAt(messages, contactId) {
@@ -172,7 +167,7 @@ export function syncOpenedAt(openedAt, contacts, messages, selectedId) {
     (next ??= { ...openedAt })[id] = at;
   };
   for (const item of contacts || []) {
-    const id = String(item?.id ?? '').replace(/\s+/g, '').toUpperCase();
+    const id = normalizeCode(item?.id);
     if (id && !(id in (next || openedAt))) touch(id, latestInboundAt(messages, id));
   }
   if (selectedId) touch(selectedId, latestInboundAt(messages, selectedId) || Date.now());

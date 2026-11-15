@@ -17,7 +17,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
-import { PERSON_AVATAR } from './src/contacts';
+import { PersonAvatar } from './src/contacts';
 import {
   DAY_HOURS,
   INTENTS,
@@ -707,7 +707,7 @@ function ChatScreen({
                 setAccountOpen((current) => !current);
               }}
             >
-              <Image source={PERSON_AVATAR} resizeMode="cover" style={[styles.avatar, { width: 32, height: 32, borderRadius: 16 }]} />
+              <PersonAvatar id={accountId} name={inbox?.user?.firstName} uri={inbox?.user?.avatar} size={32} />
             </Pressable>
             {accountOpen ? (
               <View testID="account-popover" style={styles.popover}>
@@ -765,17 +765,14 @@ function ChatScreen({
                 }}
                 style={styles.contact}
               >
-                {pending ? (
-                  <View style={[styles.avatarShell, styles.avatarDashed, ring && styles.circleOn, glow]}>
-                    <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatarFill} />
-                  </View>
-                ) : (
-                  <Image
-                    source={PERSON_AVATAR}
-                    resizeMode="cover"
-                    style={[styles.avatar, ring && styles.circleOn, glow]}
-                  />
-                )}
+                <PersonAvatar
+                  id={id}
+                  name={item.firstName}
+                  uri={item.avatar}
+                  size={54}
+                  dashed={pending}
+                  style={[ring && styles.circleOn, glow]}
+                />
                 <Text numberOfLines={1} style={styles.contactLabel}>
                   {item.firstName || item.id}
                 </Text>
@@ -1393,19 +1390,6 @@ const styles = StyleSheet.create({
   contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
   contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 8 },
   contact: { alignItems: 'center' },
-  avatar: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, backgroundColor: paper },
-  avatarShell: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 2,
-    borderColor: ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: paper,
-  },
-  avatarDashed: { borderStyle: 'dashed' },
-  avatarFill: { width: 46, height: 46, borderRadius: 23 },
   avatarHalo: {
     borderColor: 'rgba(72, 158, 118, 0.7)',
     shadowColor: '#3f9a6e',
