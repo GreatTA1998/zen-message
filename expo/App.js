@@ -36,7 +36,8 @@ import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
-import { bubbleTone, messageBubbleParts } from './src/messageBubble';
+import { bubbleTone, messageBubbleParts, ZEN_FILL } from './src/messageBubble';
+import { ZenMotif } from './src/zenMotif';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -50,8 +51,6 @@ import { DrawModal } from './src/DrawModal';
 const ink = '#1c1c1c';
 const paper = '#fff';
 const moon = '#5E5CE6';
-const sage = '#f3f9f5';
-const grass = '#5f9a76';
 const web = Platform.OS === 'web';
 const side = 32;
 const photoMaxWidth = web ? 320 : 280;
@@ -1277,7 +1276,7 @@ function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming
 
 function TextBubble({ message, incoming }) {
   const tone = bubbleTone(message.intent);
-  const fill = tone === 'zen' ? sage : paper;
+  const fill = tone === 'zen' ? ZEN_FILL : paper;
   return (
     <View
       testID={incoming ? 'bubble-in' : 'bubble-out'}
@@ -1291,8 +1290,8 @@ function TextBubble({ message, incoming }) {
           <View style={styles.tailEdge} />
         </View>
       </View>
-      {tone === 'zen' ? <Ionicons name="leaf-outline" size={12} color={grass} style={styles.zenMark} /> : null}
       <Text style={styles.bubbleText}>{message.body}</Text>
+      {tone === 'zen' ? <ZenMotif /> : null}
     </View>
   );
 }
@@ -1369,42 +1368,16 @@ const styles = StyleSheet.create({
   scheduleLine: { color: ink, fontSize: 16, lineHeight: 20 },
   schedulePrefix: { flexShrink: 1 },
   scheduleTime: { flexShrink: 0, textDecorationLine: 'underline' },
-  contactMenuPopover: {
-    position: 'absolute',
-    top: 124,
-    left: side,
-    zIndex: 6,
-  },
+  contactMenuPopover: { position: 'absolute', top: 124, left: side, zIndex: 6 },
   accountMenuWide: { width: 248 },
   menuFooter: { borderTopWidth: 1, borderTopColor: '#e6e3dc' },
   menuRowQuiet: { paddingVertical: 10, paddingHorizontal: 18 },
   menuTextQuiet: { color: '#6a6a6a', fontSize: 13, lineHeight: 17 },
-  menuConsequence: {
-    color: ink,
-    fontSize: 13,
-    lineHeight: 18,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
+  menuConsequence: { color: ink, fontSize: 13, lineHeight: 18, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 6 },
   menuTextAlert: { color: '#b3261e' },
-  chatNotice: {
-    position: 'absolute',
-    left: side,
-    right: side,
-    bottom: 18,
-    alignItems: 'center',
-    zIndex: 12,
-  },
+  chatNotice: { position: 'absolute', left: side, right: side, bottom: 18, alignItems: 'center', zIndex: 12 },
   chatNoticeText: {
-    color: ink,
-    backgroundColor: paper,
-    borderWidth: 1,
-    borderColor: ink,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
-    lineHeight: 18,
+    color: ink, backgroundColor: paper, borderWidth: 1, borderColor: ink, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, lineHeight: 18,
   },
   photoViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   photoViewerImage: { width: '100%', height: '100%' },
@@ -1417,26 +1390,12 @@ const styles = StyleSheet.create({
   contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
   contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 8 },
   contact: { alignItems: 'center' },
-  avatarHalo: {
-    borderColor: 'rgba(72, 158, 118, 0.7)',
-    shadowColor: '#3f9a6e',
-    shadowOpacity: 0.5,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 0 },
-  },
+  avatarHalo: { borderColor: 'rgba(72, 158, 118, 0.7)', shadowColor: '#3f9a6e', shadowOpacity: 0.5, shadowRadius: 9, shadowOffset: { width: 0, height: 0 } },
   circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
   contactLabel: { marginTop: 4, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
-  plus: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 1,
-    borderColor: ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  plus: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, alignItems: 'center', justifyContent: 'center' },
   plusMark: { color: ink, fontSize: 32, lineHeight: 34 },
   main: { flex: 1, backgroundColor: paper },
   thread: { flex: 1 },
@@ -1446,33 +1405,18 @@ const styles = StyleSheet.create({
   messageStackOut: { alignSelf: 'flex-end' },
   stickerPreview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#fafafa' },
   mediaBubble: {
-    width: photoMaxWidth,
-    maxWidth: '84%',
-    aspectRatio: 4 / 3,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
+    width: photoMaxWidth, maxWidth: '84%', aspectRatio: 4 / 3, borderRadius: 16, overflow: 'hidden', backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
   },
   stickerBubble: { width: 148, height: 148, aspectRatio: 1, backgroundColor: 'transparent', borderWidth: 0 },
   mediaBubbleIn: { alignSelf: 'flex-start' },
   mediaBubbleOut: { alignSelf: 'flex-end' },
   mediaImage: { width: '100%', height: '100%' },
   bubble: {
-    alignSelf: 'flex-end',
-    maxWidth: '84%',
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 18,
-    backgroundColor: paper,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 4,
+    alignSelf: 'flex-end', maxWidth: '84%', borderWidth: 1, borderColor: ink, borderRadius: 18, backgroundColor: paper, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 4,
   },
   bubbleOut: { borderBottomRightRadius: 2 },
   bubbleIn: { alignSelf: 'flex-start', maxWidth: '78%', marginTop: 10, marginBottom: 0, borderTopLeftRadius: 2 },
-  bubbleZen: { backgroundColor: sage, borderColor: grass, shadowColor: grass, shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } },
+  bubbleZen: { backgroundColor: ZEN_FILL, borderColor: '#2f7a52', borderWidth: 2 },
   bubbleScheduled: { borderStyle: 'dashed' },
   bubbleRead: { maxWidth: 'min(560px, 100%)' },
   tail: { position: 'absolute', width: 24, height: 20 },
@@ -1480,30 +1424,12 @@ const styles = StyleSheet.create({
   tailOut: { right: -1, bottom: -12, transform: [{ rotate: '180deg' }] },
   tailStem: { position: 'absolute', left: 0, top: 0, width: 1, height: 14, backgroundColor: ink },
   tailFill: {
-    position: 'absolute',
-    left: 1,
-    top: 0,
-    width: 0,
-    height: 0,
-    borderRightWidth: 16,
-    borderBottomWidth: 13,
-    borderRightColor: 'transparent',
-    borderBottomColor: paper,
+    position: 'absolute', left: 1, top: 0, width: 0, height: 0, borderRightWidth: 16, borderBottomWidth: 13, borderRightColor: 'transparent', borderBottomColor: paper,
   },
   tailJoin: { position: 'absolute', left: 1, top: 11, width: 16, height: 8, backgroundColor: paper },
   tailClip: { position: 'absolute', left: 0, top: 0, width: 24, height: 12, overflow: 'hidden' },
-  tailEdge: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 28,
-    height: 1,
-    backgroundColor: ink,
-    transformOrigin: 'left center',
-    transform: [{ rotate: '36deg' }],
-  },
+  tailEdge: { position: 'absolute', left: 0, top: 0, width: 28, height: 1, backgroundColor: ink, transformOrigin: 'left center', transform: [{ rotate: '36deg' }] },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
-  zenMark: { position: 'absolute', right: 8, bottom: 7, opacity: 0.38 },
   footer: { backgroundColor: paper },
   composerWrap: { position: 'relative', zIndex: 2 },
   intentSlot: {
