@@ -514,15 +514,20 @@ function ChatScreen({
   const contactPendingIn = contact?.status === 'pending-in';
   const contactPendingOut = contact?.status === 'pending-out';
   const messages = useMemo(() => {
-    if (!activeContactId || !contactActive) return [];
-    if (contact && contact.status && contact.status !== 'active') return [];
-    threadCacheRef.current = updateThreadCache(threadCacheRef.current, state?.messages);
+    // Require the contact to still be on the strip — never show a pruned peer from cache alone.
+    if (!activeContactId || !contact || !contactActive) return [];
+    if (contact.status && contact.status !== 'active') return [];
+    threadCacheRef.current = updateThreadCache(
+      threadCacheRef.current,
+      state?.messages,
+      contacts.map((item) => item.id)
+    );
     const base = cachedThread(threadCacheRef.current, state?.messages, activeContactId);
     const pending = pendingOutbound.filter(
       (item) => normalizeCode(item.contactId) === normalizeCode(activeContactId)
     );
     return pending.length ? [...base, ...pending] : base;
-  }, [activeContactId, contact, state?.messages, contactActive, pendingOutbound]);
+  }, [activeContactId, contact, contacts, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
@@ -538,8 +543,17 @@ function ChatScreen({
     selectedContactRef.current = selectedContactId;
   }, [selectedContactId, selectedContactRef]);
 
-  // Intentionally no Effect that syncs selection from contacts / state.contactId.
-  // That Effect was the snap-back to Elton after a slow /v1/open.
+  // Cold-seed ONLY while local selection is still null (inbox arrived after mount).
+  // Never re-seed from server contactId once the user (or a prior seed) has a local id —
+  // that re-sync path was the snap-back to Elton.
+  useEffect(() => {
+    if (selectedContactRef.current) return;
+    if (!contacts.length) return;
+    const initial = seedContactId(contacts, state?.contactId);
+    if (!initial) return;
+    selectedContactRef.current = initial;
+    setSelectedContactId(initial);
+  }, [contacts, state?.contactId]);
 
   useEffect(() => {
     loadStickerLibrary().then(setStickerLibrary).catch(() => {});

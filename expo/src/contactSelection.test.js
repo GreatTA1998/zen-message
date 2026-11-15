@@ -152,11 +152,37 @@ test('thread cache returns prior thread without waiting on open', () => {
     { id: '1', contactId: 'S36', body: 'elton', photo: 'data:x', visible: true },
     { id: '2', contactId: 'GHV', body: 'zjf', photo: null, visible: true },
   ];
-  const cache = updateThreadCache(new Map(), messages);
+  const cache = updateThreadCache(new Map(), messages, ['S36', 'GHV']);
   assert.equal(cachedThread(cache, [], 'GHV')[0].body, 'zjf');
   assert.equal(cachedThread(cache, [], 'S36')[0], messages[0]);
   // Switching to GHV does not require live messages array.
   assert.equal(cachedThread(cache, null, 'GHV').length, 1);
+});
+
+test('thread cache drops contacts no longer on the strip', () => {
+  const messages = [
+    { id: '1', contactId: 'S36', body: 'elton', photo: 'data:x', visible: true },
+    { id: '2', contactId: 'GHV', body: 'zjf', photo: null, visible: true },
+  ];
+  const full = updateThreadCache(new Map(), messages, ['S36', 'GHV']);
+  const pruned = updateThreadCache(full, messages, ['S36']);
+  assert.equal(pruned.has('GHV'), false);
+  assert.equal(pruned.has('S36'), true);
+  assert.equal(cachedThread(pruned, messages, 'GHV')[0].body, 'zjf'); // live fallback only
+});
+
+test('cold seed is one-shot: null local gets hint, set local is never overwritten by polls', () => {
+  assert.equal(seedContactId(contacts, 'S36'), 'S36');
+  // After local is set, resolve ignores server entirely.
+  assert.equal(resolveSelectedContactId(contacts, 'GHV', 'S36'), 'GHV');
+  const afterPolls = simulateSelectionAuthority({
+    initialLocal: null,
+    taps: [],
+    polls: ['S36', 'GHV'],
+    opens: [],
+  });
+  // Without a tap, simulate keeps null local (seed is App-level); inbox may follow prior blob.
+  assert.equal(afterPolls.local, null);
 });
 
 test('nextSelectionAfterRemoval only moves when selected contact was removed', () => {

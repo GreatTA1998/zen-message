@@ -147,9 +147,13 @@ export function mergeOpenInbox(current, next, selectedContactId) {
   };
 }
 
-/** Partition stabilized messages into a per-contact cache (switching must not wait on open). */
-export function updateThreadCache(cache, messages) {
-  const next = cache instanceof Map ? cache : new Map();
+/**
+ * Partition stabilized messages into a per-contact cache (switching must not wait on open).
+ * When `allowedContactIds` is provided, drop cache entries for contacts no longer on the strip
+ * (block / remote removal) so a deleted peer cannot linger on screen.
+ */
+export function updateThreadCache(cache, messages, allowedContactIds = null) {
+  const next = cache instanceof Map ? new Map(cache) : new Map();
   const list = Array.isArray(messages) ? messages : [];
   const seen = new Set();
   for (const item of list) {
@@ -159,6 +163,14 @@ export function updateThreadCache(cache, messages) {
     const thread = threadMessages(list, id);
     const prior = next.get(id);
     next.set(id, stabilizeMessages(prior, thread));
+  }
+  if (Array.isArray(allowedContactIds)) {
+    const allow = new Set(
+      allowedContactIds.map((item) => normalizeCode(item)).filter(Boolean)
+    );
+    for (const key of [...next.keys()]) {
+      if (!allow.has(key)) next.delete(key);
+    }
   }
   return next;
 }
