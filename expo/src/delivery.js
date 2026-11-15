@@ -3,7 +3,7 @@ export const CHECKPOINT_HOURS = [12, 19];
 export const DAY_HOURS = Array.from({ length: 24 }, (_item, hour) => hour);
 
 export const INTENTS = [
-  { id: 'anytime', label: 'anytime' },
+  { id: 'anytime', label: 'zen' },
   { id: 'scheduled', label: 'scheduled' },
   { id: 'realtime', label: 'realtime' },
 ];
