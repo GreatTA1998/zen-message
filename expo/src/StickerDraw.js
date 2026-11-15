@@ -1,13 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Modal,
-  PanResponder,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { hasDrawnInk, paintStrokes } from './stickerExport.js';
 
@@ -15,14 +7,18 @@ const ink = '#1c1c1c';
 const paper = '#fff';
 const pad = 20;
 const strokeWidth = 4;
+const pathProps = {
+  stroke: ink,
+  strokeWidth,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  fill: 'none',
+};
 
 function pointsToPath(points) {
   if (!points.length) return '';
-  const [first, ...rest] = points;
-  let d = `M ${first.x} ${first.y}`;
-  for (const point of rest) {
-    d += ` L ${point.x} ${point.y}`;
-  }
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i += 1) d += ` L ${points[i].x} ${points[i].y}`;
   return d;
 }
 
@@ -51,10 +47,7 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
   const localPoint = (event) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return null;
-    return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
 
   const onPointerDown = (event) => {
@@ -62,10 +55,10 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
     if (!point) return;
     drawing.current = true;
     active.current = [point];
-  try {
+    try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
-      // Some browsers reject capture on unsupported targets.
+      /* unsupported target */
     }
     event.preventDefault();
   };
@@ -85,10 +78,12 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
     try {
       event?.currentTarget?.releasePointerCapture?.(event.pointerId);
     } catch {
-      // Ignore release errors.
+      /* ignore */
     }
     if (active.current.length > 1) {
-      onStrokeEnd([...strokesRef.current, [...active.current]]);
+      const committed = [...strokesRef.current, [...active.current]];
+      strokesRef.current = committed;
+      onStrokeEnd(committed);
     }
     active.current = [];
     repaint();
@@ -109,55 +104,49 @@ function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
   );
 }
 
-function NativeDrawSurface({ width, height, strokes, setStrokes }) {
+function NativeDrawSurface({ width, height, strokes, onStrokeEnd }) {
+  const [live, setLive] = useState('');
   const active = useRef(null);
+  const strokesRef = useRef(strokes);
+  strokesRef.current = strokes;
 
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: (event) => {
-          const { locationX, locationY } = event.nativeEvent;
-          active.current = [{ x: locationX, y: locationY }];
-          setStrokes((current) => [...current, active.current]);
-        },
-        onPanResponderMove: (event) => {
-          if (!active.current) return;
-          const { locationX, locationY } = event.nativeEvent;
-          active.current.push({ x: locationX, y: locationY });
-          setStrokes((current) => {
-            if (!current.length) return current;
-            const next = current.slice(0, -1);
-            next.push([...active.current]);
-            return next;
-          });
-        },
-        onPanResponderRelease: () => {
-          active.current = null;
-        },
-        onPanResponderTerminate: () => {
-          active.current = null;
-        },
-      }),
-    [setStrokes],
-  );
+  useEffect(() => {
+    if (strokes.length) return;
+    active.current = null;
+    setLive('');
+  }, [strokes]);
+
+  const finish = () => {
+    if (active.current?.length > 1) onStrokeEnd([...strokesRef.current, active.current.slice()]);
+    active.current = null;
+    setLive('');
+  };
 
   return (
-    <View style={{ width, height }} {...responder.panHandlers}>
-      <Svg width={width} height={height}>
+    <View
+      style={{ width, height }}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderTerminationRequest={() => false}
+      onResponderGrant={(event) => {
+        const { locationX: x, locationY: y } = event.nativeEvent;
+        active.current = [{ x, y }];
+        setLive('');
+      }}
+      onResponderMove={(event) => {
+        if (!active.current) return;
+        const { locationX: x, locationY: y } = event.nativeEvent;
+        active.current.push({ x, y });
+        setLive(pointsToPath(active.current));
+      }}
+      onResponderRelease={finish}
+      onResponderTerminate={finish}
+    >
+      <Svg width={width} height={height} pointerEvents="none">
         {strokes.map((stroke, index) => (
-          <Path
-            key={`stroke-${index}`}
-            d={pointsToPath(stroke)}
-            stroke={ink}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
+          <Path key={`stroke-${index}`} d={pointsToPath(stroke)} {...pathProps} />
         ))}
+        {live ? <Path d={live} {...pathProps} /> : null}
       </Svg>
     </View>
   );
@@ -187,17 +176,6 @@ export async function exportDrawnSticker(strokes, captureView, size) {
   return `data:image/png;base64,${base64}`;
 }
 
-function StickerDrawShell({ children }) {
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webOverlay} accessibilityViewIsModal>
-        {children}
-      </View>
-    );
-  }
-  return children;
-}
-
 export function StickerDrawModal({ visible, onCancel, onDone }) {
   const [strokes, setStrokes] = useState([]);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -220,10 +198,6 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [visible, onCancel]);
 
-  const clear = useCallback(() => {
-    setStrokes([]);
-  }, []);
-
   const finish = useCallback(async () => {
     if (saving.current) return;
     saving.current = true;
@@ -235,52 +209,49 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
     }
   }, [onDone, size, strokes]);
 
-  const onLayout = (event) => {
-    const { width, height } = event.nativeEvent.layout;
-    if (width > 0 && height > 0) setSize({ width, height });
-  };
-
   if (!visible) return null;
 
+  const surface =
+    size.width > 0 && size.height > 0 ? (
+      <View ref={captureRefView} collapsable={false} style={styles.canvasInner}>
+        {Platform.OS === 'web' ? (
+          <WebDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
+        ) : (
+          <NativeDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
+        )}
+      </View>
+    ) : null;
+
   const body = (
-    <StickerDrawShell>
-      <View style={styles.sheet}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Cancel drawing"
-            onPress={onCancel}
-            style={styles.headerButton}
-          >
-            <Text style={styles.headerAction}>Cancel</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Draw sticker</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Clear drawing" onPress={clear} style={styles.headerButton}>
-            <Text style={[styles.headerAction, styles.headerActionRight]}>Clear</Text>
-          </Pressable>
-        </View>
-        <View style={styles.canvasFrame} onLayout={onLayout}>
-          {size.width > 0 && size.height > 0 ? (
-            <View ref={captureRefView} collapsable={false} style={styles.canvasInner}>
-              {Platform.OS === 'web' ? (
-                <WebDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
-              ) : (
-                <NativeDrawSurface width={size.width} height={size.height} strokes={strokes} setStrokes={setStrokes} />
-              )}
-            </View>
-          ) : null}
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={finish} style={styles.done}>
-          <Text style={styles.doneText}>Done</Text>
+    <View
+      style={[styles.sheet, Platform.OS === 'web' && styles.webOverlay]}
+      accessibilityViewIsModal={Platform.OS === 'web' ? true : undefined}
+    >
+      <View style={styles.header}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cancel drawing" onPress={onCancel} style={styles.headerButton}>
+          <Text style={styles.headerAction}>Cancel</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>Draw sticker</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear drawing" onPress={() => setStrokes([])} style={styles.headerButton}>
+          <Text style={[styles.headerAction, styles.headerActionRight]}>Clear</Text>
         </Pressable>
       </View>
-    </StickerDrawShell>
+      <View
+        style={styles.canvasFrame}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          if (width > 0 && height > 0) setSize({ width, height });
+        }}
+      >
+        {surface}
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={finish} style={styles.done}>
+        <Text style={styles.doneText}>Done</Text>
+      </Pressable>
+    </View>
   );
 
-  if (Platform.OS === 'web') {
-    return body;
-  }
-
+  if (Platform.OS === 'web') return body;
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onCancel}>
       {body}
