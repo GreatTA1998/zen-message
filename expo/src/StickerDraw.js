@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { hasDrawnInk, paintStrokes } from './stickerExport.js';
+import { clampCrop, hasDrawnInk, inkBounds, paintStrokes, STROKE_WIDTH } from './stickerExport.js';
 
 const ink = '#1c1c1c';
 const paper = '#fff';
 const pad = 20;
-const strokeWidth = 4;
 const pathProps = {
   stroke: ink,
-  strokeWidth,
+  strokeWidth: STROKE_WIDTH,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
   fill: 'none',
@@ -22,89 +21,13 @@ function pointsToPath(points) {
   return d;
 }
 
-function WebDrawSurface({ width, height, strokes, onStrokeEnd }) {
-  const canvasRef = useRef(null);
-  const drawing = useRef(false);
-  const active = useRef([]);
-  const strokesRef = useRef(strokes);
-  strokesRef.current = strokes;
-
-  const repaint = useCallback(
-    (activeStroke = null) => {
-      const canvas = canvasRef.current;
-      if (!canvas || !width || !height) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      paintStrokes(ctx, strokesRef.current, width, height, activeStroke);
-    },
-    [width, height],
-  );
-
-  useEffect(() => {
-    repaint();
-  }, [strokes, width, height, repaint]);
-
-  const localPoint = (event) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  };
-
-  const onPointerDown = (event) => {
-    const point = localPoint(event);
-    if (!point) return;
-    drawing.current = true;
-    active.current = [point];
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      /* unsupported target */
-    }
-    event.preventDefault();
-  };
-
-  const onPointerMove = (event) => {
-    if (!drawing.current) return;
-    const point = localPoint(event);
-    if (!point) return;
-    active.current.push(point);
-    repaint([...active.current]);
-    event.preventDefault();
-  };
-
-  const endStroke = (event) => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    try {
-      event?.currentTarget?.releasePointerCapture?.(event.pointerId);
-    } catch {
-      /* ignore */
-    }
-    if (active.current.length > 1) {
-      const committed = [...strokesRef.current, [...active.current]];
-      strokesRef.current = committed;
-      onStrokeEnd(committed);
-    }
-    active.current = [];
-    repaint();
-  };
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{ width, height, touchAction: 'none', display: 'block', cursor: 'crosshair' }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endStroke}
-      onPointerCancel={endStroke}
-      onPointerLeave={endStroke}
-    />
-  );
+function cropFor(strokes, size, nudge) {
+  const bounds = inkBounds(strokes);
+  if (!bounds || !size.width) return null;
+  return clampCrop({ ...bounds, x: bounds.x + nudge.x, y: bounds.y + nudge.y }, size.width, size.height);
 }
 
-function NativeDrawSurface({ width, height, strokes, onStrokeEnd }) {
+function DrawSurface({ width, height, strokes, onStrokeEnd }) {
   const [live, setLive] = useState('');
   const active = useRef(null);
   const strokesRef = useRef(strokes);
@@ -152,39 +75,44 @@ function NativeDrawSurface({ width, height, strokes, onStrokeEnd }) {
   );
 }
 
-export async function exportDrawnSticker(strokes, captureView, size) {
+export async function exportDrawnSticker(strokes, captureView, size, crop) {
   if (!hasDrawnInk(strokes)) return null;
+  const rect = crop?.width > 0 && crop?.height > 0 ? crop : { x: 0, y: 0, width: size.width, height: size.height };
 
   if (Platform.OS === 'web') {
     const canvas = document.createElement('canvas');
-    canvas.width = size.width;
-    canvas.height = size.height;
+    canvas.width = Math.max(1, Math.round(rect.width));
+    canvas.height = Math.max(1, Math.round(rect.height));
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    paintStrokes(ctx, strokes, size.width, size.height);
+    paintStrokes(ctx, strokes, canvas.width, canvas.height, null, rect);
     return canvas.toDataURL('image/png');
   }
 
   if (!captureView) return null;
   const { captureRef } = await import('react-native-view-shot');
-  const base64 = await captureRef(captureView, {
-    format: 'png',
-    quality: 0.92,
-    result: 'base64',
-  });
-  if (typeof base64 !== 'string' || !base64) return null;
-  return `data:image/png;base64,${base64}`;
+  const base64 = await captureRef(captureView, { format: 'png', quality: 0.92, result: 'base64' });
+  return typeof base64 === 'string' && base64 ? `data:image/png;base64,${base64}` : null;
 }
 
 export function StickerDrawModal({ visible, onCancel, onDone }) {
   const [strokes, setStrokes] = useState([]);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [nudge, setNudge] = useState({ x: 0, y: 0 });
   const captureRefView = useRef(null);
+  const drag = useRef(null);
   const saving = useRef(false);
+  const crop = cropFor(strokes, size, nudge);
+
+  const commitStrokes = useCallback((next) => {
+    setNudge({ x: 0, y: 0 });
+    setStrokes(next);
+  }, []);
 
   useEffect(() => {
     if (!visible) {
       setStrokes([]);
+      setNudge({ x: 0, y: 0 });
       saving.current = false;
     }
   }, [visible]);
@@ -202,23 +130,66 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
     if (saving.current) return;
     saving.current = true;
     try {
-      const dataUri = await exportDrawnSticker(strokes, captureRefView, size);
+      const dataUri = await exportDrawnSticker(strokes, captureRefView, size, crop);
       if (dataUri) onDone?.(dataUri);
     } finally {
       saving.current = false;
     }
-  }, [onDone, size, strokes]);
+  }, [crop, onDone, size, strokes]);
 
   if (!visible) return null;
 
   const surface =
     size.width > 0 && size.height > 0 ? (
-      <View ref={captureRefView} collapsable={false} style={styles.canvasInner}>
-        {Platform.OS === 'web' ? (
-          <WebDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
-        ) : (
-          <NativeDrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={setStrokes} />
-        )}
+      <View style={styles.canvasInner}>
+        <DrawSurface width={size.width} height={size.height} strokes={strokes} onStrokeEnd={commitStrokes} />
+        {crop ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <View pointerEvents="none" style={[styles.cropFrame, crop]} />
+            <View
+              accessibilityRole="adjustable"
+              accessibilityLabel="Adjust crop"
+              style={[
+                styles.cropHandle,
+                { left: crop.x + crop.width / 2 - 18, top: Math.min(crop.y + crop.height - 6, size.height - 24) },
+              ]}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={() => true}
+              onResponderTerminationRequest={() => false}
+              onResponderGrant={(event) => {
+                drag.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, nudge };
+              }}
+              onResponderMove={(event) => {
+                if (!drag.current) return;
+                setNudge({
+                  x: drag.current.nudge.x + event.nativeEvent.pageX - drag.current.x,
+                  y: drag.current.nudge.y + event.nativeEvent.pageY - drag.current.y,
+                });
+              }}
+              onResponderRelease={() => {
+                drag.current = null;
+              }}
+            />
+          </View>
+        ) : null}
+        {Platform.OS !== 'web' && crop ? (
+          <View
+            ref={captureRefView}
+            collapsable={false}
+            pointerEvents="none"
+            style={[styles.exportCapture, { width: Math.round(crop.width), height: Math.round(crop.height) }]}
+          >
+            <Svg width={Math.round(crop.width)} height={Math.round(crop.height)}>
+              {strokes.map((stroke, index) => (
+                <Path
+                  key={`export-${index}`}
+                  d={pointsToPath(stroke.map((point) => ({ x: point.x - crop.x, y: point.y - crop.y })))}
+                  {...pathProps}
+                />
+              ))}
+            </Svg>
+          </View>
+        ) : null}
       </View>
     ) : null;
 
@@ -232,7 +203,15 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
           <Text style={styles.headerAction}>Cancel</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Draw sticker</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Clear drawing" onPress={() => setStrokes([])} style={styles.headerButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Clear drawing"
+          onPress={() => {
+            setStrokes([]);
+            setNudge({ x: 0, y: 0 });
+          }}
+          style={styles.headerButton}
+        >
           <Text style={[styles.headerAction, styles.headerActionRight]}>Clear</Text>
         </Pressable>
       </View>
@@ -260,15 +239,7 @@ export function StickerDrawModal({ visible, onCancel, onDone }) {
 }
 
 const styles = StyleSheet.create({
-  webOverlay: {
-    position: 'fixed',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 2000,
-    backgroundColor: '#f4f4f4',
-  },
+  webOverlay: { position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 2000, backgroundColor: '#f4f4f4' },
   sheet: { flex: 1, backgroundColor: '#f4f4f4' },
   header: {
     flexDirection: 'row',
@@ -288,6 +259,9 @@ const styles = StyleSheet.create({
   headerTitle: { color: ink, fontSize: 17, fontWeight: '600' },
   canvasFrame: { flex: 1, margin: pad, borderRadius: 18, overflow: 'hidden', backgroundColor: paper },
   canvasInner: { flex: 1, backgroundColor: paper },
+  cropFrame: { position: 'absolute', borderWidth: 2, borderColor: ink, zIndex: 3 },
+  cropHandle: { position: 'absolute', width: 36, height: 24, borderRadius: 12, backgroundColor: ink, zIndex: 5 },
+  exportCapture: { position: 'absolute', left: -10000, top: 0, backgroundColor: paper, overflow: 'hidden' },
   done: {
     marginHorizontal: pad,
     marginBottom: pad + 8,
@@ -299,3 +273,4 @@ const styles = StyleSheet.create({
   },
   doneText: { color: paper, fontSize: 17, fontWeight: '600' },
 });
+
