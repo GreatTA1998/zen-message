@@ -34,10 +34,10 @@ export function scheduledChoices(now, offsetMinutes) {
   );
 }
 
-export function dayPhrase(hour, minute = 0) {
+export function dayPhrase(hour, minute = 0, pad) {
   const suffix = hour >= 12 ? 'pm' : 'am';
   const shown = hour % 12 || 12;
-  if (!minute) return `${shown} ${suffix}`;
+  if (!minute && !pad) return `${shown} ${suffix}`;
   return `${shown}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
@@ -48,13 +48,21 @@ export function receiptPhrase(at, now = new Date(), offsetMinutes) {
   const nowParts = partsInZone(nowDate, offsetMinutes);
   const dayDiff = dayNumber(atParts) - dayNumber(nowParts);
   const when = dayDiff <= 0 ? 'today' : dayDiff === 1 ? 'tomorrow' : WEEKDAYS[atParts.weekday];
-  return `Received at ${clockWords(atParts.hour, atParts.minute)} ${when}`;
+  return `Received at ${dayPhrase(atParts.hour, atParts.minute, true)} ${when}`;
 }
 
-function clockWords(hour, minute) {
-  const suffix = hour >= 12 ? 'pm' : 'am';
-  const shown = hour % 12 || 12;
-  return `${shown}:${String(minute).padStart(2, '0')} ${suffix}`;
+export function choiceLabel(at, now) {
+  const day = receiptPhrase(at, now).split(' ').pop();
+  const clock = dayPhrase(at.getHours(), at.getMinutes()).replace(' ', '');
+  return day === 'today' ? clock : `${clock} ${day}`;
+}
+
+export function composerPlaceholder(name, intent, at) {
+  const who = String(name || '').trim();
+  if (!who) return 'Message';
+  if (intent === 'realtime') return `Message ${who} with a realtime notification`;
+  if (intent !== 'scheduled' || !at) return `Message ${who} without a notification`;
+  return `Message ${who} at ${dayPhrase(at.getHours(), at.getMinutes())}`;
 }
 
 function nextClock(now, hour, minute, offsetMinutes) {
@@ -75,10 +83,6 @@ function nextClock(now, hour, minute, offsetMinutes) {
       offsetMinutes * 60000;
   }
   return new Date(at);
-}
-
-function clampDay(value) {
-  return Number.isInteger(value) && value >= 0 && value <= 6 ? value : 0;
 }
 
 function clampHour(value, fallback = 19) {

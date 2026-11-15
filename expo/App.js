@@ -21,10 +21,11 @@ import { PERSON_AVATAR } from './src/contacts';
 import {
   DAY_HOURS,
   INTENTS,
+  choiceLabel,
+  composerPlaceholder,
   dailyClock,
   dayPhrase,
   nextDaily,
-  receiptPhrase,
   messageSticker,
   scheduledChoices,
   threadMessages,
@@ -634,7 +635,8 @@ function ChatScreen({
     },
     onInputSize,
     inputHeight,
-    contactId: selectedContactId || contact?.id,
+    contactName: contact?.firstName || contact?.id || selectedContactId,
+    selectedAt,
     canSend,
     onSend: () => send(),
     onAttach: () => attach('library'),
@@ -960,15 +962,6 @@ function userId(inbox) {
   return inbox?.user?.id;
 }
 
-function choiceLabel(at, now) {
-  const phrase = receiptPhrase(at, now).replace(/^Received at /, '');
-  const match = phrase.match(/^(\d+)(?::(\d+))?\s*(am|pm)\s+(.+)$/i);
-  if (!match) return phrase;
-  const [, hour, minute, suffix, day] = match;
-  const clock = minute && minute !== '00' ? `${hour}:${minute}${suffix.toLowerCase()}` : `${hour}${suffix.toLowerCase()}`;
-  return day === 'today' ? clock : `${clock} ${day}`;
-}
-
 function ComposerFooter({
   testID,
   autoFocus = false,
@@ -994,7 +987,8 @@ function ComposerFooter({
   onChangeDraft,
   onInputSize,
   inputHeight,
-  contactId,
+  contactName,
+  selectedAt,
   canSend,
   onSend,
   onAttach,
@@ -1145,7 +1139,7 @@ function ComposerFooter({
             autoFocus={autoFocus}
             onChangeText={onChangeDraft}
             onContentSizeChange={onInputSize}
-            placeholder={contactId ? `Message ${contactId}` : 'Message'}
+            placeholder={composerPlaceholder(contactName, intent, selectedAt)}
             placeholderTextColor="#8a8a8a"
             multiline
             numberOfLines={2}
@@ -1186,9 +1180,7 @@ function ComposerFooter({
                     style={styles.intentWord}
                   >
                     <Text numberOfLines={1} style={[styles.intentText, selected && styles.intentTextSelected]}>
-                      {item.id === 'scheduled' && selected
-                        ? choiceLabel(choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0], now)
-                        : item.label}
+                      {item.id === 'scheduled' && selected ? choiceLabel(selectedAt, now) : item.label}
                     </Text>
                   </Pressable>
                 );
