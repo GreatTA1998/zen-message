@@ -267,9 +267,6 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/effects/ack') {
-      if (body.armedDigest && user.digest && !user.digest.presented) {
-        user.digest = { ...user.digest, platformScheduled: true };
-      }
       user.pendingEffects = [];
       save(user);
       send(response, 200, { ok: true });

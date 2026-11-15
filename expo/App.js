@@ -122,8 +122,8 @@ function Root() {
   const deliverInbox = useCallback(async (current, next) => {
     setInbox(next);
     if (next?.effects?.length) {
-      const armedDigest = await runNotificationEffects(next.effects);
-      await api('/v1/effects/ack', { token: current, method: 'POST', body: { armedDigest } });
+      await runNotificationEffects(next.effects);
+      await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
     }
     return next;
   }, []);

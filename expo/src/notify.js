@@ -63,27 +63,11 @@ export async function presentNow(plan) {
   }
 }
 
-async function digestNotice(at, plan) {
-  if (Platform.OS === 'web') return false;
+async function cancelDigest() {
+  if (Platform.OS === 'web') return;
   try {
     await Notifications.cancelScheduledNotificationAsync(DIGEST_ID);
   } catch {}
-  const when = Number(at);
-  if (!plan || !Number.isFinite(when) || when <= Date.now()) return false;
-  try {
-    await Notifications.scheduleNotificationAsync({
-      identifier: DIGEST_ID,
-      content: contentFrom(plan),
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: new Date(when),
-        ...(Platform.OS === 'android' ? { channelId: 'zen-normal' } : {}),
-      },
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function listenForDigest(onDigest) {
@@ -93,11 +77,8 @@ export function listenForDigest(onDigest) {
 }
 
 export async function runNotificationEffects(effects) {
-  let armedDigest = false;
   for (const effect of effects || []) {
     if (effect.type === 'present') await presentNow(effect.plan);
-    else if (effect.type === 'schedule-digest') armedDigest = (await digestNotice(effect.at, effect.plan)) || armedDigest;
-    else if (effect.type === 'cancel-digest') await digestNotice();
+    else if (effect.type === 'cancel-digest') await cancelDigest();
   }
-  return armedDigest;
 }

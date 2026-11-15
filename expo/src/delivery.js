@@ -400,7 +400,6 @@ function holdDigest(state) {
         at,
         messageIds: plan.data.messageIds,
         presented: false,
-        platformScheduled: false,
       },
     },
     effects: [{ type: 'schedule-digest', at, plan }],
@@ -411,7 +410,7 @@ function release(state, now) {
   if (!state.digest || state.digest.presented || now < state.digest.at) {
     return { state, effects: [] };
   }
-  return finishDigest(state, state.digest.platformScheduled ? [] : undefined);
+  return finishDigest(state);
 }
 
 function shown(state) {
@@ -474,7 +473,6 @@ export function sanitize(raw) {
           at: raw.digest.at,
           messageIds: raw.digest.messageIds,
           presented: raw.digest.presented,
-          platformScheduled: raw.digest.platformScheduled === true,
         }
       : null,
   };

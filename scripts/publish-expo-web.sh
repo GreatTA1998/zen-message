@@ -18,4 +18,8 @@ if [[ -f "$out/index.html" ]]; then
 fi
 
 bundle=$(ls -S "$out"/_expo/static/js/web/index-*.js 2>/dev/null | head -1 | xargs -n1 basename)
+# Expo may emit extra small index-*.js chunks; keep only the HTML entry bundle.
+for f in "$out"/_expo/static/js/web/index-*.js; do
+  [[ "$(basename "$f")" == "$bundle" ]] || rm -f "$f"
+done
 echo "Published web bundle: $bundle"
