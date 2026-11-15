@@ -347,7 +347,7 @@ function ChatScreen({
   const [drawOpen, setDrawOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
   const [intent, setIntent] = useState('anytime');
-  const [choice, setChoice] = useState(0);
+  const [choiceAt, setChoiceAt] = useState(null);
   const [panel, setPanel] = useState('chat');
   const [requestBusy, setRequestBusy] = useState(false);
   const [pendingMode, setPendingMode] = useState(null);
@@ -394,7 +394,7 @@ function ChatScreen({
   const now = new Date();
   const columns = scheduledColumns(now);
   const choices = columns.today.concat(columns.tomorrow);
-  const selectedAt = choices[choice] ?? choices[0];
+  const selectedAt = choices.find((at) => at.getTime() === choiceAt) ?? choices[0];
   const canSend =
     contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
 
@@ -583,8 +583,8 @@ function ChatScreen({
   const composerProps = {
     intent,
     onIntent: setIntent,
-    choice,
-    onChoice: setChoice,
+    choiceAt,
+    onChoice: setChoiceAt,
     columns,
     now,
     photo,
@@ -934,7 +934,7 @@ function ComposerFooter({
   autoFocus = false,
   intent,
   onIntent,
-  choice,
+  choiceAt,
   onChoice,
   columns,
   now,
@@ -967,14 +967,14 @@ function ComposerFooter({
   }
 
   function choiceCell(at, index, first) {
-    const on = choice === index;
+    const on = (choiceAt ?? selectedAt?.getTime()) === at.getTime();
     return (
       <Pressable
         key={at.getTime()}
         testID={showIds ? `choice-${index}` : undefined}
         accessibilityRole="button"
         accessibilityState={{ selected: on }}
-        onPress={() => { onChoice(index); setTimesOpen(false); }}
+        onPress={() => { onChoice(at.getTime()); setTimesOpen(false); }}
         style={[styles.choiceRow, first && styles.choiceRowFirst, on && styles.choiceRowOn]}
       >
         <Text numberOfLines={1} style={[styles.choiceText, on && styles.choiceTextOn]}>
@@ -1492,10 +1492,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: ink,
     zIndex: 6,
-    maxHeight: 220,
   },
   choiceColumns: { flexDirection: 'row' },
-  choiceCol: { flex: 1 },
+  choiceCol: { flex: 1, maxHeight: 220 },
   choiceColRight: { borderLeftWidth: 1, borderLeftColor: ink },
   choiceRow: { paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: ink },
   choiceRowFirst: { borderTopWidth: 0 },
