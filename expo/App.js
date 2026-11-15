@@ -31,7 +31,7 @@ import {
 import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
-import { listenForDigest, prepareNotifications } from './src/notify';
+import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
@@ -136,6 +136,7 @@ function Root() {
     const next = await api(inboxPath(), { token: current });
     setInbox(next);
     if (next.effects?.length) {
+      await runNotificationEffects(next.effects);
       await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
     }
     return next;
@@ -419,6 +420,7 @@ function ChatScreen({
     const next = await api(path, { token, method: 'POST', body });
     onInbox(next);
     if (next.effects?.length) {
+      await runNotificationEffects(next.effects);
       await api('/v1/effects/ack', { token, method: 'POST', body: {} });
     }
     return next;

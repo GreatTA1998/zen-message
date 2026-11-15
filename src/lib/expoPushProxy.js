@@ -26,6 +26,10 @@ function sanitizePushMessage(item) {
   const messageIds = Array.isArray(data.messageIds)
     ? data.messageIds.filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 80).slice(0, 40)
     : [];
+  const collapseId =
+    typeof item.collapseId === 'string'
+      ? item.collapseId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64)
+      : '';
   const message = {
     to: item.to,
     title,
@@ -34,6 +38,7 @@ function sanitizePushMessage(item) {
     priority: item.priority === 'high' ? 'high' : 'default',
     interruptionLevel: item.interruptionLevel === 'passive' ? 'passive' : 'active',
     channelId: item.channelId === 'zen-quiet' ? 'zen-quiet' : 'zen-normal',
+    ...(collapseId ? { collapseId } : {}),
     data: {
       kind: data.kind,
       quiet: data.quiet === true,
