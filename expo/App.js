@@ -32,7 +32,7 @@ import {
 import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
-import { listenForDigest, prepareNotifications } from './src/notify';
+import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
@@ -137,6 +137,7 @@ function Root() {
     const next = await api(inboxPath(), { token: current });
     setInbox(next);
     if (next.effects?.length) {
+      await runNotificationEffects(next.effects);
       await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
     }
     return next;
@@ -364,6 +365,7 @@ function ChatScreen({
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadPickedContact().then((id) => {
@@ -420,6 +422,7 @@ function ChatScreen({
     const next = await api(path, { token, method: 'POST', body });
     onInbox(next);
     if (next.effects?.length) {
+      await runNotificationEffects(next.effects);
       await api('/v1/effects/ack', { token, method: 'POST', body: {} });
     }
     return next;
@@ -935,7 +938,7 @@ function ChatScreen({
               accessibilityRole="button"
               accessibilityLabel="Close"
               onPress={() => setPhotoViewerUri(null)}
-              style={styles.photoViewerClose}
+              style={[styles.photoViewerClose, { top: insets.top + 8 }]}
               hitSlop={8}
             >
               <Feather name="x" size={28} color={paper} />
@@ -1185,7 +1188,9 @@ function ComposerFooter({
                     style={styles.intentWord}
                   >
                     <Text numberOfLines={1} style={[styles.intentText, selected && styles.intentTextSelected]}>
-                      {item.label}
+                      {item.id === 'scheduled' && selected
+                        ? choiceLabel(choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0], now)
+                        : item.label}
                     </Text>
                   </Pressable>
                 );
@@ -1470,15 +1475,15 @@ const styles = StyleSheet.create({
   },
   photoViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   photoViewerImage: { width: '100%', height: '100%' },
-  photoViewerClose: { position: 'absolute', top: 12, left: 12, padding: 10 },
+  photoViewerClose: { position: 'absolute', left: 12, padding: 10 },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
   menuRowSelected: { backgroundColor: '#f6f3ee' },
   menuText: { color: ink, fontSize: 16, lineHeight: 21 },
   menuTextSelected: { fontWeight: '700' },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3 },
   contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
-  contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 18 },
-  contact: { width: 76, alignItems: 'center' },
+  contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 8 },
+  contact: { alignItems: 'center' },
   avatar: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, backgroundColor: paper },
   avatarShell: {
     width: 54,
@@ -1495,7 +1500,7 @@ const styles = StyleSheet.create({
   circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
-  contactLabel: { marginTop: 4, maxWidth: 76, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
+  contactLabel: { marginTop: 4, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
   plus: {
     width: 54,
     height: 54,
@@ -1552,7 +1557,8 @@ const styles = StyleSheet.create({
   stickerPreview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#fafafa' },
   mediaBubble: {
     width: photoMaxWidth,
-    height: Math.round(photoMaxWidth * 0.75),
+    maxWidth: '84%',
+    aspectRatio: 4 / 3,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#f0f0f0',
