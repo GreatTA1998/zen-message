@@ -3,6 +3,7 @@ import {
   Alert,
   Image,
   Keyboard,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -875,7 +876,12 @@ function ChatScreen({
               <ThreadMessage
                 key={message.id}
                 message={message}
-                onOpenPhoto={setPhotoViewerUri}
+                onOpenPhoto={(uri) => {
+                  setScheduleOpen(false);
+                  setAccountOpen(false);
+                  setContactMenuId(null);
+                  setPhotoViewerUri(uri);
+                }}
                 onReportIncoming={(messageId) => {
                   if (!contact?.id) return;
                   reportContact(contact.id, messageId);
@@ -902,27 +908,40 @@ function ChatScreen({
             await adoptSticker(dataUri);
           }}
         />
-        {photoViewerUri ? (
-          <View testID="photo-viewer" style={styles.photoViewer}>
-            <Pressable
-              testID="photo-viewer-backdrop"
-              accessibilityRole="button"
-              accessibilityLabel="Close photo"
-              onPress={() => setPhotoViewerUri(null)}
-              style={styles.photoViewerBackdrop}
-            />
-            <Image testID="photo-viewer-image" source={{ uri: photoViewerUri }} resizeMode="contain" style={styles.photoViewerImage} />
+        <Modal
+          visible={Boolean(photoViewerUri)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPhotoViewerUri(null)}
+        >
+          <Pressable
+            testID="photo-viewer"
+            accessibilityRole="button"
+            accessibilityLabel="Close photo"
+            onPress={() => setPhotoViewerUri(null)}
+            style={styles.photoViewer}
+          >
+            {photoViewerUri ? (
+              <Image
+                testID="photo-viewer-image"
+                source={{ uri: photoViewerUri }}
+                resizeMode="contain"
+                style={styles.photoViewerImage}
+                pointerEvents="none"
+              />
+            ) : null}
             <Pressable
               testID="photo-viewer-close"
               accessibilityRole="button"
               accessibilityLabel="Close"
               onPress={() => setPhotoViewerUri(null)}
               style={styles.photoViewerClose}
+              hitSlop={8}
             >
               <Feather name="x" size={28} color={paper} />
             </Pressable>
-          </View>
-        ) : null}
+          </Pressable>
+        </Modal>
         {notice ? (
           <View testID="chat-notice" style={styles.chatNotice} pointerEvents="none">
             <Text style={styles.chatNoticeText}>{notice}</Text>
@@ -1341,17 +1360,6 @@ function TextBubble({ message, incoming }) {
 }
 
 function MediaBubble({ kind, uri, incoming, onOpenPhoto }) {
-  const [aspect, setAspect] = useState(kind === 'sticker' ? 1 : 4 / 3);
-  useEffect(() => {
-    if (!uri) return;
-    Image.getSize(
-      uri,
-      (width, height) => {
-        if (width > 0 && height > 0) setAspect(width / height);
-      },
-      () => {},
-    );
-  }, [uri]);
   const sticker = kind === 'sticker';
   return (
     <Pressable
@@ -1359,12 +1367,7 @@ function MediaBubble({ kind, uri, incoming, onOpenPhoto }) {
       accessibilityRole="button"
       accessibilityLabel={sticker ? 'View sticker' : 'View photo'}
       onPress={() => onOpenPhoto?.(uri)}
-      style={[
-        styles.mediaBubble,
-        incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut,
-        web && styles.mediaBubbleWeb,
-        { width: photoMaxWidth, aspectRatio: aspect },
-      ]}
+      style={[styles.mediaBubble, sticker && styles.stickerBubble, incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut]}
     >
       <Image
         testID={sticker ? 'bubble-sticker' : 'bubble-photo'}
@@ -1465,25 +1468,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
   },
-  photoViewer: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoViewerBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.92)' },
+  photoViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   photoViewerImage: { width: '100%', height: '100%' },
-  photoViewerClose: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 10,
-    zIndex: 1,
-  },
+  photoViewerClose: { position: 'absolute', top: 12, left: 12, padding: 10 },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
   menuRowSelected: { backgroundColor: '#f6f3ee' },
   menuText: { color: ink, fontSize: 16, lineHeight: 21 },
@@ -1521,7 +1508,7 @@ const styles = StyleSheet.create({
   plusMark: { color: ink, fontSize: 32, lineHeight: 34 },
   main: { flex: 1, backgroundColor: paper },
   thread: { flex: 1 },
-  threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 16, gap: 14, overflow: 'visible' },
+  threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 16, gap: 14 },
   messageStack: { gap: 6, maxWidth: '100%' },
   messageStackIn: { alignSelf: 'flex-start', marginTop: 10 },
   messageStackOut: { alignSelf: 'flex-end' },
@@ -1564,15 +1551,17 @@ const styles = StyleSheet.create({
   stickerTrayThumb: { width: '100%', height: '100%' },
   stickerPreview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#fafafa' },
   mediaBubble: {
+    width: photoMaxWidth,
+    height: Math.round(photoMaxWidth * 0.75),
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#f0f0f0',
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
   },
+  stickerBubble: { width: 148, height: 148, backgroundColor: 'transparent', borderWidth: 0 },
   mediaBubbleIn: { alignSelf: 'flex-start' },
   mediaBubbleOut: { alignSelf: 'flex-end' },
-  mediaBubbleWeb: { maxWidth: 'min(320px, 84%)' },
   mediaImage: { width: '100%', height: '100%' },
   bubble: {
     alignSelf: 'flex-end',
