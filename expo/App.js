@@ -342,6 +342,7 @@ function ChatScreen({
   const [panel, setPanel] = useState('chat');
   const [requestBusy, setRequestBusy] = useState(false);
   const [pendingMode, setPendingMode] = useState(null);
+  const [pendingClock, setPendingClock] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [notice, setNotice] = useState('');
@@ -414,7 +415,11 @@ function ChatScreen({
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
-  const clock = dailyClock(state);
+  const serverClock = dailyClock(state);
+  const clock =
+    pendingClock && (pendingClock.hour !== serverClock.hour || pendingClock.minute !== serverClock.minute)
+      ? pendingClock
+      : serverClock;
   const summaryTime = mode !== 'relaxed' ? dayPhrase(clock.hour, clock.minute, true).replace(/ /g, '') : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
@@ -689,11 +694,12 @@ function ChatScreen({
                 {scheduleOpen ? (
                   <View testID="schedule-popover" style={styles.popover}>
                     <ScheduleSettings
-                      key={`${clock.hour}-${clock.minute}`}
-                      state={state}
+                      hour={clock.hour}
+                      minute={clock.minute}
                       onChoose={(dayHour, dayMinute) => {
                         setScheduleOpen(false);
-                        mutate('/v1/schedule', { dayHour, dayMinute });
+                        setPendingClock({ hour: dayHour, minute: dayMinute });
+                        mutate('/v1/schedule', { dayHour, dayMinute }).catch(() => setPendingClock(null));
                       }}
                     />
                   </View>
@@ -1187,9 +1193,8 @@ function AccountMenu({ userId, onLogout, onDeleteAccount }) {
   );
 }
 
-function ScheduleSettings({ state, onChoose }) {
-  const clock = dailyClock(state);
-  const [hour, setHour] = useState(clock.hour);
+function ScheduleSettings({ hour: selectedHour, minute: selectedMinute, onChoose }) {
+  const [hour, setHour] = useState(selectedHour);
   const row = (testID, label, on, press) => (
     <Pressable
       key={testID}
@@ -1212,7 +1217,7 @@ function ScheduleSettings({ state, onChoose }) {
           row(
             `schedule-minute-${minute}`,
             String(minute).padStart(2, '0'),
-            hour === clock.hour && minute === clock.minute,
+            hour === selectedHour && minute === selectedMinute,
             () => onChoose(hour, minute)
           )
         )}
