@@ -63,7 +63,7 @@ test('anytime batched stays hidden and joins one digest', () => {
     messageIds: ['a'],
   });
   assert.equal(first.effects[0].plan.body, 'Wren: Hello world');
-  assert.equal(threadMessages(first.state.messages, 'wren').length, 0);
+  assert.equal(threadMessages(first.state.messages, 'wren').length, 1);
 
   const second = send(
     first.state,
@@ -346,18 +346,11 @@ test('sanitize drops broken saved data', () => {
   assert.deepEqual(sanitize(null), createState());
 });
 
-test('tap selection cannot snap: thread follows last picked id, not poll contactId', () => {
+test('thread lists Focus-held GHV rows; pick is independent of poll contactId', () => {
   const messages = [
     { id: '1', contactId: 'S36', body: 'elton', visible: true },
-    { id: '2', contactId: 'GHV', body: 'zjf', visible: true },
+    { id: '2', contactId: 'GHV', body: 'zjf', visible: false, intent: 'anytime' },
   ];
-  let selected = 'S36';
-  selected = 'GHV'; // tap zjf
-  const pollContactId = 'S36'; // inbox poll still has Elton
-  void pollContactId;
-  assert.equal(selected, 'GHV');
-  assert.deepEqual(
-    threadMessages(messages, selected).map((item) => item.id),
-    ['2']
-  );
+  const selected = 'GHV';
+  assert.deepEqual(threadMessages(messages, selected).map((item) => item.id), ['2']);
 });

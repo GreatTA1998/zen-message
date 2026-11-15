@@ -124,9 +124,8 @@ export function threadMessages(messages, contactId) {
     .replace(/\s+/g, '')
     .toUpperCase();
   if (!id) return [];
-  return messages.filter(
+  return (messages || []).filter(
     (item) =>
-      item.visible &&
       String(item.contactId ?? '')
         .replace(/\s+/g, '')
         .toUpperCase() === id

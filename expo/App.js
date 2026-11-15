@@ -36,7 +36,7 @@ import { messageBubbleParts } from './src/messageBubble';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
-import { loadSession, saveSession } from './src/session';
+import { loadPickedContact, loadSession, savePickedContact, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
@@ -62,11 +62,6 @@ function scheduleLabel(mode, state) {
   if (mode === 'relaxed') return 'open to all messages';
   const clock = dailyClock(state);
   return `receiving summary at ${summaryAt(clock.hour, clock.minute)}`;
-}
-
-function scheduleSummaryTime(state) {
-  const clock = dailyClock(state);
-  return summaryAt(clock.hour, clock.minute);
 }
 
 function useKeyboardInset() {
@@ -101,7 +96,6 @@ function useKeyboardInset() {
       hide.remove();
     };
   }, []);
-  // Phone already sits in SafeAreaView — don't double-count the home indicator.
   if (Platform.OS === 'web' || keyboard === 0) return keyboard;
   return Math.max(0, keyboard - safeBottom);
 }
@@ -131,11 +125,6 @@ function Root() {
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
   const tokenRef = useRef(null);
-  const lookupCacheRef = useRef(new Map());
-
-  const applyInbox = useCallback((next) => {
-    setInbox((current) => (typeof next === 'function' ? next(current) : next));
-  }, []);
 
   useEffect(() => {
     if (inbox?.user) setUser(inbox.user);
@@ -145,12 +134,12 @@ function Root() {
     const current = tokenRef.current;
     if (!current) return null;
     const next = await api(inboxPath(), { token: current });
-    applyInbox(next);
+    setInbox(next);
     if (next.effects?.length) {
       await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
     }
     return next;
-  }, [applyInbox]);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -210,11 +199,11 @@ function Root() {
       const current = tokenRef.current;
       if (!current) return;
       api('/v1/shown', { token: current, method: 'POST', body: {} })
-        .then(applyInbox)
+        .then(setInbox)
         .catch(() => {});
     });
     return () => subscription.remove();
-  }, [applyInbox]);
+  }, []);
 
   async function onSubject(result) {
     if (result.missing) {
@@ -247,21 +236,16 @@ function Root() {
   const onLookup = useCallback(async (raw) => {
     const code = normalizeCode(raw);
     if (!isCode(code) || code === user?.id) return { found: false };
-    const cached = lookupCacheRef.current.get(code);
-    if (cached) return cached;
     try {
-      const result = await api(`/v1/person?code=${encodeURIComponent(code)}`, { token: tokenRef.current });
-      lookupCacheRef.current.set(code, result);
-      return result;
+      return await api(`/v1/person?code=${encodeURIComponent(code)}`, { token: tokenRef.current });
     } catch {
-      const miss = { found: false };
-      lookupCacheRef.current.set(code, miss);
-      return miss;
+      return { found: false };
     }
   }, [user?.id]);
 
   async function onLogout() {
     await saveSession(null);
+    await savePickedContact(null);
     tokenRef.current = null;
     setToken(null);
     setUser(null);
@@ -294,7 +278,7 @@ function Root() {
     if (code === user?.id) return 'That is your ID.';
     try {
       const next = await api('/v1/contacts', { token, method: 'POST', body: { code } });
-      applyInbox(next);
+      setInbox(next);
       return '';
     } catch (error) {
       if (error.code === 'code_invalid') return '1, I, and L are not used.';
@@ -311,7 +295,6 @@ function Root() {
 
   if (!ready) return <View style={styles.boot} />;
 
-  // Prefer inbox.user on the same render as a fresh inbox so onboarding does not flash ChatScreen.
   const sessionUser = user ?? inbox?.user ?? null;
 
   let body = null;
@@ -330,7 +313,7 @@ function Root() {
       <ChatScreen
         token={token}
         inbox={inbox}
-        onInbox={applyInbox}
+        onInbox={setInbox}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
@@ -374,12 +357,17 @@ function ChatScreen({
   const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
-  // One selected id. Only set on tap (and block/decline clear). Polls/open never touch it.
   const [pickedId, setPickedId] = useState(null);
   const focusRequest = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
+
+  useEffect(() => {
+    loadPickedContact().then((id) => {
+      if (id) setPickedId(id);
+    });
+  }, []);
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
   const selectedContactId =
@@ -399,7 +387,7 @@ function ChatScreen({
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
-  const summaryTime = mode !== 'relaxed' ? scheduleSummaryTime(state) : '';
+  const summaryTime = mode !== 'relaxed' ? summaryAt(dailyClock(state).hour, dailyClock(state).minute) : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
   const choices = scheduledChoices(now);
@@ -438,8 +426,8 @@ function ChatScreen({
     const id = normalizeCode(item.id);
     if (!id) return;
     setPickedId(id);
+    savePickedContact(id).catch(() => {});
     setPanel(item.status === 'pending-in' ? 'request' : 'chat');
-    // Persist server-side only; ignore response so poll/open cannot rewrite UI selection.
     api('/v1/open', { token, method: 'POST', body: { contactId: id } }).catch(() => {});
   }
 
@@ -463,7 +451,9 @@ function ChatScreen({
         const next = await api('/v1/block', { token, method: 'POST', body: { contactId: targetId } });
         onInbox(next);
         if (normalizeCode(pickedId) === normalizeCode(targetId)) {
-          setPickedId(normalizeCode(next?.contacts?.[0]?.id) || null);
+          const nextId = normalizeCode(next?.contacts?.[0]?.id) || null;
+          setPickedId(nextId);
+          savePickedContact(nextId).catch(() => {});
         }
         setPanel('chat');
         flashNotice('Contact blocked.');
@@ -758,7 +748,6 @@ function ChatScreen({
             const selected = normalizeCode(item.id) === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
             const ring = panel !== 'add' && selected;
-            const dim = ring ? styles.circleOn : styles.circleDim;
             return (
               <Pressable
                 key={item.id}
@@ -777,14 +766,14 @@ function ChatScreen({
                 style={styles.contact}
               >
                 {pending ? (
-                  <View style={[styles.avatarShell, styles.avatarDashed, dim]}>
+                  <View style={[styles.avatarShell, styles.avatarDashed, ring && styles.circleOn]}>
                     <Image source={PERSON_AVATAR} resizeMode="cover" style={styles.avatarFill} />
                   </View>
                 ) : (
                   <Image
                     source={PERSON_AVATAR}
                     resizeMode="cover"
-                    style={[styles.avatar, dim]}
+                    style={[styles.avatar, ring && styles.circleOn]}
                   />
                 )}
                 <Text numberOfLines={1} style={styles.contactLabel}>
@@ -801,7 +790,7 @@ function ChatScreen({
             onPress={() => setPanel((current) => (current === 'add' ? 'chat' : 'add'))}
             style={styles.contact}
           >
-            <View style={[styles.plus, panel === 'add' ? styles.circleOn : styles.circleDim]}>
+            <View style={[styles.plus, panel === 'add' && styles.circleOn]}>
               <Text style={styles.plusMark}>+</Text>
             </View>
             <Text numberOfLines={1} style={styles.contactLabel}>
@@ -850,7 +839,9 @@ function ChatScreen({
                 const declinedId = contact.id;
                 const next = await mutate('/v1/friend-request/decline', { contactId: declinedId });
                 if (normalizeCode(pickedId) === normalizeCode(declinedId)) {
-                  setPickedId(normalizeCode(next?.contacts?.[0]?.id) || null);
+                  const nextId = normalizeCode(next?.contacts?.[0]?.id) || null;
+                  setPickedId(nextId);
+                  savePickedContact(nextId).catch(() => {});
                 }
                 setPanel('chat');
               } finally {
@@ -1526,8 +1517,7 @@ const styles = StyleSheet.create({
   },
   avatarDashed: { borderStyle: 'dashed' },
   avatarFill: { width: 46, height: 46, borderRadius: 23 },
-  circleOn: { opacity: 1, borderWidth: 2, borderColor: ink },
-  circleDim: { opacity: 0.55 },
+  circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
   contactLabel: { marginTop: 4, maxWidth: 76, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
