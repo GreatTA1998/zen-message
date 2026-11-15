@@ -1,8 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
-  InteractionManager,
   Keyboard,
   Platform,
   Pressable,
@@ -15,18 +14,9 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PERSON_AVATAR } from './src/contacts';
-import {
-  cachedThread,
-  mergeInboxPreservingSelection,
-  mergeOpenInbox,
-  nextSelectionAfterRemoval,
-  resolveSelectedContactId,
-  seedContactId,
-  updateThreadCache,
-} from './src/contactSelection';
 import {
   DAY_HOURS,
   INTENTS,
@@ -36,6 +26,7 @@ import {
   receiptPhrase,
   messageSticker,
   scheduledChoices,
+  threadMessages,
 } from './src/delivery';
 import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
@@ -78,136 +69,41 @@ function scheduleSummaryTime(state) {
   return summaryAt(clock.hour, clock.minute);
 }
 
-function webKeyboardOverlap() {
-  const viewport = window.visualViewport;
-  if (!viewport) return 0;
-  return Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
-}
-
-function useConversation(hostRef) {
-  const [open, setOpen] = useState(false);
-  const [inset, setInset] = useState(0);
-  const openRef = useRef(false);
-  const insetRef = useRef(0);
-  const focusCount = useRef(0);
-  const handoff = useRef(false);
-  const blurTimer = useRef(null);
-  const restingBottom = useRef(0);
-  const pendingShow = useRef(null);
-
-  const rememberBottom = useCallback(() => {
-    if (insetRef.current > 0) return;
-    hostRef.current?.measureInWindow((_x, y, _width, height) => {
-      if (height) restingBottom.current = y + height;
-    });
-  }, [hostRef]);
-
-  const overlapFrom = useCallback((event) => {
-    const screenY = event?.endCoordinates?.screenY;
-    if (typeof screenY !== 'number') return 0;
-    const bottom = restingBottom.current;
-    if (!bottom) return Math.max(0, Math.round(event.endCoordinates?.height ?? 0));
-    return Math.max(0, Math.round(bottom - screenY));
-  }, []);
-
-  const commit = useCallback((show, nextInset) => {
-    const insetValue = show ? nextInset : 0;
-    if (openRef.current === show && insetRef.current === insetValue) return;
-    openRef.current = show;
-    insetRef.current = insetValue;
-    setOpen(show);
-    setInset(insetValue);
-  }, []);
-
-  const presentWithKeyboard = useCallback((event) => {
-    if (openRef.current) {
-      handoff.current = false;
-      return;
-    }
-    handoff.current = true;
-    const nextInset = event ? overlapFrom(event) : Platform.OS === 'web' ? webKeyboardOverlap() : 0;
-    commit(true, nextInset);
-  }, [commit, overlapFrom]);
-
-  const dismissWithKeyboard = useCallback(() => {
-    handoff.current = false;
-    commit(false, 0);
-  }, [commit]);
-
-  const onComposerFocus = useCallback(() => {
-    focusCount.current += 1;
-    if (blurTimer.current) {
-      clearTimeout(blurTimer.current);
-      blurTimer.current = null;
-    }
-    if (Platform.OS === 'web') return;
-    if (Platform.OS === 'ios') {
-      if (openRef.current) {
-        handoff.current = false;
-        return;
-      }
-      const event = pendingShow.current;
-      if (!event) return;
-      pendingShow.current = null;
-      presentWithKeyboard(event);
-      return;
-    }
-    presentWithKeyboard(null);
-  }, [presentWithKeyboard]);
-
-  const onComposerBlur = useCallback(() => {
-    focusCount.current = Math.max(0, focusCount.current - 1);
-    if (focusCount.current > 0) return;
-    if (Platform.OS === 'ios') {
-      if (handoff.current) return;
-      if (typeof Keyboard.isVisible === 'function' && Keyboard.isVisible()) return;
-      commit(false, 0);
-      return;
-    }
-    if (blurTimer.current) clearTimeout(blurTimer.current);
-    blurTimer.current = setTimeout(() => {
-      blurTimer.current = null;
-      if (focusCount.current > 0) return;
-      commit(false, 0);
-    }, 120);
-  }, [commit]);
-
+function useKeyboardInset() {
+  const [keyboard, setKeyboard] = useState(0);
+  const { bottom: safeBottom } = useSafeAreaInsets();
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      const update = () => {
+        const viewport = window.visualViewport;
+        setKeyboard(
+          viewport
+            ? Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))
+            : 0
+        );
+      };
+      update();
+      window.visualViewport?.addEventListener('resize', update);
+      window.visualViewport?.addEventListener('scroll', update);
+      return () => {
+        window.visualViewport?.removeEventListener('resize', update);
+        window.visualViewport?.removeEventListener('scroll', update);
+      };
+    }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (event) => {
+      setKeyboard(Math.max(0, Math.round(event?.endCoordinates?.height ?? 0)));
+    });
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboard(0));
     return () => {
-      if (blurTimer.current) clearTimeout(blurTimer.current);
+      show.remove();
+      hide.remove();
     };
   }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return undefined;
-
-    function onShow(event) {
-      pendingShow.current = event;
-      if (focusCount.current === 0) return;
-      pendingShow.current = null;
-      presentWithKeyboard(event);
-    }
-
-    function onHide(event) {
-      pendingShow.current = null;
-      if (handoff.current || !openRef.current) return;
-      dismissWithKeyboard(event);
-    }
-
-    const subs = [
-      Keyboard.addListener('keyboardWillShow', onShow),
-      Keyboard.addListener('keyboardWillHide', onHide),
-    ];
-    return () => subs.forEach((sub) => sub.remove());
-  }, [commit, dismissWithKeyboard, presentWithKeyboard]);
-
-  return {
-    open,
-    inset,
-    rememberBottom,
-    onComposerFocus,
-    onComposerBlur,
-  };
+  // Phone already sits in SafeAreaView — don't double-count the home indicator.
+  if (Platform.OS === 'web' || keyboard === 0) return keyboard;
+  return Math.max(0, keyboard - safeBottom);
 }
 
 const MISSING = {
@@ -236,13 +132,9 @@ function Root() {
   const [notice, setNotice] = useState('');
   const tokenRef = useRef(null);
   const lookupCacheRef = useRef(new Map());
-  const selectedContactRef = useRef(null);
 
   const applyInbox = useCallback((next) => {
-    setInbox((current) => {
-      const payload = typeof next === 'function' ? next(current) : next;
-      return mergeInboxPreservingSelection(payload, selectedContactRef.current, current);
-    });
+    setInbox((current) => (typeof next === 'function' ? next(current) : next));
   }, []);
 
   useEffect(() => {
@@ -371,7 +263,6 @@ function Root() {
   async function onLogout() {
     await saveSession(null);
     tokenRef.current = null;
-    selectedContactRef.current = null;
     setToken(null);
     setUser(null);
     setInbox(null);
@@ -440,7 +331,6 @@ function Root() {
         token={token}
         inbox={inbox}
         onInbox={applyInbox}
-        selectedContactRef={selectedContactRef}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
@@ -460,7 +350,6 @@ function ChatScreen({
   token,
   inbox,
   onInbox,
-  selectedContactRef,
   onAdd,
   onLookup,
   onLogout,
@@ -485,49 +374,28 @@ function ChatScreen({
   const [contactMenuId, setContactMenuId] = useState(null);
   const [photoViewerUri, setPhotoViewerUri] = useState(null);
   const [pendingOutbound, setPendingOutbound] = useState([]);
-  // Selection is local UI authority. Seed once from Root ref (survives remount) or
-  // cold-start hint — never re-seed from poll/open server contactId (that was snap-back).
-  const [selectedContactId, setSelectedContactId] = useState(() => {
-    const existing = normalizeCode(selectedContactRef.current);
-    if (existing) return existing;
-    const initial = seedContactId(inbox?.contacts, inbox?.state?.contactId);
-    selectedContactRef.current = initial;
-    return initial;
-  });
+  // One selected id. Only set on tap (and block/decline clear). Polls/open never touch it.
+  const [pickedId, setPickedId] = useState(null);
   const focusRequest = useRef(0);
-  const openContactSync = useRef(0);
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
-  const threadCacheRef = useRef(new Map());
-  const phoneRef = useRef(null);
-  const { open, inset, rememberBottom, onComposerFocus, onComposerBlur } = useConversation(phoneRef);
+  const keyboardInset = useKeyboardInset();
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
-  // Local only — second/third args must never adopt server contactId into the ring.
-  const activeContactId = resolveSelectedContactId(
-    contacts,
-    selectedContactId ?? selectedContactRef.current,
-    null
-  );
-  const contact = contacts.find((item) => normalizeCode(item.id) === activeContactId) ?? null;
+  const selectedContactId =
+    normalizeCode(pickedId) || normalizeCode(contacts[0]?.id) || null;
+  const contact = contacts.find((item) => normalizeCode(item.id) === selectedContactId) ?? null;
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
   const contactPendingOut = contact?.status === 'pending-out';
   const messages = useMemo(() => {
-    // Require the contact to still be on the strip — never show a pruned peer from cache alone.
-    if (!activeContactId || !contact || !contactActive) return [];
-    if (contact.status && contact.status !== 'active') return [];
-    threadCacheRef.current = updateThreadCache(
-      threadCacheRef.current,
-      state?.messages,
-      contacts.map((item) => item.id)
-    );
-    const base = cachedThread(threadCacheRef.current, state?.messages, activeContactId);
+    if (!selectedContactId || !contact || !contactActive) return [];
+    const base = threadMessages(state?.messages, selectedContactId);
     const pending = pendingOutbound.filter(
-      (item) => normalizeCode(item.contactId) === normalizeCode(activeContactId)
+      (item) => normalizeCode(item.contactId) === selectedContactId
     );
     return pending.length ? [...base, ...pending] : base;
-  }, [activeContactId, contact, contacts, state?.messages, contactActive, pendingOutbound]);
+  }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const label = scheduleLabel(mode, state);
@@ -538,22 +406,6 @@ function ChatScreen({
   const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
   const canSend =
     contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
-
-  useEffect(() => {
-    selectedContactRef.current = selectedContactId;
-  }, [selectedContactId, selectedContactRef]);
-
-  // Cold-seed ONLY while local selection is still null (inbox arrived after mount).
-  // Never re-seed from server contactId once the user (or a prior seed) has a local id —
-  // that re-sync path was the snap-back to Elton.
-  useEffect(() => {
-    if (selectedContactRef.current) return;
-    if (!contacts.length) return;
-    const initial = seedContactId(contacts, state?.contactId);
-    if (!initial) return;
-    selectedContactRef.current = initial;
-    setSelectedContactId(initial);
-  }, [contacts, state?.contactId]);
 
   useEffect(() => {
     loadStickerLibrary().then(setStickerLibrary).catch(() => {});
@@ -570,17 +422,8 @@ function ChatScreen({
   }
 
   useEffect(() => {
-    if (open) {
-      setScheduleOpen(false);
-      setAccountOpen(false);
-      setStickerTrayOpen(false);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (open) return;
     threadRef.current?.scrollToEnd({ animated: false });
-  }, [messages.length, open]);
+  }, [messages.length, selectedContactId]);
 
   async function mutate(path, body) {
     const next = await api(path, { token, method: 'POST', body });
@@ -594,41 +437,10 @@ function ChatScreen({
   function pickContact(item) {
     const id = normalizeCode(item.id);
     if (!id) return;
-    // Same-frame UI authority: ring + composer + thread filter. Never await network.
-    selectedContactRef.current = id;
-    setSelectedContactId(id);
-    if (item.status === 'pending-in') setPanel('request');
-    else setPanel('chat');
-    // Align inbox blob with local selection so later merges do not reintroduce S36.
-    // Does not set React selection — selection already set above.
-    onInbox((current) => {
-      if (!current?.state) return current;
-      if (normalizeCode(current.state.contactId) === id) return current;
-      return {
-        ...current,
-        state: {
-          ...current.state,
-          contactId: id,
-        },
-      };
-    });
-    const requestId = openContactSync.current + 1;
-    openContactSync.current = requestId;
-    // Background persistence only. Callback must not call setSelectedContactId.
-    api('/v1/open', { token, method: 'POST', body: { contactId: id } })
-      .then((next) => {
-        if (openContactSync.current !== requestId) return;
-        // Always merge against the live ref (last tap), never against this request's id
-        // alone — a newer tap wins. mergeOpenInbox ignores next.state.contactId for selection.
-        onInbox((current) => mergeOpenInbox(current, next, selectedContactRef.current));
-      })
-      .catch(() => {});
-  }
-
-  function adoptSelection(nextId) {
-    const id = normalizeCode(nextId);
-    selectedContactRef.current = id;
-    setSelectedContactId(id);
+    setPickedId(id);
+    setPanel(item.status === 'pending-in' ? 'request' : 'chat');
+    // Persist server-side only; ignore response so poll/open cannot rewrite UI selection.
+    api('/v1/open', { token, method: 'POST', body: { contactId: id } }).catch(() => {});
   }
 
   function flashNotice(text) {
@@ -650,9 +462,9 @@ function ChatScreen({
       try {
         const next = await api('/v1/block', { token, method: 'POST', body: { contactId: targetId } });
         onInbox(next);
-        // Explicit user action: only then may selection move off a removed contact.
-        const nextId = nextSelectionAfterRemoval(next?.contacts, selectedContactRef.current, targetId);
-        adoptSelection(nextId);
+        if (normalizeCode(pickedId) === normalizeCode(targetId)) {
+          setPickedId(normalizeCode(next?.contacts?.[0]?.id) || null);
+        }
         setPanel('chat');
         flashNotice('Contact blocked.');
       } catch {
@@ -826,21 +638,15 @@ function ChatScreen({
     onChangeDraft,
     onInputSize,
     inputHeight,
-    contactId: activeContactId || contact?.id,
+    contactId: selectedContactId || contact?.id,
     canSend,
     onSend: () => send(),
     onAttach: () => attach('library'),
-    onComposerFocus,
-    onComposerBlur,
   };
 
   return (
     <View style={styles.root}>
-      <View
-        ref={phoneRef}
-        onLayout={rememberBottom}
-        style={[styles.phone, web && styles.webScreen]}
-      >
+      <View style={[styles.phone, web && styles.webScreen, { paddingBottom: keyboardInset }]}>
         {scheduleOpen || accountOpen || contactMenuId ? (
           <Pressable
             testID="schedule-backdrop"
@@ -949,7 +755,7 @@ function ChatScreen({
           scrollEventThrottle={16}
         >
           {contacts.map((item) => {
-            const selected = normalizeCode(item.id) === activeContactId;
+            const selected = normalizeCode(item.id) === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
             const ring = panel !== 'add' && selected;
             const dim = ring ? styles.circleOn : styles.circleDim;
@@ -1043,9 +849,9 @@ function ChatScreen({
               try {
                 const declinedId = contact.id;
                 const next = await mutate('/v1/friend-request/decline', { contactId: declinedId });
-                adoptSelection(
-                  nextSelectionAfterRemoval(next?.contacts, selectedContactRef.current, declinedId)
-                );
+                if (normalizeCode(pickedId) === normalizeCode(declinedId)) {
+                  setPickedId(normalizeCode(next?.contacts?.[0]?.id) || null);
+                }
                 setPanel('chat');
               } finally {
                 setRequestBusy(false);
@@ -1070,7 +876,6 @@ function ChatScreen({
             automaticallyAdjustKeyboardInsets={false}
             contentInsetAdjustmentBehavior="never"
             onContentSizeChange={() => {
-              if (open) return;
               threadRef.current?.scrollToEnd({ animated: false });
             }}
           >
@@ -1096,22 +901,6 @@ function ChatScreen({
         </>
         )}
         </View>
-        ) : null}
-        {panel === 'chat' && open && Platform.OS !== 'web' ? (
-          <ConversationSheet
-            inset={inset}
-            messages={messages}
-            footer={<ComposerFooter testID="composer-copy" autoFocus {...composerProps} />}
-            onOpenPhoto={setPhotoViewerUri}
-            onReportIncoming={(messageId) => {
-              if (!contact?.id) return;
-              reportContact(contact.id, messageId);
-            }}
-            onBlockIncoming={() => {
-              if (!contact?.id) return;
-              confirmBlock(contact.id);
-            }}
-          />
         ) : null}
         <StickerDrawModal
           visible={drawStickerOpen}
@@ -1194,8 +983,6 @@ function ComposerFooter({
   canSend,
   onSend,
   onAttach,
-  onComposerFocus,
-  onComposerBlur,
 }) {
   const inputRef = useRef(null);
   const [timesOpen, setTimesOpen] = useState(false);
@@ -1346,8 +1133,6 @@ function ComposerFooter({
             autoFocus={autoFocus}
             onChangeText={onChangeDraft}
             onContentSizeChange={onInputSize}
-            onFocus={onComposerFocus}
-            onBlur={onComposerBlur}
             placeholder={contactId ? `Message ${contactId}` : 'Message'}
             placeholderTextColor="#8a8a8a"
             multiline
@@ -1407,35 +1192,6 @@ function ComposerFooter({
             </Pressable>
           </View>
         </View>
-      </View>
-    </View>
-  );
-}
-
-function ConversationSheet({ inset, messages, footer, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
-  const ordered = messages.slice().reverse();
-  return (
-    <View testID="conversation-copy" style={[styles.copy, { top: 0, paddingBottom: inset }]}>
-      <View style={styles.copyColumn}>
-        <ScrollView
-          style={[styles.thread, styles.flip]}
-          contentContainerStyle={styles.threadContent}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets={false}
-          contentInsetAdjustmentBehavior="never"
-        >
-          {ordered.map((message) => (
-            <View key={message.id} style={styles.flip}>
-              <ThreadMessage
-                message={message}
-                onOpenPhoto={onOpenPhoto}
-                onReportIncoming={onReportIncoming}
-                onBlockIncoming={onBlockIncoming}
-              />
-            </View>
-          ))}
-        </ScrollView>
-        {footer}
       </View>
     </View>
   );
@@ -1560,12 +1316,16 @@ function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming
       style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut]}
     >
       {parts.map((kind) =>
-        kind === 'sticker' ? (
-          <StickerBubble key={`${message.id}-sticker`} message={message} incoming={incoming} onOpenPhoto={onOpenPhoto} />
-        ) : kind === 'photo' ? (
-          <PhotoBubble key={`${message.id}-photo`} message={message} incoming={incoming} onOpenPhoto={onOpenPhoto} />
-        ) : (
+        kind === 'text' ? (
           <TextBubble key={`${message.id}-text`} message={message} incoming={incoming} />
+        ) : (
+          <MediaBubble
+            key={`${message.id}-${kind}`}
+            kind={kind}
+            uri={kind === 'sticker' ? message.sticker : message.photo}
+            incoming={incoming}
+            onOpenPhoto={onOpenPhoto}
+          />
         ),
       )}
     </Pressable>
@@ -1588,88 +1348,41 @@ function TextBubble({ message, incoming }) {
   );
 }
 
-const StickerBubble = memo(function StickerBubble({ message, incoming, onOpenPhoto }) {
-  const [aspect, setAspect] = useState(1);
-  const [ready, setReady] = useState(false);
+function MediaBubble({ kind, uri, incoming, onOpenPhoto }) {
+  const [aspect, setAspect] = useState(kind === 'sticker' ? 1 : 4 / 3);
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => setReady(true));
-    return () => {
-      if (typeof task?.cancel === 'function') task.cancel();
-    };
-  }, [message.id]);
-  useEffect(() => {
-    if (!ready || !message.sticker) return;
+    if (!uri) return;
     Image.getSize(
-      message.sticker,
+      uri,
       (width, height) => {
         if (width > 0 && height > 0) setAspect(width / height);
       },
       () => {},
     );
-  }, [ready, message.sticker]);
+  }, [uri]);
+  const sticker = kind === 'sticker';
   return (
     <Pressable
-      testID={incoming ? 'sticker-in' : 'sticker-out'}
+      testID={incoming ? `${kind}-in` : `${kind}-out`}
       accessibilityRole="button"
-      accessibilityLabel="View sticker"
-      onPress={() => onOpenPhoto?.(message.sticker)}
+      accessibilityLabel={sticker ? 'View sticker' : 'View photo'}
+      onPress={() => onOpenPhoto?.(uri)}
       style={[
-        styles.stickerBubble,
-        incoming ? styles.stickerBubbleIn : styles.stickerBubbleOut,
-        web && styles.stickerBubbleWeb,
+        styles.mediaBubble,
+        incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut,
+        web && styles.mediaBubbleWeb,
         { width: photoMaxWidth, aspectRatio: aspect },
       ]}
     >
-      {ready ? (
-        <Image testID="bubble-sticker" source={{ uri: message.sticker }} resizeMode="contain" style={styles.stickerImage} />
-      ) : (
-        <View testID="sticker-placeholder" style={styles.mediaPlaceholder} />
-      )}
+      <Image
+        testID={sticker ? 'bubble-sticker' : 'bubble-photo'}
+        source={{ uri }}
+        resizeMode={sticker ? 'contain' : 'cover'}
+        style={styles.mediaImage}
+      />
     </Pressable>
   );
-});
-
-const PhotoBubble = memo(function PhotoBubble({ message, incoming, onOpenPhoto }) {
-  const [aspect, setAspect] = useState(4 / 3);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    // Text/composer/ring paint first; decode the inline data-URI after interactions.
-    const task = InteractionManager.runAfterInteractions(() => setReady(true));
-    return () => {
-      if (typeof task?.cancel === 'function') task.cancel();
-    };
-  }, [message.id]);
-  useEffect(() => {
-    if (!ready || !message.photo) return;
-    Image.getSize(
-      message.photo,
-      (width, height) => {
-        if (width > 0 && height > 0) setAspect(width / height);
-      },
-      () => {},
-    );
-  }, [ready, message.photo]);
-  return (
-    <Pressable
-      testID={incoming ? 'photo-in' : 'photo-out'}
-      accessibilityRole="button"
-      accessibilityLabel="View photo"
-      onPress={() => onOpenPhoto?.(message.photo)}
-      style={[
-        styles.photoBubble,
-        incoming ? styles.photoBubbleIn : styles.photoBubbleOut,
-        web && styles.photoBubbleWeb,
-        { width: photoMaxWidth, aspectRatio: aspect },
-      ]}
-    >
-      {ready ? (
-        <Image testID="bubble-photo" source={{ uri: message.photo }} resizeMode="cover" style={styles.photoImage} />
-      ) : (
-        <View testID="photo-placeholder" style={styles.mediaPlaceholder} />
-      )}
-    </Pressable>
-  );
-});
+}
 
 const styles = StyleSheet.create({
   boot: { flex: 1, backgroundColor: paper },
@@ -1792,14 +1505,7 @@ const styles = StyleSheet.create({
     padding: 10,
     zIndex: 1,
   },
-  menu: { borderBottomWidth: 1, borderBottomColor: ink, backgroundColor: paper },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
-  weekBlock: { paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: ink, gap: 8 },
-  weekRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 18 },
-  weekChip: { borderWidth: 1, borderColor: ink, paddingHorizontal: 8, paddingVertical: 6 },
-  weekChipOn: { backgroundColor: ink },
-  weekChipText: { color: ink, fontSize: 13, lineHeight: 16 },
-  weekChipTextOn: { color: paper },
   menuRowSelected: { backgroundColor: '#f6f3ee' },
   menuText: { color: ink, fontSize: 16, lineHeight: 21 },
   menuTextSelected: { fontWeight: '700' },
@@ -1821,7 +1527,7 @@ const styles = StyleSheet.create({
   avatarDashed: { borderStyle: 'dashed' },
   avatarFill: { width: 46, height: 46, borderRadius: 23 },
   circleOn: { opacity: 1, borderWidth: 2, borderColor: ink },
-  circleDim: { opacity: 0.4 },
+  circleDim: { opacity: 0.55 },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
   contactLabel: { marginTop: 4, maxWidth: 76, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
@@ -1836,17 +1542,6 @@ const styles = StyleSheet.create({
   },
   plusMark: { color: ink, fontSize: 32, lineHeight: 34 },
   main: { flex: 1, backgroundColor: paper },
-  copy: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 8,
-    overflow: 'hidden',
-    backgroundColor: paper,
-  },
-  copyColumn: { flex: 1, backgroundColor: paper },
-  flip: { transform: [{ scaleY: -1 }] },
   thread: { flex: 1 },
   threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 16, gap: 14, overflow: 'visible' },
   messageStack: { gap: 6, maxWidth: '100%' },
@@ -1890,27 +1585,17 @@ const styles = StyleSheet.create({
   },
   stickerTrayThumb: { width: '100%', height: '100%' },
   stickerPreview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#fafafa' },
-  stickerBubble: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-  },
-  stickerBubbleIn: { alignSelf: 'flex-start' },
-  stickerBubbleOut: { alignSelf: 'flex-end' },
-  stickerBubbleWeb: { maxWidth: 'min(320px, 84%)' },
-  stickerImage: { width: '100%', height: '100%' },
-  photoBubble: {
+  mediaBubble: {
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
   },
-  photoBubbleIn: { alignSelf: 'flex-start' },
-  photoBubbleOut: { alignSelf: 'flex-end' },
-  photoBubbleWeb: { maxWidth: 'min(320px, 84%)' },
-  photoImage: { width: '100%', height: '100%' },
-  mediaPlaceholder: { flex: 1, backgroundColor: '#ececec' },
+  mediaBubbleIn: { alignSelf: 'flex-start' },
+  mediaBubbleOut: { alignSelf: 'flex-end' },
+  mediaBubbleWeb: { maxWidth: 'min(320px, 84%)' },
+  mediaImage: { width: '100%', height: '100%' },
   bubble: {
     alignSelf: 'flex-end',
     maxWidth: '84%',

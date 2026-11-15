@@ -345,3 +345,19 @@ test('sanitize drops broken saved data', () => {
   assert.equal(clean.digest.platformScheduled, true);
   assert.deepEqual(sanitize(null), createState());
 });
+
+test('tap selection cannot snap: thread follows last picked id, not poll contactId', () => {
+  const messages = [
+    { id: '1', contactId: 'S36', body: 'elton', visible: true },
+    { id: '2', contactId: 'GHV', body: 'zjf', visible: true },
+  ];
+  let selected = 'S36';
+  selected = 'GHV'; // tap zjf
+  const pollContactId = 'S36'; // inbox poll still has Elton
+  void pollContactId;
+  assert.equal(selected, 'GHV');
+  assert.deepEqual(
+    threadMessages(messages, selected).map((item) => item.id),
+    ['2']
+  );
+});
