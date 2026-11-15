@@ -1276,22 +1276,23 @@ function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming
 
 function TextBubble({ message, incoming }) {
   const tone = bubbleTone(message.intent);
-  const fill = tone === 'zen' ? ZEN_FILL : paper;
+  const zen = tone === 'zen';
+  const fill = zen ? ZEN_FILL : paper;
   return (
     <View
       testID={incoming ? 'bubble-in' : 'bubble-out'}
-      style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, tone === 'zen' && styles.bubbleZen, tone === 'scheduled' && styles.bubbleScheduled, web && styles.bubbleRead]}
+      style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, zen && styles.bubbleZen, tone === 'scheduled' && styles.bubbleScheduled, web && styles.bubbleRead]}
     >
-      <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut]}>
-        <View style={styles.tailStem} />
-        <View style={[styles.tailFill, { borderBottomColor: fill }]} />
-        <View style={[styles.tailJoin, { backgroundColor: fill }]} />
+      <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut, zen && (incoming ? styles.tailInZen : styles.tailOutZen)]}>
+        <View style={[styles.tailStem, zen && styles.tailStemZen]} />
+        <View style={[styles.tailFill, zen && styles.tailFillZen, { borderBottomColor: fill }]} />
+        <View style={[styles.tailJoin, zen && styles.tailJoinZen, { backgroundColor: fill }]} />
         <View style={styles.tailClip}>
-          <View style={styles.tailEdge} />
+          <View style={[styles.tailEdge, zen && styles.tailEdgeZen]} />
         </View>
       </View>
       <Text style={styles.bubbleText}>{message.body}</Text>
-      {tone === 'zen' ? <ZenMotif /> : null}
+      {zen ? <ZenMotif /> : null}
     </View>
   );
 }
@@ -1422,13 +1423,19 @@ const styles = StyleSheet.create({
   tail: { position: 'absolute', width: 24, height: 20 },
   tailIn: { left: -1, top: -12 },
   tailOut: { right: -1, bottom: -12, transform: [{ rotate: '180deg' }] },
+  tailInZen: { left: -2 },
+  tailOutZen: { right: -2 },
   tailStem: { position: 'absolute', left: 0, top: 0, width: 1, height: 14, backgroundColor: ink },
+  tailStemZen: { width: 2, backgroundColor: '#2f7a52' },
   tailFill: {
     position: 'absolute', left: 1, top: 0, width: 0, height: 0, borderRightWidth: 16, borderBottomWidth: 13, borderRightColor: 'transparent', borderBottomColor: paper,
   },
+  tailFillZen: { left: 2 },
   tailJoin: { position: 'absolute', left: 1, top: 11, width: 16, height: 8, backgroundColor: paper },
+  tailJoinZen: { left: 2, top: 10, width: 14 },
   tailClip: { position: 'absolute', left: 0, top: 0, width: 24, height: 12, overflow: 'hidden' },
   tailEdge: { position: 'absolute', left: 0, top: 0, width: 28, height: 1, backgroundColor: ink, transformOrigin: 'left center', transform: [{ rotate: '36deg' }] },
+  tailEdgeZen: { height: 2, backgroundColor: '#2f7a52' },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { backgroundColor: paper },
   composerWrap: { position: 'relative', zIndex: 2 },
