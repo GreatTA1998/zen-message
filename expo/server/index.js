@@ -52,9 +52,8 @@ function contactCard(contact) {
   const person = users.get(contact.id);
   return {
     id: contact.id,
-    scheduleId: person?.scheduleId || 'daily-1-7',
-    weekDay: Number.isInteger(person?.weekDay) ? person.weekDay : 0,
-    weekHour: Number.isInteger(person?.weekHour) ? person.weekHour : 17,
+    dayHour: Number.isInteger(person?.dayHour) ? person.dayHour : 19,
+    dayMinute: Number.isInteger(person?.dayMinute) ? person.dayMinute : 0,
     offsetMinutes: Number.isInteger(person?.offsetMinutes) ? person.offsetMinutes : 0,
   };
 }
@@ -66,9 +65,8 @@ function inbox(user) {
     effects: user.pendingEffects,
     state: {
       mode: user.mode,
-      scheduleId: user.scheduleId,
-      weekDay: user.weekDay,
-      weekHour: user.weekHour,
+      dayHour: Number.isInteger(user.dayHour) ? user.dayHour : 19,
+      dayMinute: Number.isInteger(user.dayMinute) ? user.dayMinute : 0,
       contactId: user.contactId,
       messages: user.messages,
       digest: user.digest,
@@ -253,10 +251,7 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/schedule') {
-      const result = changeSchedule(user, body.scheduleId, Date.now(), {
-        weekDay: body.weekDay,
-        weekHour: body.weekHour,
-      });
+      const result = changeSchedule(user, body.dayHour, body.dayMinute, Date.now());
       Object.assign(user, result.state);
       await notify(user, result.effects);
       save(user);
@@ -272,6 +267,9 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/effects/ack') {
+      if (body.armedDigest && user.digest && !user.digest.presented) {
+        user.digest = { ...user.digest, platformScheduled: true };
+      }
       user.pendingEffects = [];
       save(user);
       send(response, 200, { ok: true });
@@ -281,7 +279,7 @@ const server = createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/v1/shown') {
       const result = reduce(user, { type: 'shown', now: Date.now() });
       Object.assign(user, result.state);
-      user.pendingEffects = [];
+      user.pendingEffects = result.effects;
       save(user);
       send(response, 200, inbox(user));
       return;

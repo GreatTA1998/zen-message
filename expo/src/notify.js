@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
+const DIGEST_ID = 'zen-digest';
+
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const quiet = notification?.request?.content?.data?.quiet === true;
@@ -42,27 +44,45 @@ export async function prepareNotifications() {
       });
     }
     const current = await Notifications.getPermissionsAsync();
-    if (current.status !== 'granted') {
-      await Notifications.requestPermissionsAsync();
-    }
+    if (current.status !== 'granted') await Notifications.requestPermissionsAsync();
   } catch {
     // Permissions or channels can fail on web / simulators.
   }
 }
 
 export async function presentNow(plan) {
-  const channelId = plan.quiet ? 'zen-quiet' : 'zen-normal';
-  const trigger = Platform.OS === 'android' ? { channelId } : null;
-  const id = plan.data?.messageIds?.[0];
   try {
     await Notifications.scheduleNotificationAsync({
-      ...(id ? { identifier: String(id).slice(0, 64) } : {}),
+      ...(plan.data?.messageIds?.[0] ? { identifier: String(plan.data.messageIds[0]).slice(0, 64) } : {}),
       content: contentFrom(plan),
-      trigger,
+      trigger: Platform.OS === 'android' ? { channelId: plan.quiet ? 'zen-quiet' : 'zen-normal' } : null,
     });
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+async function digestNotice(at, plan) {
+  if (Platform.OS === 'web') return false;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(DIGEST_ID);
+  } catch {}
+  const when = Number(at);
+  if (!plan || !Number.isFinite(when) || when <= Date.now()) return false;
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: DIGEST_ID,
+      content: contentFrom(plan),
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(when),
+        ...(Platform.OS === 'android' ? { channelId: 'zen-normal' } : {}),
+      },
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -73,7 +93,11 @@ export function listenForDigest(onDigest) {
 }
 
 export async function runNotificationEffects(effects) {
-  for (const effect of effects) {
+  let armedDigest = false;
+  for (const effect of effects || []) {
     if (effect.type === 'present') await presentNow(effect.plan);
+    else if (effect.type === 'schedule-digest') armedDigest = (await digestNotice(effect.at, effect.plan)) || armedDigest;
+    else if (effect.type === 'cancel-digest') await digestNotice();
   }
+  return armedDigest;
 }

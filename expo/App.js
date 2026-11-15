@@ -119,17 +119,20 @@ function Root() {
     if (inbox?.user) setUser(inbox.user);
   }, [inbox?.user]);
 
-  const refresh = useCallback(async () => {
-    const current = tokenRef.current;
-    if (!current) return null;
-    const next = await api(inboxPath(), { token: current });
+  const deliverInbox = useCallback(async (current, next) => {
     setInbox(next);
-    if (next.effects?.length) {
-      await runNotificationEffects(next.effects);
-      await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
+    if (next?.effects?.length) {
+      const armedDigest = await runNotificationEffects(next.effects);
+      await api('/v1/effects/ack', { token: current, method: 'POST', body: { armedDigest } });
     }
     return next;
   }, []);
+
+  const refresh = useCallback(async () => {
+    const current = tokenRef.current;
+    if (!current) return null;
+    return deliverInbox(current, await api(inboxPath(), { token: current }));
+  }, [deliverInbox]);
 
   useEffect(() => {
     let alive = true;
@@ -189,11 +192,11 @@ function Root() {
       const current = tokenRef.current;
       if (!current) return;
       api('/v1/shown', { token: current, method: 'POST', body: {} })
-        .then(setInbox)
+        .then((next) => deliverInbox(current, next))
         .catch(() => {});
     });
     return () => subscription.remove();
-  }, []);
+  }, [deliverInbox]);
 
   async function onSubject(result) {
     if (result.missing) {
@@ -304,7 +307,7 @@ function Root() {
       <ChatScreen
         token={token}
         inbox={inbox}
-        onInbox={setInbox}
+        onInbox={(next) => deliverInbox(token, next)}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
@@ -412,7 +415,7 @@ function ChatScreen({
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const clock = dailyClock(state);
-  const summaryTime = mode !== 'relaxed' ? dayPhrase(clock.hour, clock.minute).replace(/ /g, '') : '';
+  const summaryTime = mode !== 'relaxed' ? dayPhrase(clock.hour, clock.minute, true).replace(/ /g, '') : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
   const columns = scheduledColumns(now);
@@ -432,13 +435,13 @@ function ChatScreen({
   }
 
   async function mutate(path, body) {
-    const next = await api(path, { token, method: 'POST', body });
-    onInbox(next);
-    if (next.effects?.length) {
-      await runNotificationEffects(next.effects);
-      await api('/v1/effects/ack', { token, method: 'POST', body: {} });
-    }
-    return next;
+    return onInbox(
+      await api(path, {
+        token,
+        method: 'POST',
+        body: { ...body, offsetMinutes: new Date().getTimezoneOffset() },
+      })
+    );
   }
 
   function pickContact(item) {
@@ -686,10 +689,11 @@ function ChatScreen({
                 {scheduleOpen ? (
                   <View testID="schedule-popover" style={styles.popover}>
                     <ScheduleSettings
+                      key={`${clock.hour}-${clock.minute}`}
                       state={state}
-                      onChoose={(dayHour) => {
+                      onChoose={(dayHour, dayMinute) => {
                         setScheduleOpen(false);
-                        mutate('/v1/schedule', { dayHour, dayMinute: 0 });
+                        mutate('/v1/schedule', { dayHour, dayMinute });
                       }}
                     />
                   </View>
@@ -1184,25 +1188,36 @@ function AccountMenu({ userId, onLogout, onDeleteAccount }) {
 }
 
 function ScheduleSettings({ state, onChoose }) {
-  const selected = dailyClock(state).hour;
+  const clock = dailyClock(state);
+  const [hour, setHour] = useState(clock.hour);
+  const row = (testID, label, on, press) => (
+    <Pressable
+      key={testID}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      onPress={press}
+      style={[styles.menuRow, on && styles.menuRowSelected]}
+    >
+      <Text style={[styles.menuText, on && styles.menuTextSelected]}>{label}</Text>
+    </Pressable>
+  );
   return (
-    <ScrollView testID="schedule-menu" style={styles.popoverList} keyboardShouldPersistTaps="handled">
-      {DAY_HOURS.map((hour) => {
-        const on = hour === selected;
-        return (
-          <Pressable
-            key={hour}
-            testID={`schedule-hour-${hour}`}
-            accessibilityRole="button"
-            accessibilityState={{ selected: on }}
-            onPress={() => onChoose(hour)}
-            style={[styles.menuRow, on && styles.menuRowSelected]}
-          >
-            <Text style={[styles.menuText, on && styles.menuTextSelected]}>{dayPhrase(hour)}</Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <View testID="schedule-menu" style={styles.choiceColumns}>
+      <ScrollView style={styles.choiceCol} keyboardShouldPersistTaps="handled">
+        {DAY_HOURS.map((value) => row(`schedule-hour-${value}`, dayPhrase(value), value === hour, () => setHour(value)))}
+      </ScrollView>
+      <ScrollView style={[styles.choiceCol, styles.choiceColRight]} keyboardShouldPersistTaps="handled">
+        {Array.from({ length: 60 }, (_, minute) =>
+          row(
+            `schedule-minute-${minute}`,
+            String(minute).padStart(2, '0'),
+            hour === clock.hour && minute === clock.minute,
+            () => onChoose(hour, minute)
+          )
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1332,13 +1347,12 @@ const styles = StyleSheet.create({
     top: '100%',
     right: 0,
     marginTop: 8,
-    width: 168,
+    width: 200,
     backgroundColor: paper,
     borderWidth: 1,
     borderColor: ink,
     zIndex: 6,
   },
-  popoverList: { maxHeight: 280 },
   scheduleLine: { color: ink, fontSize: 16, lineHeight: 20 },
   schedulePrefix: { flexShrink: 1 },
   scheduleTime: { flexShrink: 0, textDecorationLine: 'underline' },

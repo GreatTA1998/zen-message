@@ -487,6 +487,9 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     }
 
     if (method === 'POST' && url.pathname === '/v1/effects/ack') {
+      if (body?.armedDigest && user.digest && !user.digest.presented) {
+        user.digest = { ...user.digest, platformScheduled: true };
+      }
       user.pendingEffects = [];
       await commit(store, state);
       return { ok: true };
@@ -495,7 +498,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     if (method === 'POST' && url.pathname === '/v1/shown') {
       const result = reduce(user, { type: 'shown', now: Date.now() });
       adopt(user, result.state);
-      user.pendingEffects = [];
+      user.pendingEffects = result.effects;
       await commit(store, state);
       return inbox(state, user);
     }
