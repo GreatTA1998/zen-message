@@ -17,5 +17,5 @@ if [[ -f "$out/index.html" ]]; then
   sed -i 's|href="/favicon.ico"|href="/app/favicon.ico"|g' "$out/index.html"
 fi
 
-bundle=$(basename "$out"/_expo/static/js/web/index-*.js)
+bundle=$(ls -S "$out"/_expo/static/js/web/index-*.js 2>/dev/null | head -1 | xargs -n1 basename)
 echo "Published web bundle: $bundle"
