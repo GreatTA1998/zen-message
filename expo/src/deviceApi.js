@@ -487,9 +487,6 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     }
 
     if (method === 'POST' && url.pathname === '/v1/effects/ack') {
-      if (body?.armedDigest && user.digest && !user.digest.presented) {
-        user.digest = { ...user.digest, platformScheduled: true };
-      }
       user.pendingEffects = [];
       await commit(store, state);
       return { ok: true };

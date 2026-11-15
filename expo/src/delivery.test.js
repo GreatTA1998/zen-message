@@ -79,6 +79,9 @@ test('anytime batched stays hidden and joins one digest', () => {
   assert.equal(second.effects[0].plan.body, '2 messages · Wren, Pip');
   assert.equal(second.state.digest.messageIds.length, 2);
   assert.equal(second.state.messages.every((item) => item.visible === false), true);
+  const due = reduce(second.state, { type: 'release', now: at(19, 0).getTime() });
+  assert.deepEqual(due.effects[0].plan.data.messageIds, ['a', 'b']);
+  assert.equal(due.effects[0].plan.body, '2 messages · Wren, Pip');
 });
 
 test('anytime relaxed is visible and silent', () => {
@@ -92,10 +95,7 @@ test('anytime relaxed is visible and silent', () => {
 
 test('relax reveals a held digest without notifying', () => {
   const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
-  const relaxed = reduce(
-    { ...held.state, digest: { ...held.state.digest, platformScheduled: true } },
-    { type: 'set-mode', mode: 'relaxed' }
-  );
+  const relaxed = reduce(held.state, { type: 'set-mode', mode: 'relaxed' });
   assert.equal(relaxed.state.mode, 'relaxed');
   assert.equal(relaxed.state.messages[0].visible, true);
   assert.equal(relaxed.state.digest, null);
@@ -203,27 +203,19 @@ test('a daily time change moves anytime and leaves a scheduled message', () => {
 
 test('the window reveals held messages once', () => {
   const held = send(createState(), { id: 'a', body: 'Hello world', intent: 'anytime' }, at(10, 15));
-  const scheduled = {
-    ...held.state,
-    digest: { ...held.state.digest, platformScheduled: true },
-  };
-  const early = reduce(scheduled, { type: 'release', now: at(12, 0).getTime() });
+  const early = reduce(held.state, { type: 'release', now: at(12, 0).getTime() });
   assert.equal(early.state.messages[0].visible, false);
   assert.equal(early.effects.length, 0);
 
-  const due = reduce(scheduled, { type: 'release', now: at(19, 0).getTime() });
+  const due = reduce(held.state, { type: 'release', now: at(19, 0).getTime() });
   assert.equal(due.state.messages[0].visible, true);
   assert.equal(due.state.digest.presented, true);
-  assert.equal(due.effects.length, 0);
+  assert.equal(due.effects.length, 1);
+  assert.equal(due.effects[0].type, 'present');
+  assert.equal(due.effects[0].plan.data.kind, 'digest');
 
   const again = reduce(due.state, { type: 'release', now: at(19, 5).getTime() });
   assert.equal(again.effects.length, 0);
-
-  const unscheduled = reduce(held.state, { type: 'release', now: at(19, 0).getTime() });
-  assert.equal(unscheduled.effects.length, 1);
-  assert.equal(unscheduled.effects[0].type, 'present');
-  assert.equal(unscheduled.effects[0].plan.data.kind, 'digest');
-  assert.equal(unscheduled.effects[0].plan.quiet, false);
 });
 
 test('a shown digest does not present a second time', () => {
@@ -349,12 +341,12 @@ test('sanitize drops broken saved data', () => {
     dayHour: 99,
     contactId: 'pip',
     messages: [{ id: 'a', contactId: 'pip', contactName: 'Pip', body: 'Hi', intent: 'anytime', createdAt: 1, visible: true }, { nope: true }],
-    digest: { at: 5, messageIds: ['a'], presented: false, platformScheduled: true },
+    digest: { at: 5, messageIds: ['a'], presented: false },
   });
   assert.equal(clean.mode, 'relaxed');
   assert.equal(clean.dayHour, 19);
   assert.equal(clean.messages.length, 1);
-  assert.equal(clean.digest.platformScheduled, true);
+  assert.equal(clean.digest.presented, false);
   assert.deepEqual(sanitize(null), createState());
 });
 
