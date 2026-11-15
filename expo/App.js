@@ -27,7 +27,7 @@ import {
   dayPhrase,
   nextDaily,
   messageSticker,
-  scheduledChoices,
+  scheduledColumns,
   threadMessages,
 } from './src/delivery';
 import { FriendRequestView } from './src/FriendRequestView';
@@ -348,7 +348,6 @@ function ChatScreen({
   const [inputHeight, setInputHeight] = useState(44);
   const [intent, setIntent] = useState('anytime');
   const [choice, setChoice] = useState(0);
-  const [customHour, setCustomHour] = useState(15);
   const [panel, setPanel] = useState('chat');
   const [requestBusy, setRequestBusy] = useState(false);
   const [pendingMode, setPendingMode] = useState(null);
@@ -393,8 +392,9 @@ function ChatScreen({
   const summaryTime = mode !== 'relaxed' ? summaryAt(dailyClock(state).hour, dailyClock(state).minute) : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
-  const choices = scheduledChoices(now);
-  const selectedAt = choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0];
+  const columns = scheduledColumns(now);
+  const choices = columns.today.concat(columns.tomorrow);
+  const selectedAt = choices[choice] ?? choices[0];
   const canSend =
     contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
 
@@ -585,10 +585,8 @@ function ChatScreen({
     onIntent: setIntent,
     choice,
     onChoice: setChoice,
-    choices,
+    columns,
     now,
-    customHour,
-    onCustomHour: setCustomHour,
     photo,
     onClearPhoto: () => setPhoto(null),
     sticker,
@@ -938,10 +936,8 @@ function ComposerFooter({
   onIntent,
   choice,
   onChoice,
-  choices,
+  columns,
   now,
-  customHour,
-  onCustomHour,
   photo,
   onClearPhoto,
   sticker,
@@ -970,58 +966,37 @@ function ComposerFooter({
     setTimesOpen(id === 'scheduled');
   }
 
+  function choiceCell(at, index, first) {
+    const on = choice === index;
+    return (
+      <Pressable
+        key={at.getTime()}
+        testID={showIds ? `choice-${index}` : undefined}
+        accessibilityRole="button"
+        accessibilityState={{ selected: on }}
+        onPress={() => { onChoice(index); setTimesOpen(false); }}
+        style={[styles.choiceRow, first && styles.choiceRowFirst, on && styles.choiceRowOn]}
+      >
+        <Text numberOfLines={1} style={[styles.choiceText, on && styles.choiceTextOn]}>
+          {dayPhrase(at.getHours()).replace(' ', '')}
+        </Text>
+      </Pressable>
+    );
+  }
+
   return (
     <View style={styles.footer}>
       <View style={styles.composerWrap}>
         {timesOpen ? (
           <View testID={showIds ? 'scheduled-choices' : undefined} style={[styles.choicePopover, web && styles.webChoices]}>
-            {choices.map((at, index) => {
-              const selected = choice === index;
-              return (
-                <Pressable
-                  key={at.getTime()}
-                  testID={showIds ? `choice-${index}` : undefined}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => { onChoice(index); setTimesOpen(false); }}
-                  style={[styles.choiceRow, index === 0 && styles.choiceRowFirst, selected && styles.choiceRowOn]}
-                >
-                  <Text numberOfLines={1} style={[styles.choiceText, selected && styles.choiceTextOn]}>
-                    {choiceLabel(at, now)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            <Pressable
-              testID={showIds ? 'choice-custom' : undefined}
-              accessibilityRole="button"
-              accessibilityState={{ selected: choice === 'custom' }}
-              onPress={() => onChoice('custom')}
-              style={[styles.choiceRow, choice === 'custom' && styles.choiceRowOn]}
-            >
-              <Text numberOfLines={1} style={[styles.choiceText, choice === 'custom' && styles.choiceTextOn]}>
-                custom
-              </Text>
-            </Pressable>
-            {choice === 'custom' ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hours}>
-                {DAY_HOURS.map((hour) => {
-                  const selected = hour === customHour;
-                  return (
-                    <Pressable
-                      key={hour}
-                      testID={showIds ? `custom-hour-${hour}` : undefined}
-                      accessibilityRole="button"
-                      accessibilityLabel={dayPhrase(hour)}
-                      onPress={() => { onCustomHour(hour); setTimesOpen(false); }}
-                      style={[styles.hourChip, selected && styles.hourChipOn]}
-                    >
-                      <Text style={[styles.hourChipText, selected && styles.hourChipTextOn]}>{dayPhrase(hour)}</Text>
-                    </Pressable>
-                  );
-                })}
+            <View style={styles.choiceColumns}>
+              <ScrollView style={styles.choiceCol} keyboardShouldPersistTaps="handled">
+                {columns.today.map((at, i) => choiceCell(at, i, !i))}
               </ScrollView>
-            ) : null}
+              <ScrollView style={[styles.choiceCol, styles.choiceColRight]} keyboardShouldPersistTaps="handled">
+                {columns.tomorrow.map((at, i) => choiceCell(at, columns.today.length + i, !i))}
+              </ScrollView>
+            </View>
           </View>
         ) : null}
         <View testID={showIds ? 'composer-bar' : undefined} style={[styles.composer, web && styles.webComposer]}>
@@ -1509,25 +1484,24 @@ const styles = StyleSheet.create({
   intentTextSelected: { fontWeight: '700' },
   choicePopover: {
     position: 'absolute',
-    left: 56,
-    right: 56,
+    left: 24,
+    right: 24,
     bottom: '100%',
     marginBottom: 6,
     backgroundColor: paper,
     borderWidth: 1,
     borderColor: ink,
     zIndex: 6,
+    maxHeight: 220,
   },
+  choiceColumns: { flexDirection: 'row' },
+  choiceCol: { flex: 1 },
+  choiceColRight: { borderLeftWidth: 1, borderLeftColor: ink },
   choiceRow: { paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: ink },
   choiceRowFirst: { borderTopWidth: 0 },
   choiceRowOn: { backgroundColor: '#f6f3ee' },
   choiceText: { color: ink, fontSize: 15, lineHeight: 20 },
   choiceTextOn: { fontWeight: '700' },
-  hours: { paddingHorizontal: 10, paddingBottom: 10, gap: 6 },
-  hourChip: { borderWidth: 1, borderColor: ink, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 },
-  hourChipOn: { backgroundColor: ink },
-  hourChipText: { color: ink, fontSize: 12, lineHeight: 16 },
-  hourChipTextOn: { color: paper },
   composer: {
     marginHorizontal: 12,
     marginTop: 10,

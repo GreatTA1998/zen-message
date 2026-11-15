@@ -1,5 +1,4 @@
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-export const CHECKPOINT_HOURS = [12, 19];
 export const DAY_HOURS = Array.from({ length: 24 }, (_item, hour) => hour);
 
 export const INTENTS = ['anytime', 'scheduled', 'realtime'].map((id) => ({ id, label: id === 'anytime' ? 'zen' : id }));
@@ -28,10 +27,29 @@ export function nextDaily(now, hour = 19, minute = 0, offsetMinutes) {
   return nextClock(now, clampHour(hour, 19), clampMinute(minute), offsetMinutes);
 }
 
+export function scheduledColumns(now, offsetMinutes) {
+  const date = now instanceof Date ? now : new Date(now);
+  const slot = (dayOffset, hour) => {
+    if (offsetMinutes == null) {
+      const at = new Date(date);
+      at.setHours(0, 0, 0, 0);
+      at.setDate(at.getDate() + dayOffset);
+      at.setHours(hour, 0, 0, 0);
+      return at;
+    }
+    const local = new Date(date.getTime() - offsetMinutes * 60000);
+    return new Date(
+      Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + dayOffset, hour, 0, 0, 0) +
+        offsetMinutes * 60000
+    );
+  };
+  const keep = (dayOffset, hours) => hours.map((h) => slot(dayOffset, h)).filter((at) => at.getTime() > date.getTime());
+  return { today: keep(0, DAY_HOURS), tomorrow: keep(1, DAY_HOURS.slice(8)) };
+}
+
 export function scheduledChoices(now, offsetMinutes) {
-  return CHECKPOINT_HOURS.map((hour) => nextClock(now, hour, 0, offsetMinutes)).sort(
-    (left, right) => left.getTime() - right.getTime()
-  );
+  const { today, tomorrow } = scheduledColumns(now, offsetMinutes);
+  return today.concat(tomorrow);
 }
 
 export function dayPhrase(hour, minute = 0, pad) {
