@@ -78,7 +78,7 @@ export function choiceLabel(at, now) {
 export function composerPlaceholder(name, intent, at) {
   const who = String(name || '').trim();
   if (!who) return 'Message';
-  if (intent === 'realtime') return `Message ${who} with a realtime notification`;
+  if (intent === 'realtime') return `Message ${who}`;
   if (intent !== 'scheduled' || !at) return `Message ${who} without a notification`;
   return `Message ${who} at ${dayPhrase(at.getHours(), at.getMinutes())}`;
 }
