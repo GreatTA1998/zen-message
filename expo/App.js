@@ -364,6 +364,7 @@ function ChatScreen({
   const attachBusy = useRef(false);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
+  const { top: safeTop } = useSafeAreaInsets();
 
   useEffect(() => {
     loadPickedContact().then((id) => {
@@ -908,10 +909,12 @@ function ChatScreen({
             await adoptSticker(dataUri);
           }}
         />
+        {photoViewerUri ? <StatusBar style="light" /> : null}
         <Modal
           visible={Boolean(photoViewerUri)}
           transparent
           animationType="fade"
+          statusBarTranslucent
           onRequestClose={() => setPhotoViewerUri(null)}
         >
           <Pressable
@@ -935,7 +938,7 @@ function ChatScreen({
               accessibilityRole="button"
               accessibilityLabel="Close"
               onPress={() => setPhotoViewerUri(null)}
-              style={styles.photoViewerClose}
+              style={[styles.photoViewerClose, { top: safeTop + 12 }]}
               hitSlop={8}
             >
               <Feather name="x" size={28} color={paper} />
@@ -1367,7 +1370,12 @@ function MediaBubble({ kind, uri, incoming, onOpenPhoto }) {
       accessibilityRole="button"
       accessibilityLabel={sticker ? 'View sticker' : 'View photo'}
       onPress={() => onOpenPhoto?.(uri)}
-      style={[styles.mediaBubble, sticker && styles.stickerBubble, incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut]}
+      style={[
+        styles.mediaBubble,
+        web && styles.mediaBubbleWeb,
+        sticker && styles.stickerBubble,
+        incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut,
+      ]}
     >
       <Image
         testID={sticker ? 'bubble-sticker' : 'bubble-photo'}
@@ -1562,6 +1570,7 @@ const styles = StyleSheet.create({
   stickerBubble: { width: 148, height: 148, backgroundColor: 'transparent', borderWidth: 0 },
   mediaBubbleIn: { alignSelf: 'flex-start' },
   mediaBubbleOut: { alignSelf: 'flex-end' },
+  mediaBubbleWeb: { maxWidth: '100%' },
   mediaImage: { width: '100%', height: '100%' },
   bubble: {
     alignSelf: 'flex-end',
