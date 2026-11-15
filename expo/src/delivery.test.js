@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  choiceLabel,
+  composerPlaceholder,
   createState,
   dailyClock,
   digestPlan,
@@ -329,6 +331,15 @@ test('receipt phrase names the chosen time and ignores focus', () => {
   assert.equal(receiptPhrase(later, wednesday), 'Received at 5:00 pm Wednesday');
   assert.equal(receiptPhrase(later, wednesday).includes('relax'), false);
   assert.equal(receiptPhrase(later, wednesday).includes('batched'), false);
+  assert.equal(choiceLabel(at(19, 0), morning), '7pm');
+  assert.equal(choiceLabel(later, wednesday), '5pm Wednesday');
+});
+
+test('composer placeholder uses nickname and delivery mode', () => {
+  assert.equal(composerPlaceholder('nathan', 'realtime'), 'Message nathan with a realtime notification');
+  assert.equal(composerPlaceholder('nathan', 'anytime'), 'Message nathan without a notification');
+  assert.equal(composerPlaceholder('nathan', 'scheduled', at(19, 0)), 'Message nathan at 7 pm');
+  assert.equal(composerPlaceholder('', 'realtime'), 'Message');
 });
 
 test('sanitize drops broken saved data', () => {
