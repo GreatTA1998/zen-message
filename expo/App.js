@@ -1168,7 +1168,9 @@ function ComposerFooter({
                     style={styles.intentWord}
                   >
                     <Text numberOfLines={1} style={[styles.intentText, selected && styles.intentTextSelected]}>
-                      {item.label}
+                      {item.id === 'scheduled' && selected
+                        ? choiceLabel(choice === 'custom' ? nextDaily(now, customHour, 0) : choices[choice] ?? choices[0], now)
+                        : item.label}
                     </Text>
                   </Pressable>
                 );
