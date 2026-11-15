@@ -47,19 +47,13 @@ export function applyCropDrag(crop, mode, dx, dy, canvasWidth, canvasHeight, min
   if (mode === 'move') {
     return clampCrop({ x: x + dx, y: y + dy, width, height }, canvasWidth, canvasHeight);
   }
-  if (mode.includes('w')) {
-    const next = Math.min(x + width - minSize, x + dx);
-    width += x - next;
-    x = next;
-  }
-  if (mode.includes('e')) width = Math.max(minSize, width + dx);
-  if (mode.includes('n')) {
-    const next = Math.min(y + height - minSize, y + dy);
-    height += y - next;
-    y = next;
-  }
-  if (mode.includes('s')) height = Math.max(minSize, height + dy);
-  return clampCrop({ x, y, width, height }, canvasWidth, canvasHeight);
+  let right = x + width;
+  let bottom = y + height;
+  if (mode.includes('w')) x = Math.min(right - minSize, Math.max(0, x + dx));
+  if (mode.includes('e')) right = Math.max(x + minSize, Math.min(canvasWidth, right + dx));
+  if (mode.includes('n')) y = Math.min(bottom - minSize, Math.max(0, y + dy));
+  if (mode.includes('s')) bottom = Math.max(y + minSize, Math.min(canvasHeight, bottom + dy));
+  return { x, y, width: right - x, height: bottom - y };
 }
 
 function strokePath(ctx, stroke) {

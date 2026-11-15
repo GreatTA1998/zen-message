@@ -19,4 +19,17 @@ test('applyCropDrag moves and resizes within the canvas', () => {
   assert.deepEqual(applyCropDrag(start, 'move', 10, -5, 200, 200), { x: 30, y: 15, width: 60, height: 60 });
   assert.deepEqual(applyCropDrag(start, 'se', 10, 10, 200, 200), { x: 20, y: 20, width: 70, height: 70 });
   assert.equal(applyCropDrag(start, 'nw', 50, 50, 200, 200).width >= 48, true);
+  // East/south against the canvas edge must not slide the opposite edge.
+  assert.deepEqual(applyCropDrag({ x: 150, y: 150, width: 40, height: 40 }, 'e', 100, 0, 200, 200), {
+    x: 150,
+    y: 150,
+    width: 50,
+    height: 40,
+  });
+  assert.deepEqual(applyCropDrag({ x: 150, y: 150, width: 40, height: 40 }, 's', 0, 100, 200, 200), {
+    x: 150,
+    y: 150,
+    width: 40,
+    height: 50,
+  });
 });

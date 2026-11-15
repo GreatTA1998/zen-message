@@ -123,22 +123,26 @@ function CropOverlay({ crop, canvas, onChange }) {
     ['w', x, midY],
   ];
 
+  const rim = 22;
+  const move = bind('move');
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, height: y, backgroundColor: dim }} />
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: y + height, right: 0, bottom: 0, backgroundColor: dim }} />
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: y, width: x, height, backgroundColor: dim }} />
       <View pointerEvents="none" style={{ position: 'absolute', left: x + width, top: y, right: 0, height, backgroundColor: dim }} />
-      <View
-        accessibilityLabel="Crop frame"
-        style={[styles.cropFrame, { left: x, top: y, width, height }]}
-        {...bind('move')}
-      >
-        <View pointerEvents="none" style={[styles.gridLine, { left: width / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
-        <View pointerEvents="none" style={[styles.gridLine, { left: (width * 2) / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
-        <View pointerEvents="none" style={[styles.gridLine, { top: height / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
-        <View pointerEvents="none" style={[styles.gridLine, { top: (height * 2) / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
+      <View pointerEvents="none" style={[styles.cropFrame, { left: x, top: y, width, height }]}>
+        <View style={[styles.gridLine, { left: width / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
+        <View style={[styles.gridLine, { left: (width * 2) / 3, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />
+        <View style={[styles.gridLine, { top: height / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
+        <View style={[styles.gridLine, { top: (height * 2) / 3, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />
       </View>
+      {/* Rim only moves the crop — interior stays drawable. */}
+      <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x, top: y - rim / 2, width, height: rim, zIndex: 5 }} {...move} />
+      <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x, top: y + height - rim / 2, width, height: rim, zIndex: 5 }} {...move} />
+      <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x - rim / 2, top: y, width: rim, height, zIndex: 5 }} {...move} />
+      <View accessibilityLabel="Move crop" style={{ position: 'absolute', left: x + width - rim / 2, top: y, width: rim, height, zIndex: 5 }} {...move} />
       {handles.map(([mode, hx, hy]) => (
         <View
           key={mode}
