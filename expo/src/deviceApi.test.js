@@ -207,6 +207,7 @@ test('a web realtime message alerts the signed-in phone once', async () => {
   const alerts = presents(storage.delivered, apple.user.id);
   assert.equal(alerts.length, 1);
   assert.equal(alerts[0].plan.data.kind, 'realtime');
+  assert.equal(alerts[0].plan.title, 'Gus');
   assert.equal(alerts[0].plan.quiet, false);
   assert.equal(storage.delivered.find((item) => item.id === apple.user.id).pushToken, 'ExponentPushToken[phonephonephone]');
   const inbox = await phone('/v1/inbox?offset=0', { token: apple.token });
