@@ -11,3 +11,6 @@ export function messageBubbleParts(message) {
 export function bubbleTone(intent) {
   return intent === 'scheduled' ? 'scheduled' : intent === 'anytime' || intent === 'timely' ? 'zen' : 'normal';
 }
+
+export const ZEN_FILL = '#d4ecd9';
+export const ZEN_LINE = '#2f7a52';
