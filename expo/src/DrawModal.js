@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { applyCropDrag, clampCrop, hasDrawnInk, paintStrokes, STROKE_WIDTH } from './stickerExport.js';
 
@@ -22,8 +23,8 @@ function pointsToPath(points) {
   return d;
 }
 
-function fullCrop(size) {
-  return clampCrop({ x: 0, y: 0, width: size.width, height: size.height }, size.width, size.height);
+function fullCrop({ width: w, height: h }) {
+  return clampCrop({ x: 10, y: 10, width: w - 20, height: h - 20 }, w, h);
 }
 
 function DrawSurface({ width, height, strokes, onStrokeEnd }) {
@@ -186,6 +187,7 @@ export async function exportDrawnSticker(strokes, captureView, size, crop) {
 }
 
 export function DrawModal({ visible, onCancel, onDone }) {
+  const insets = useSafeAreaInsets();
   const [strokes, setStrokes] = useState([]);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [crop, setCrop] = useState(null);
@@ -261,7 +263,7 @@ export function DrawModal({ visible, onCancel, onDone }) {
       style={[styles.sheet, Platform.OS === 'web' && styles.webOverlay]}
       accessibilityViewIsModal={Platform.OS === 'web' ? true : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 16 : 8) }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Cancel drawing" onPress={onCancel} style={styles.headerButton}>
           <Text style={styles.headerAction}>Cancel</Text>
         </Pressable>
@@ -293,7 +295,7 @@ export function DrawModal({ visible, onCancel, onDone }) {
       >
         {surface}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={finish} style={styles.done}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={finish} style={[styles.done, { marginBottom: pad + Math.max(insets.bottom, 8) }]}>
         <Text style={styles.doneText}>Done</Text>
       </Pressable>
     </View>
@@ -314,7 +316,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'web' ? 16 : 14,
     paddingHorizontal: 16,
     paddingBottom: 10,
     backgroundColor: paper,
@@ -328,17 +329,16 @@ const styles = StyleSheet.create({
   headerTitle: { color: ink, fontSize: 17, fontWeight: '600' },
   canvasFrame: { flex: 1, margin: pad, borderRadius: 18, overflow: 'hidden', backgroundColor: paper },
   canvasInner: { flex: 1, backgroundColor: paper },
-  cropFrame: { position: 'absolute', borderWidth: 2, borderColor: '#fff', zIndex: 4 },
-  gridLine: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.7)' },
+  cropFrame: { position: 'absolute', borderWidth: 2, borderColor: ink, zIndex: 4 },
+  gridLine: { position: 'absolute', backgroundColor: 'rgba(28,28,28,0.35)' },
   cropHit: { position: 'absolute', width: hit, height: hit, alignItems: 'center', justifyContent: 'center', zIndex: 6 },
-  cropKnob: { backgroundColor: '#fff', borderRadius: 1 },
+  cropKnob: { backgroundColor: paper, borderWidth: 2, borderColor: ink, borderRadius: 1 },
   cropKnobCorner: { width: 16, height: 16 },
   cropKnobEdgeH: { width: 24, height: 5 },
   cropKnobEdgeV: { width: 5, height: 24 },
   exportCapture: { position: 'absolute', left: -10000, top: 0, backgroundColor: paper, overflow: 'hidden' },
   done: {
     marginHorizontal: pad,
-    marginBottom: pad + 8,
     borderRadius: 14,
     backgroundColor: ink,
     paddingVertical: 14,
