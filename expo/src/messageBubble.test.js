@@ -30,5 +30,7 @@ test('sticker beats photo when both are present', () => {
 });
 
 test('bubbleTone: zen for anytime/timely, scheduled apart, else normal', () => {
-  assert.deepEqual(['anytime', 'timely', 'scheduled', 'realtime'].map(bubbleTone), ['zen', 'zen', 'scheduled', 'normal']);
+  assert.deepEqual(['anytime', 'timely', 'scheduled', 'realtime', 'urgent'].map(bubbleTone), [
+    'zen', 'zen', 'scheduled', 'normal', 'normal',
+  ]);
 });

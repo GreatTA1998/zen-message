@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  INTENTS,
   choiceLabel,
   composerPlaceholder,
   createState,
@@ -329,10 +330,15 @@ test('receipt phrase names the chosen time and ignores focus', () => {
 });
 
 test('composer placeholder uses nickname and delivery mode', () => {
+  assert.deepEqual(INTENTS.map((item) => item.label), ['zen', 'scheduled', 'urgent']);
   assert.equal(composerPlaceholder('nathan', 'realtime'), 'Message nathan');
+  assert.equal(composerPlaceholder('nathan', 'urgent'), 'Message nathan');
   assert.equal(composerPlaceholder('nathan', 'anytime'), 'Message nathan without a notification');
   assert.equal(composerPlaceholder('nathan', 'scheduled', at(19, 0)), 'Message nathan at 7 pm');
   assert.equal(composerPlaceholder('', 'realtime'), 'Message');
+  const urgent = send(createState(), { id: 'u', body: 'Now', intent: 'urgent' }, at(10, 15));
+  assert.equal(urgent.state.messages[0].intent, 'realtime');
+  assert.equal(urgent.effects[0].plan.data.kind, 'realtime');
 });
 
 test('sanitize drops broken saved data', () => {

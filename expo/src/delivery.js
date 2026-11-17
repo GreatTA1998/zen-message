@@ -3,9 +3,8 @@ import { normalizeCode } from './people.js';
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const DAY_HOURS = Array.from({ length: 24 }, (_item, hour) => hour);
 
-export const INTENTS = ['anytime', 'scheduled', 'realtime'].map((id) => ({ id, label: id === 'anytime' ? 'zen' : id }));
-
-const INTENT_IDS = new Set([...INTENTS.map((item) => item.id), 'timely']);
+export const INTENTS = ['anytime', 'scheduled', 'realtime'].map((id) => ({ id, label: id === 'anytime' ? 'zen' : id === 'realtime' ? 'urgent' : id }));
+const INTENT_IDS = new Set([...INTENTS.map((item) => item.id), 'timely', 'urgent']);
 
 export function createState() {
   return {
@@ -80,7 +79,7 @@ export function choiceLabel(at, now) {
 export function composerPlaceholder(name, intent, at) {
   const who = String(name || '').trim();
   if (!who) return 'Message';
-  if (intent === 'realtime') return `Message ${who}`;
+  if (intent === 'realtime' || intent === 'urgent') return `Message ${who}`;
   if (intent !== 'scheduled' || !at) return `Message ${who} without a notification`;
   return `Message ${who} at ${dayPhrase(at.getHours(), at.getMinutes())}`;
 }
@@ -330,7 +329,7 @@ function outgoing(state, action, now) {
     body: content.body,
     photo: content.photo,
     sticker: content.sticker,
-    intent: action.intent,
+    intent: action.intent === 'urgent' ? 'realtime' : action.intent,
     createdAt: now,
     visible: true,
     releaseAt: null,
@@ -349,7 +348,7 @@ function send(state, action, now) {
     body: content.body,
     photo: content.photo,
     sticker: content.sticker,
-    intent: action.intent,
+    intent: action.intent === 'urgent' ? 'realtime' : action.intent,
     createdAt: now,
     visible: false,
     releaseAt: null,
