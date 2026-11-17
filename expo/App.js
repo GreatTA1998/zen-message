@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -43,7 +44,7 @@ import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadDraft, loadOpenedAt, loadPickedContact, loadSession, saveDraft, saveOpenedAt, savePickedContact, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
-import { ContactActionsMenu, NotifyAllToggle } from './src/contactActions';
+import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
 import { photoFromPickerAsset, pickLibraryPhoto } from './src/pickPhoto';
 import { DrawModal } from './src/DrawModal';
@@ -343,6 +344,7 @@ function ChatScreen({
   const [panel, setPanel] = useState('chat');
   const [requestBusy, setRequestBusy] = useState(false);
   const [pendingMode, setPendingMode] = useState(null);
+  const [pendingNotify, setPendingNotify] = useState(null);
   const [pendingClock, setPendingClock] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -904,7 +906,12 @@ function ChatScreen({
 
         {contactActive ? (
           <View style={styles.footer}>
-            <NotifyAllToggle contactId={contact?.id} notifyAll={!!contact?.notifyAll} onToggle={contact ? (on) => mutate('/v1/notify-all', { contactId: contact.id, on }).catch(() => {}) : undefined} />
+            {contact ? (
+              <View style={styles.notifyRow}>
+                <Text style={styles.menuText}>Get all notifications</Text>
+                <Switch testID={`notify-all-${contact.id}`} accessibilityLabel="Get all notifications" value={pendingNotify?.id === contact.id ? pendingNotify.on : !!contact.notifyAll} onValueChange={(on) => { setPendingNotify({ id: contact.id, on }); mutate('/v1/notify-all', { contactId: contact.id, on }).catch(() => {}).finally(() => setPendingNotify(null)); }} trackColor={{ false: '#d1d1d6', true: '#34c759' }} />
+              </View>
+            ) : null}
             <ComposerFooter testID="composer" {...composerProps} />
           </View>
         ) : null}
@@ -1407,6 +1414,7 @@ const styles = StyleSheet.create({
   tailEdge: { position: 'absolute', left: 0, top: 0, width: 28, height: 1, backgroundColor: ink, transformOrigin: 'left center', transform: [{ rotate: '36deg' }] },
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { backgroundColor: paper },
+  notifyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 8 },
   composerWrap: { position: 'relative', zIndex: 2 },
   intentSlot: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 },
   intentWord: { paddingVertical: 6, paddingHorizontal: 2 },
