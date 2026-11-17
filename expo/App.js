@@ -43,7 +43,7 @@ import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
 import { loadDraft, loadOpenedAt, loadPickedContact, loadSession, saveDraft, saveOpenedAt, savePickedContact, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
-import { ContactActionsMenu } from './src/contactActions';
+import { ContactActionsMenu, NotifyAllToggle } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
 import { photoFromPickerAsset, pickLibraryPhoto } from './src/pickPhoto';
 import { DrawModal } from './src/DrawModal';
@@ -403,7 +403,6 @@ function ChatScreen({
   }, [openedLoaded, contacts, state?.messages, selectedContactId, panel]);
 
   const contact = contacts.find((item) => normalizeCode(item.id) === selectedContactId) ?? null;
-  const menuContact = contactMenuId ? contacts.find((item) => item.id === contactMenuId) : null;
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
   const contactPendingOut = contact?.status === 'pending-out';
@@ -811,12 +810,6 @@ function ChatScreen({
           <View testID="contact-actions-popover" style={styles.contactMenuPopover}>
             <ContactActionsMenu
               contactId={contactMenuId}
-              notifyAll={!!menuContact?.notifyAll}
-              onToggleNotifyAll={
-                menuContact?.status === 'active'
-                  ? (on) => mutate('/v1/notify-all', { contactId: contactMenuId, on }).catch(() => {})
-                  : undefined
-              }
               onReport={() => reportContact(contactMenuId)}
               onBlock={() => confirmBlock(contactMenuId)}
               onClose={() => setContactMenuId(null)}
@@ -909,7 +902,12 @@ function ChatScreen({
           </ScrollView>
         </View>
 
-        {contactActive ? <ComposerFooter testID="composer" {...composerProps} /> : null}
+        {contactActive ? (
+          <View style={styles.footer}>
+            <NotifyAllToggle contactId={contact?.id} notifyAll={!!contact?.notifyAll} onToggle={contact ? (on) => mutate('/v1/notify-all', { contactId: contact.id, on }).catch(() => {}) : undefined} />
+            <ComposerFooter testID="composer" {...composerProps} />
+          </View>
+        ) : null}
         </>
         )}
         </View>
@@ -1020,8 +1018,7 @@ function ComposerFooter({
   }
 
   return (
-    <View style={styles.footer}>
-      <View style={styles.composerWrap}>
+    <View style={styles.composerWrap}>
         {timesOpen ? (
           <View testID="scheduled-choices" style={[styles.choicePopover, web && styles.webChoices]}>
             <View style={styles.choiceColumns}>
@@ -1131,7 +1128,6 @@ function ComposerFooter({
             </Pressable>
           </View>
         </View>
-      </View>
     </View>
   );
 }
@@ -1338,41 +1334,13 @@ const styles = StyleSheet.create({
   webChoices: { left: side, right: side, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' },
   top: { zIndex: 4, backgroundColor: paper },
   chromeGone: { display: 'none' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: ink,
-    paddingLeft: 14,
-    paddingRight: 16,
-    paddingVertical: 8,
-    gap: 8,
-    position: 'relative',
-  },
+  header: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: ink, paddingLeft: 14, paddingRight: 16, paddingVertical: 8, gap: 8, position: 'relative' },
   headerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
-  focus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-    borderRadius: 16,
-    flexShrink: 0,
-  },
+  focus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 16, flexShrink: 0 },
   focusText: { color: ink, fontSize: 16, lineHeight: 20, fontWeight: '600' },
   scheduleWrap: { flex: 1, position: 'relative', zIndex: 2, minWidth: 0 },
   schedulePhrase: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  popover: {
-    position: 'absolute',
-    top: '100%',
-    right: 0,
-    marginTop: 8,
-    width: 200,
-    backgroundColor: paper,
-    borderWidth: 1,
-    borderColor: ink,
-    zIndex: 6,
-  },
+  popover: { position: 'absolute', top: '100%', right: 0, marginTop: 8, width: 200, backgroundColor: paper, borderWidth: 1, borderColor: ink, zIndex: 6 },
   scheduleLine: { color: ink, fontSize: 16, lineHeight: 20 },
   schedulePrefix: { flexShrink: 1 },
   scheduleTime: { flexShrink: 0, textDecorationLine: 'underline' },
@@ -1440,27 +1408,11 @@ const styles = StyleSheet.create({
   bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { backgroundColor: paper },
   composerWrap: { position: 'relative', zIndex: 2 },
-  intentSlot: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-  },
+  intentSlot: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 },
   intentWord: { paddingVertical: 6, paddingHorizontal: 2 },
   intentText: { color: ink, fontSize: 14, lineHeight: 18 },
   intentTextSelected: { fontWeight: '700' },
-  choicePopover: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    bottom: '100%',
-    marginBottom: 6,
-    backgroundColor: paper,
-    borderWidth: 1,
-    borderColor: ink,
-    zIndex: 6,
-  },
+  choicePopover: { position: 'absolute', left: 24, right: 24, bottom: '100%', marginBottom: 6, backgroundColor: paper, borderWidth: 1, borderColor: ink, zIndex: 6 },
   choiceColumns: { flexDirection: 'row' },
   choiceCol: { maxHeight: 220 },
   choiceColRight: { borderLeftWidth: 1, borderLeftColor: ink },
@@ -1469,56 +1421,13 @@ const styles = StyleSheet.create({
   choiceRowOn: { backgroundColor: '#f6f3ee' },
   choiceText: { color: ink, fontSize: 15, lineHeight: 20 },
   choiceTextOn: { fontWeight: '700' },
-  composer: {
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 22,
-    backgroundColor: paper,
-    overflow: 'hidden',
-  },
+  composer: { marginHorizontal: 12, marginTop: 10, marginBottom: 10, borderWidth: 1, borderColor: ink, borderRadius: 22, backgroundColor: paper, overflow: 'hidden' },
   previewWrap: { paddingTop: 12, paddingHorizontal: 12 },
   preview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#f3f3f3' },
-  previewClear: {
-    position: 'absolute',
-    top: 18,
-    left: 104,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: ink,
-    backgroundColor: paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  input: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
-    fontSize: 17,
-    lineHeight: 22,
-    color: ink,
-    borderWidth: 0,
-    outlineStyle: 'none',
-  },
-  boxTools: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 6,
-    paddingRight: 8,
-    paddingBottom: 8,
-  },
+  previewClear: { position: 'absolute', top: 18, left: 104, width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: ink, backgroundColor: paper, alignItems: 'center', justifyContent: 'center' },
+  input: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, fontSize: 17, lineHeight: 22, color: ink, borderWidth: 0, outlineStyle: 'none' },
+  boxTools: { flexDirection: 'row', alignItems: 'center', paddingLeft: 6, paddingRight: 8, paddingBottom: 8 },
   photoButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  send: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f2f2f2',
-  },
+  send: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f2' },
   sendReady: { backgroundColor: ink },
 });
