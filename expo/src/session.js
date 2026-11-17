@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { parseOutbox } from './outbox.js';
 import { normalizeCode } from './people.js';
 
 const S = 'zen-message.session';
 const P = 'zen-message.picked-contact';
 const D = 'zen-message.draft';
 const O = 'zen-message.opened-at';
+const X = 'zen-message.outbox';
 
 async function get(key, fallback = null) {
   try {
@@ -25,6 +27,8 @@ export const loadPickedContact = async () => normalizeCode(await get(P, '')) || 
 export const savePickedContact = (id) => put(P, normalizeCode(id) || null);
 export const loadDraft = async () => (await get(D, '')) || '';
 export const saveDraft = (text) => put(D, text || null);
+export const loadOutbox = async () => parseOutbox(await get(X, '[]'));
+export const saveOutbox = (items) => put(X, items?.length ? JSON.stringify(items) : null);
 
 export async function loadOpenedAt() {
   try {

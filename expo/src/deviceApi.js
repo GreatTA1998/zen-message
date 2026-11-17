@@ -37,7 +37,8 @@ function contactKind(contact) {
 }
 
 function isActiveContact(contacts, id) {
-  return contacts.some((item) => item.id === id && contactKind(item) === 'active');
+  const want = normalizeCode(id);
+  return contacts.some((item) => normalizeCode(item.id) === want && contactKind(item) === 'active');
 }
 
 function avatarOf(user) {
@@ -450,8 +451,16 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       ) {
         fail('person_not_found');
       }
+      const clientId =
+        typeof body?.clientId === 'string' && body.clientId.length > 0 && body.clientId.length <= 48
+          ? body.clientId
+          : null;
+      if (clientId && (user.messages || []).some((message) => message.id === clientId)) {
+        return inbox(state, user);
+      }
+      const before = (user.messages || []).length;
       const result = deliverMessage(user, recipient, {
-        id: await hex(8),
+        id: clientId || (await hex(8)),
         body: body?.body,
         photo: body?.photo,
         sticker: body?.sticker,
@@ -461,6 +470,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       });
       adopt(user, result.sender);
       adopt(recipient, result.recipient);
+      if ((user.messages || []).length <= before) fail('message_invalid');
       linkIncomingContacts(state, recipient);
       if (result.recipientEffects.length) holdEffects(recipient, result.recipientEffects);
       await commit(store, state);

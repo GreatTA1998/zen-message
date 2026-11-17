@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  AppState,
   Image,
   Keyboard,
   Modal,
@@ -25,7 +26,6 @@ import {
   composerPlaceholder,
   dailyClock,
   dayPhrase,
-  nextDaily,
   contactUnread,
   messageSticker,
   scheduledColumns,
@@ -37,10 +37,22 @@ import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { bubbleTone, messageBubbleParts, ZEN_FILL, ZEN_LINE } from './src/messageBubble';
+import { outboxThreadRows } from './src/outbox';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
-import { loadDraft, loadOpenedAt, loadPickedContact, loadSession, saveDraft, saveOpenedAt, savePickedContact, saveSession } from './src/session';
+import {
+  loadDraft,
+  loadOpenedAt,
+  loadOutbox,
+  loadPickedContact,
+  loadSession,
+  saveDraft,
+  saveOpenedAt,
+  saveOutbox,
+  savePickedContact,
+  saveSession,
+} from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
@@ -114,12 +126,14 @@ function Root() {
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
   const tokenRef = useRef(null);
+  const writeGen = useRef(0);
 
   useEffect(() => {
     if (inbox?.user) setUser(inbox.user);
   }, [inbox?.user]);
 
-  const deliverInbox = useCallback(async (current, next) => {
+  const deliverInbox = useCallback(async (current, next, { write = false } = {}) => {
+    if (write) writeGen.current += 1;
     setInbox(next);
     if (next?.effects?.length) {
       await runNotificationEffects(next.effects);
@@ -131,7 +145,10 @@ function Root() {
   const refresh = useCallback(async () => {
     const current = tokenRef.current;
     if (!current) return null;
-    return deliverInbox(current, await api(inboxPath(), { token: current }));
+    const gen = writeGen.current;
+    const next = await api(inboxPath(), { token: current });
+    if (writeGen.current !== gen) return null;
+    return deliverInbox(current, next);
   }, [deliverInbox]);
 
   useEffect(() => {
@@ -192,7 +209,7 @@ function Root() {
       const current = tokenRef.current;
       if (!current) return;
       api('/v1/shown', { token: current, method: 'POST', body: {} })
-        .then((next) => deliverInbox(current, next))
+        .then((next) => deliverInbox(current, next, { write: true }))
         .catch(() => {});
     });
     return () => subscription.remove();
@@ -240,6 +257,7 @@ function Root() {
     await saveSession(null);
     await savePickedContact(null);
     await saveDraft('');
+    await saveOutbox([]);
     tokenRef.current = null;
     setToken(null);
     setUser(null);
@@ -307,7 +325,7 @@ function Root() {
       <ChatScreen
         token={token}
         inbox={inbox}
-        onInbox={(next) => deliverInbox(token, next)}
+        onInbox={(next) => deliverInbox(token, next, { write: true })}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
@@ -354,6 +372,8 @@ function ChatScreen({
   const [openedAt, setOpenedAt] = useState(null);
   const focusRequest = useRef(0);
   const attachBusy = useRef(false);
+  const flushBusy = useRef(new Set());
+  const pendingRef = useRef([]);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
   const hideChrome = Platform.OS !== 'web' && keyboardInset > 0 && panel === 'chat';
@@ -409,9 +429,7 @@ function ChatScreen({
   const messages = useMemo(() => {
     if (!selectedContactId || !contact || !contactActive) return [];
     const base = threadMessages(state?.messages, selectedContactId);
-    const pending = pendingOutbound.filter(
-      (item) => normalizeCode(item.contactId) === selectedContactId
-    );
+    const pending = outboxThreadRows(pendingOutbound, selectedContactId);
     return pending.length ? [...base, ...pending] : base;
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
@@ -506,64 +524,82 @@ function ChatScreen({
     setSticker(next);
   }
 
-  function send(text = draft) {
+  function rememberOutbox(items) {
+    pendingRef.current = items;
+    setPendingOutbound(items);
+    return saveOutbox(items);
+  }
+
+  function dropOutbox(pendingId) {
+    return rememberOutbox(pendingRef.current.filter((item) => item.id !== pendingId));
+  }
+
+  async function flushOutbound(item) {
+    if (!item?.id || flushBusy.current.has(item.id)) return;
+    flushBusy.current.add(item.id);
+    try {
+      await mutate('/v1/messages', {
+        clientId: item.id,
+        contactId: item.contactId,
+        body: item.body,
+        photo: item.photo,
+        sticker: item.sticker,
+        intent: item.intent,
+        releaseAt: item.releaseAt,
+      });
+      await dropOutbox(item.id);
+    } catch {
+      flashNotice('Could not send message. Will retry.');
+    } finally {
+      flushBusy.current.delete(item.id);
+    }
+  }
+
+  useEffect(() => {
+    let alive = true;
+    const kick = () => {
+      for (const item of pendingRef.current) flushOutbound(item);
+    };
+    loadOutbox().then((items) => {
+      if (!alive) return;
+      pendingRef.current = items;
+      setPendingOutbound(items);
+      kick();
+    });
+    const onApp = AppState.addEventListener('change', (state) => {
+      if (state === 'active') kick();
+    });
+    return () => {
+      alive = false;
+      onApp.remove();
+    };
+  }, [token]);
+
+  async function send(text = draft) {
     const body = text.trim();
     if ((!body && !photo && !sticker) || !contact) return;
     const attachedSticker = sticker;
     const attached = attachedSticker ? null : photo;
     const sentIntent = intent;
-    const sentContact = contact;
-    const sentAt = selectedAt?.getTime();
-    const createdAt = Date.now();
-    const pendingId = `local-${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
+    const item = {
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      contactId: contact.id,
+      contactName: contact.firstName || contact.id,
+      body,
+      photo: attached,
+      sticker: attachedSticker,
+      intent: sentIntent,
+      releaseAt: sentIntent === 'scheduled' ? selectedAt?.getTime() : undefined,
+      createdAt: Date.now(),
+    };
+    const next = [...pendingRef.current, item];
+    await rememberOutbox(next);
     setDraft('');
     saveDraft('').catch(() => {});
     setPhoto(null);
     setSticker(null);
     setInputHeight(44);
-    setPendingOutbound((current) => [
-      ...current,
-      {
-        id: pendingId,
-        contactId: sentContact.id,
-        contactName: sentContact.firstName || sentContact.id,
-        body,
-        photo: attached,
-        sticker: attachedSticker,
-        intent: sentIntent,
-        createdAt,
-        visible: true,
-        releaseAt: null,
-        direction: 'out',
-      },
-    ]);
-    mutate('/v1/messages', {
-      contactId: sentContact.id,
-      body,
-      photo: attached,
-      sticker: attachedSticker,
-      intent: sentIntent,
-      releaseAt: sentIntent === 'scheduled' ? sentAt : undefined,
-    })
-      .then(() => {
-        setPendingOutbound((current) => current.filter((item) => item.id !== pendingId));
-      })
-      .catch(() => {
-        setPendingOutbound((current) => current.filter((item) => item.id !== pendingId));
-        flashNotice('Could not send message.');
-      });
-    if (sentIntent !== 'realtime') {
-      const at =
-        sentIntent === 'scheduled'
-          ? sentAt
-          : nextDaily(new Date(), sentContact.dayHour, sentContact.dayMinute, sentContact.offsetMinutes).getTime();
-      const delay = at - Date.now() + 1000;
-      if (delay > 0 && delay < 8 * 24 * 60 * 60 * 1000) {
-        setTimeout(() => {
-          api(inboxPath(), { token }).catch(() => {});
-        }, delay);
-      }
-    }
+    flushOutbound(item);
   }
 
   async function attach(source) {
