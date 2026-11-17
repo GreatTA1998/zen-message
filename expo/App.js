@@ -37,7 +37,6 @@ import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { bubbleTone, messageBubbleParts, ZEN_FILL, ZEN_LINE } from './src/messageBubble';
-import { ZenMotif } from './src/zenMotif';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -1294,7 +1293,7 @@ function TextBubble({ message, incoming }) {
           <View style={styles.tailEdge} />
         </View>
       </View>
-      {zen ? <ZenMotif /> : null}
+      {zen ? <View pointerEvents="none" testID="zen-mark" style={styles.zenMark} /> : null}
       <Text style={styles.bubbleText}>{message.body}</Text>
     </View>
   );
@@ -1392,9 +1391,10 @@ const styles = StyleSheet.create({
   },
   bubbleOut: { borderBottomRightRadius: 2 },
   bubbleIn: { alignSelf: 'flex-start', maxWidth: '78%', marginTop: 10, marginBottom: 0, borderTopLeftRadius: 2 },
-  bubbleZen: { backgroundColor: ZEN_FILL, borderColor: ZEN_LINE, paddingBottom: 30 },
+  bubbleZen: { backgroundColor: ZEN_FILL, borderColor: ZEN_LINE },
   bubbleScheduled: { borderStyle: 'dashed' },
   bubbleRead: { maxWidth: 'min(560px, 100%)' },
+  zenMark: { position: 'absolute', right: 9, bottom: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: ZEN_LINE, opacity: 0.55 },
   tail: { position: 'absolute', width: 24, height: 20 },
   tailIn: { left: -1, top: -12 },
   tailOut: { right: -1, bottom: -12, transform: [{ rotate: '180deg' }] },
