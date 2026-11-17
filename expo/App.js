@@ -774,12 +774,10 @@ function ChatScreen({
             const id = normalizeCode(item.id);
             const selected = id === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
-            const ring = panel !== 'add' && selected;
+            const notify = pendingNotify?.id === item.id ? pendingNotify.on : !!item.notifyAll;
+            const star = !pending && (!focused || notify);
             const glow =
-              openedAt &&
-              !pending &&
-              !selected &&
-              contactUnread(state?.messages, id, openedAt[id])
+              openedAt && !pending && !selected && contactUnread(state?.messages, id, openedAt[id])
                 ? styles.avatarHalo
                 : null;
             return (
@@ -788,28 +786,23 @@ function ChatScreen({
                 testID={`contact-${item.id}`}
                 accessibilityRole="button"
                 accessibilityLabel={item.firstName || item.id}
-                accessibilityState={{
-                  selected: (panel === 'chat' || panel === 'request') && selected,
-                }}
+                accessibilityState={{ selected: (panel === 'chat' || panel === 'request') && selected }}
                 onPress={() => pickContact(item)}
-                onLongPress={() => {
-                  setScheduleOpen(false);
-                  setAccountOpen(false);
-                  setContactMenuId(item.id);
-                }}
+                onLongPress={() => { setScheduleOpen(false); setAccountOpen(false); setContactMenuId(item.id); }}
                 style={styles.contact}
               >
-                <PersonAvatar
-                  id={id}
-                  name={item.firstName}
-                  uri={item.avatar}
-                  size={54}
-                  dashed={pending}
-                  style={[ring && styles.circleOn, glow]}
-                />
-                <Text numberOfLines={1} style={styles.contactLabel}>
-                  {item.firstName || item.id}
-                </Text>
+                <View>
+                  <PersonAvatar
+                    id={id}
+                    name={item.firstName}
+                    uri={item.avatar}
+                    size={54}
+                    dashed={pending}
+                    style={[panel !== 'add' && selected && styles.circleOn, glow]}
+                  />
+                  {star ? <Ionicons testID={`notify-star-${item.id}`} name="star" size={11} color={focused ? '#b3261e' : ink} style={styles.contactStar} importantForAccessibility="no" /> : null}
+                </View>
+                <Text numberOfLines={1} style={styles.contactLabel}>{item.firstName || item.id}</Text>
               </Pressable>
             );
           })}
@@ -1081,7 +1074,7 @@ function ComposerFooter({
                 testID="draw-preview"
                 source={{ uri: sticker }}
                 resizeMode="contain"
-                style={styles.stickerPreview}
+                style={styles.preview}
               />
               <Pressable
                 testID="draw-clear"
@@ -1387,9 +1380,7 @@ const styles = StyleSheet.create({
   menuConsequence: { color: ink, fontSize: 13, lineHeight: 18, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 6 },
   menuTextAlert: { color: '#b3261e' },
   chatNotice: { position: 'absolute', left: side, right: side, bottom: 18, alignItems: 'center', zIndex: 12 },
-  chatNoticeText: {
-    color: ink, backgroundColor: paper, borderWidth: 1, borderColor: ink, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, lineHeight: 18,
-  },
+  chatNoticeText: { color: ink, backgroundColor: paper, borderWidth: 1, borderColor: ink, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, lineHeight: 18 },
   photoViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   photoViewerImage: { width: '100%', height: '100%' },
   photoViewerClose: { position: 'absolute', left: 12, padding: 10 },
@@ -1401,6 +1392,7 @@ const styles = StyleSheet.create({
   contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
   contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 8 },
   contact: { alignItems: 'center' },
+  contactStar: { position: 'absolute', top: -1, right: -1 },
   avatarHalo: { borderColor: 'rgba(72, 158, 118, 0.7)', shadowColor: '#3f9a6e', shadowOpacity: 0.5, shadowRadius: 9, shadowOffset: { width: 0, height: 0 } },
   circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
@@ -1414,17 +1406,12 @@ const styles = StyleSheet.create({
   messageStack: { gap: 6, maxWidth: '100%' },
   messageStackIn: { alignSelf: 'flex-start', marginTop: 10 },
   messageStackOut: { alignSelf: 'flex-end' },
-  stickerPreview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#fafafa' },
-  mediaBubble: {
-    width: photoMaxWidth, maxWidth: '84%', aspectRatio: 4 / 3, borderRadius: 16, overflow: 'hidden', backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
-  },
+  mediaBubble: { width: photoMaxWidth, maxWidth: '84%', aspectRatio: 4 / 3, borderRadius: 16, overflow: 'hidden', backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
   stickerBubble: { width: 148, height: 148, aspectRatio: 1, backgroundColor: 'transparent', borderWidth: 0 },
   mediaBubbleIn: { alignSelf: 'flex-start' },
   mediaBubbleOut: { alignSelf: 'flex-end' },
   mediaImage: { width: '100%', height: '100%' },
-  bubble: {
-    alignSelf: 'flex-end', maxWidth: '84%', borderWidth: 1, borderColor: ink, borderRadius: 18, backgroundColor: paper, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 4,
-  },
+  bubble: { alignSelf: 'flex-end', maxWidth: '84%', borderWidth: 1, borderColor: ink, borderRadius: 18, backgroundColor: paper, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 4 },
   bubbleOut: { borderBottomRightRadius: 2 },
   bubbleIn: { alignSelf: 'flex-start', maxWidth: '78%', marginTop: 10, marginBottom: 0, borderTopLeftRadius: 2 },
   bubbleZen: { backgroundColor: ZEN_FILL, borderColor: ZEN_LINE },
@@ -1435,9 +1422,7 @@ const styles = StyleSheet.create({
   tailIn: { left: -1, top: -12 },
   tailOut: { right: -1, bottom: -12, transform: [{ rotate: '180deg' }] },
   tailStem: { position: 'absolute', left: 0, top: 0, width: 1, height: 14, backgroundColor: ink },
-  tailFill: {
-    position: 'absolute', left: 1, top: 0, width: 0, height: 0, borderRightWidth: 16, borderBottomWidth: 13, borderRightColor: 'transparent', borderBottomColor: paper,
-  },
+  tailFill: { position: 'absolute', left: 1, top: 0, width: 0, height: 0, borderRightWidth: 16, borderBottomWidth: 13, borderRightColor: 'transparent', borderBottomColor: paper },
   tailJoin: { position: 'absolute', left: 1, top: 11, width: 16, height: 8, backgroundColor: paper },
   tailClip: { position: 'absolute', left: 0, top: 0, width: 24, height: 12, overflow: 'hidden' },
   tailEdge: { position: 'absolute', left: 0, top: 0, width: 28, height: 1, backgroundColor: ink, transformOrigin: 'left center', transform: [{ rotate: '36deg' }] },
