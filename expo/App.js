@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PersonAvatar } from './src/contacts';
@@ -45,7 +44,7 @@ import { loadDraft, loadOpenedAt, loadPickedContact, loadSession, saveDraft, sav
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { finishSignIn } from './src/signIn';
-import { photoFromPickerAsset, pickLibraryPhoto } from './src/pickPhoto';
+import { pickCameraPhoto, pickLibraryPhoto } from './src/pickPhoto';
 import { DrawModal } from './src/DrawModal';
 
 const ink = '#1c1c1c';
@@ -571,30 +570,7 @@ function ChatScreen({
     if (attachBusy.current) return;
     attachBusy.current = true;
     try {
-      if (source === 'camera') {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) return;
-        const options = {
-          mediaTypes: ['images'],
-          quality: 0.4,
-          base64: true,
-          exif: false,
-        };
-        if (Platform.OS === 'ios') {
-          options.preferredAssetRepresentationMode =
-            ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible;
-        }
-        const result = await ImagePicker.launchCameraAsync(options);
-        const asset = result.canceled ? null : result.assets?.[0];
-        if (!asset) return;
-        const next = photoFromPickerAsset(asset);
-        if (next) {
-          setSticker(null);
-          setPhoto(next);
-        }
-        return;
-      }
-      const next = await pickLibraryPhoto();
+      const next = source === 'camera' ? await pickCameraPhoto() : await pickLibraryPhoto();
       if (next) {
         setSticker(null);
         setPhoto(next);
@@ -636,6 +612,7 @@ function ChatScreen({
     canSend,
     onSend: () => send(),
     onAttach: () => attach('library'),
+    onAttachCamera: () => attach('camera'),
   };
 
   return (
@@ -996,6 +973,7 @@ function ComposerFooter({
   canSend,
   onSend,
   onAttach,
+  onAttachCamera,
 }) {
   const [timesOpen, setTimesOpen] = useState(false);
   const drawEnabled = Platform.OS === 'web' || Platform.OS === 'ios';
@@ -1094,15 +1072,21 @@ function ComposerFooter({
                 <MaterialCommunityIcons name="draw-pen" size={22} color={ink} />
               </Pressable>
             ) : null}
-            <Pressable
-              testID="attach-photo"
-              accessibilityRole="button"
-              accessibilityLabel="Photo"
-              onPress={onAttach}
-              style={styles.photoButton}
-            >
-              <Feather name="image" size={22} color={ink} />
-            </Pressable>
+            {[
+              ['attach-camera', 'Camera', onAttachCamera, 'camera'],
+              ['attach-photo', 'Photo', onAttach, 'image'],
+            ].map(([id, label, press, icon]) => (
+              <Pressable
+                key={id}
+                testID={id}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                onPress={press}
+                style={styles.photoButton}
+              >
+                <Feather name={icon} size={22} color={ink} />
+              </Pressable>
+            ))}
             <View style={styles.intentSlot}>
               {INTENTS.map((item) => {
                 const selected = item.id === intent;

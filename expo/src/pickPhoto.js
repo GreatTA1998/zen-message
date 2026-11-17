@@ -26,20 +26,16 @@ async function webUriToDataUrl(uri, mimeType) {
   }
 }
 
-export async function pickLibraryPhoto() {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) return null;
-  const options = {
-    mediaTypes: ['images'],
-    quality: 0.4,
-    base64: true,
-    exif: false,
-  };
-  if (Platform.OS === 'ios') {
+function pickerOptions(forCamera) {
+  const options = { mediaTypes: ['images'], quality: 0.4, base64: true, exif: false };
+  if (!forCamera && Platform.OS === 'ios') {
     options.preferredAssetRepresentationMode =
       ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible;
   }
-  const result = await ImagePicker.launchImageLibraryAsync(options);
+  return options;
+}
+
+async function photoFromResult(result) {
   const asset = result.canceled ? null : result.assets?.[0];
   if (!asset) return null;
   let dataUrl = photoFromPickerAsset(asset);
@@ -50,4 +46,17 @@ export async function pickLibraryPhoto() {
     URL.revokeObjectURL(asset.uri);
   }
   return dataUrl;
+}
+
+export async function pickLibraryPhoto() {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) return null;
+  return photoFromResult(await ImagePicker.launchImageLibraryAsync(pickerOptions(false)));
+}
+
+export async function pickCameraPhoto() {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) return null;
+  // Temp capture; expo-image-picker does not write to the Photos library.
+  return photoFromResult(await ImagePicker.launchCameraAsync(pickerOptions(true)));
 }
