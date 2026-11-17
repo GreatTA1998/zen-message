@@ -12,5 +12,5 @@ export function bubbleTone(intent) {
   return intent === 'scheduled' ? 'scheduled' : intent === 'anytime' || intent === 'timely' ? 'zen' : 'normal';
 }
 
-export const ZEN_FILL = '#d4ecd9';
-export const ZEN_LINE = '#2f7a52';
+export const ZEN_FILL = '#b9dccb'; // Monet/NEVA meadow mist
+export const ZEN_LINE = '#3f7a5c';
