@@ -37,7 +37,6 @@ import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { bubbleTone, messageBubbleParts, ZEN_FILL, ZEN_LINE } from './src/messageBubble';
-import { outboxThreadRows } from './src/outbox';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -126,14 +125,12 @@ function Root() {
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
   const tokenRef = useRef(null);
-  const writeGen = useRef(0);
 
   useEffect(() => {
     if (inbox?.user) setUser(inbox.user);
   }, [inbox?.user]);
 
-  const deliverInbox = useCallback(async (current, next, { write = false } = {}) => {
-    if (write) writeGen.current += 1;
+  const deliverInbox = useCallback(async (current, next) => {
     setInbox(next);
     if (next?.effects?.length) {
       await runNotificationEffects(next.effects);
@@ -145,10 +142,7 @@ function Root() {
   const refresh = useCallback(async () => {
     const current = tokenRef.current;
     if (!current) return null;
-    const gen = writeGen.current;
-    const next = await api(inboxPath(), { token: current });
-    if (writeGen.current !== gen) return null;
-    return deliverInbox(current, next);
+    return deliverInbox(current, await api(inboxPath(), { token: current }));
   }, [deliverInbox]);
 
   useEffect(() => {
@@ -209,7 +203,7 @@ function Root() {
       const current = tokenRef.current;
       if (!current) return;
       api('/v1/shown', { token: current, method: 'POST', body: {} })
-        .then((next) => deliverInbox(current, next, { write: true }))
+        .then((next) => deliverInbox(current, next))
         .catch(() => {});
     });
     return () => subscription.remove();
@@ -325,7 +319,7 @@ function Root() {
       <ChatScreen
         token={token}
         inbox={inbox}
-        onInbox={(next) => deliverInbox(token, next, { write: true })}
+        onInbox={(next) => deliverInbox(token, next)}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
@@ -372,7 +366,6 @@ function ChatScreen({
   const [openedAt, setOpenedAt] = useState(null);
   const focusRequest = useRef(0);
   const attachBusy = useRef(false);
-  const flushBusy = useRef(new Set());
   const pendingRef = useRef([]);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
@@ -429,7 +422,9 @@ function ChatScreen({
   const messages = useMemo(() => {
     if (!selectedContactId || !contact || !contactActive) return [];
     const base = threadMessages(state?.messages, selectedContactId);
-    const pending = outboxThreadRows(pendingOutbound, selectedContactId);
+    const pending = pendingOutbound.filter(
+      (item) => normalizeCode(item.contactId) === selectedContactId
+    );
     return pending.length ? [...base, ...pending] : base;
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
@@ -524,19 +519,13 @@ function ChatScreen({
     setSticker(next);
   }
 
-  function rememberOutbox(items) {
+  function setOutbox(items) {
     pendingRef.current = items;
     setPendingOutbound(items);
-    return saveOutbox(items);
+    saveOutbox(items).catch(() => {});
   }
 
-  function dropOutbox(pendingId) {
-    return rememberOutbox(pendingRef.current.filter((item) => item.id !== pendingId));
-  }
-
-  async function flushOutbound(item) {
-    if (!item?.id || flushBusy.current.has(item.id)) return;
-    flushBusy.current.add(item.id);
+  async function flush(item) {
     try {
       await mutate('/v1/messages', {
         clientId: item.id,
@@ -545,61 +534,55 @@ function ChatScreen({
         photo: item.photo,
         sticker: item.sticker,
         intent: item.intent,
-        releaseAt: item.releaseAt,
+        releaseAt: item.releaseAt || undefined,
       });
-      await dropOutbox(item.id);
+      setOutbox(pendingRef.current.filter((row) => row.id !== item.id));
     } catch {
       flashNotice('Could not send message. Will retry.');
-    } finally {
-      flushBusy.current.delete(item.id);
     }
   }
 
   useEffect(() => {
     let alive = true;
-    const kick = () => {
-      for (const item of pendingRef.current) flushOutbound(item);
-    };
     loadOutbox().then((items) => {
       if (!alive) return;
-      pendingRef.current = items;
-      setPendingOutbound(items);
-      kick();
+      setOutbox(items);
+      items.forEach(flush);
     });
-    const onApp = AppState.addEventListener('change', (state) => {
-      if (state === 'active') kick();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') pendingRef.current.forEach(flush);
     });
     return () => {
       alive = false;
-      onApp.remove();
+      sub.remove();
     };
   }, [token]);
 
   async function send(text = draft) {
     const body = text.trim();
     if ((!body && !photo && !sticker) || !contact) return;
-    const attachedSticker = sticker;
-    const attached = attachedSticker ? null : photo;
-    const sentIntent = intent;
+    const stickerAsset = sticker;
+    const photoAsset = stickerAsset ? null : photo;
     const item = {
       id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       contactId: contact.id,
       contactName: contact.firstName || contact.id,
       body,
-      photo: attached,
-      sticker: attachedSticker,
-      intent: sentIntent,
-      releaseAt: sentIntent === 'scheduled' ? selectedAt?.getTime() : undefined,
+      photo: photoAsset,
+      sticker: stickerAsset,
+      intent,
       createdAt: Date.now(),
+      visible: true,
+      releaseAt: intent === 'scheduled' ? selectedAt?.getTime() : null,
+      direction: 'out',
     };
-    const next = [...pendingRef.current, item];
-    await rememberOutbox(next);
+    setOutbox([...pendingRef.current, item]);
     setDraft('');
     saveDraft('').catch(() => {});
     setPhoto(null);
     setSticker(null);
     setInputHeight(44);
-    flushOutbound(item);
+    flush(item);
   }
 
   async function attach(source) {

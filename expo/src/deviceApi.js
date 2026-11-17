@@ -454,7 +454,7 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       const clientId =
         typeof body?.clientId === 'string' && body.clientId.length > 0 && body.clientId.length <= 48
           ? body.clientId
-          : null;
+          : '';
       if (clientId && (user.messages || []).some((message) => message.id === clientId)) {
         return inbox(state, user);
       }
