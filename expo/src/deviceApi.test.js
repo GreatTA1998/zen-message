@@ -480,6 +480,58 @@ test('opening a contact accepts a normalized id and delivering uses the same id'
   );
 });
 
+test('invalid message payloads fail closed instead of silent ok', async () => {
+  const storage = sharedStore();
+  const left = createDeviceApi(storage, (length) => new Uint8Array(length).fill(2));
+  const right = createDeviceApi(storage, (length) => new Uint8Array(length).fill(3));
+  const ada = await left('/v1/session', { method: 'POST', body: { provider: 'apple', subject: 'apple-invalid-a' } });
+  const gus = await right('/v1/session', { method: 'POST', body: { provider: 'google', subject: 'google-invalid-b' } });
+  await left('/v1/contacts', { token: ada.token, method: 'POST', body: { code: gus.user.id } });
+  await right('/v1/friend-request/accept', {
+    token: gus.token,
+    method: 'POST',
+    body: { contactId: ada.user.id },
+  });
+  let code = null;
+  try {
+    await left('/v1/messages', {
+      token: ada.token,
+      method: 'POST',
+      body: { contactId: gus.user.id, body: 'nope', intent: 'not-a-real-intent' },
+    });
+  } catch (error) {
+    code = error.code;
+  }
+  assert.equal(code, 'message_invalid');
+  const inbox = await left('/v1/inbox?offset=0', { token: ada.token });
+  assert.equal(inbox.state.messages.some((message) => message.body === 'nope'), false);
+});
+
+test('clientId makes message sends idempotent on retry', async () => {
+  const storage = sharedStore();
+  const left = createDeviceApi(storage, (length) => new Uint8Array(length).fill(1));
+  const right = createDeviceApi(storage, (length) => new Uint8Array(length).fill(2));
+  const ada = await left('/v1/session', { method: 'POST', body: { provider: 'apple', subject: 'apple-idem-a' } });
+  const gus = await right('/v1/session', { method: 'POST', body: { provider: 'google', subject: 'google-idem-b' } });
+  await left('/v1/contacts', { token: ada.token, method: 'POST', body: { code: gus.user.id } });
+  await right('/v1/friend-request/accept', {
+    token: gus.token,
+    method: 'POST',
+    body: { contactId: ada.user.id },
+  });
+  const payload = {
+    clientId: 'local-retry-1',
+    contactId: gus.user.id,
+    body: 'once only',
+    intent: 'realtime',
+  };
+  await left('/v1/messages', { token: ada.token, method: 'POST', body: payload });
+  await left('/v1/messages', { token: ada.token, method: 'POST', body: payload });
+  const inbox = await left('/v1/inbox?offset=0', { token: ada.token });
+  assert.equal(inbox.state.messages.filter((message) => message.body === 'once only').length, 1);
+  assert.equal(inbox.state.messages.some((message) => message.id === 'local-retry-1'), true);
+});
+
 test('inbox polls skip store writes when nothing changed', async () => {
   const values = new Map();
   let writes = 0;

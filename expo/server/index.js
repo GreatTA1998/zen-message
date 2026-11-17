@@ -210,6 +210,7 @@ const server = createServer(async (request, response) => {
         send(response, 404, { error: 'person_not_found' });
         return;
       }
+      const before = (user.messages || []).length;
       const result = deliverMessage(user, recipient, {
         id: randomBytes(8).toString('hex'),
         body: body.body,
@@ -234,6 +235,10 @@ const server = createServer(async (request, response) => {
         subject: recipient.subject,
         pendingEffects: recipient.pendingEffects,
       });
+      if ((user.messages || []).length <= before) {
+        send(response, 400, { error: 'message_invalid' });
+        return;
+      }
       await notify(recipient, result.recipientEffects);
       save(user);
       save(recipient);
