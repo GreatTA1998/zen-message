@@ -775,7 +775,7 @@ function ChatScreen({
             const selected = id === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
             const notify = pendingNotify?.id === item.id ? pendingNotify.on : !!item.notifyAll;
-            const star = !pending && (!focused || notify);
+            const star = !pending && notify;
             const glow =
               openedAt && !pending && !selected && contactUnread(state?.messages, id, openedAt[id])
                 ? styles.avatarHalo
