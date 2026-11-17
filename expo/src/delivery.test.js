@@ -160,6 +160,25 @@ test('realtime is one normal notification', () => {
   ]);
 });
 
+test('notifyAll alerts immediately for zen in focus and relaxed', () => {
+  const action = {
+    type: 'send',
+    id: 'n',
+    contactId: 'wren',
+    contactName: 'Wren',
+    body: 'Zen reply',
+    intent: 'anytime',
+    notifyAll: true,
+    now: at(10, 15).getTime(),
+  };
+  const focused = reduce(createState(), action);
+  assert.equal(focused.state.messages[0].visible, true);
+  assert.equal(focused.state.digest, null);
+  assert.equal(focused.effects[0].plan.quiet, false);
+  const relaxed = reduce(reduce(createState(), { type: 'set-mode', mode: 'relaxed' }).state, action);
+  assert.equal(relaxed.effects[0].plan.quiet, false);
+});
+
 test('relaxed scheduled is readable sooner and stays private', () => {
   const relaxed = reduce(createState(), { type: 'set-mode', mode: 'relaxed' }).state;
   const scheduled = reduce(relaxed, {

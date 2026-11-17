@@ -4,10 +4,22 @@ const ink = '#1c1c1c';
 const paper = '#fff';
 const alert = '#b3261e';
 
-export function ContactActionsMenu({ contactId, onReport, onBlock, onClose }) {
+export function ContactActionsMenu({ contactId, notifyAll, onToggleNotifyAll, onReport, onBlock, onClose }) {
   if (!contactId) return null;
   return (
     <View testID="contact-actions-menu" style={styles.menu}>
+      {onToggleNotifyAll ? (
+        <Pressable
+          testID={`notify-all-${contactId}`}
+          accessibilityRole="switch"
+          accessibilityLabel="All alerts"
+          accessibilityState={{ checked: Boolean(notifyAll) }}
+          onPress={() => onToggleNotifyAll(!notifyAll)}
+          style={styles.row}
+        >
+          <Text style={styles.text}>{notifyAll ? 'All alerts on' : 'All alerts'}</Text>
+        </Pressable>
+      ) : null}
       <Pressable
         testID={`report-contact-${contactId}`}
         accessibilityRole="button"

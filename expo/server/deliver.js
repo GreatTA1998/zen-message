@@ -5,6 +5,10 @@ function displayName(person) {
   return person.firstName || person.id;
 }
 
+function wantsAllAlerts(recipient, senderId) {
+  return (recipient.contacts || []).some((item) => item.id === senderId && item.notifyAll === true);
+}
+
 export function deliverMessage(sender, recipient, action) {
   const outgoing = reduce(sender, {
     type: 'outgoing',
@@ -29,6 +33,7 @@ export function deliverMessage(sender, recipient, action) {
     now: action.now,
     offsetMinutes: recipient.offsetMinutes,
     releaseAt: action.releaseAt,
+    notifyAll: wantsAllAlerts(recipient, sender.id),
   });
   return {
     sender: outgoing.state,

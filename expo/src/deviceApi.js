@@ -68,6 +68,7 @@ function contactCard(users, contact) {
     firstName: person?.firstName || '',
     avatar: avatarOf(person),
     status: contactKind(contact),
+    notifyAll: contact.notifyAll === true,
     dayHour: Number.isInteger(person?.dayHour) ? person.dayHour : 19,
     dayMinute: Number.isInteger(person?.dayMinute) ? person.dayMinute : 0,
     offsetMinutes: Number.isInteger(person?.offsetMinutes) ? person.offsetMinutes : 0,
@@ -110,15 +111,9 @@ function upsertContact(contacts, id, status) {
   const index = list.findIndex((item) => item.id === id);
   if (index < 0) return [...list, { id, status }];
   const current = contactKind(list[index]);
-  if (current === 'active') return list;
-  if (status === 'active') {
-    const next = [...list];
-    next[index] = { id, status: 'active' };
-    return next;
-  }
-  if (current === status) return list;
+  if (current === 'active' || current === status) return list;
   const next = [...list];
-  next[index] = { id, status };
+  next[index] = { ...list[index], id, status };
   return next;
 }
 
@@ -432,6 +427,15 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
           await commit(store, state);
         }
       }
+      return inbox(state, user);
+    }
+
+    if (method === 'POST' && url.pathname === '/v1/notify-all') {
+      const id = normalizeCode(body?.contactId);
+      const match = isCode(id) ? user.contacts.find((item) => item.id === id) : null;
+      if (!match || contactKind(match) !== 'active') fail('person_not_found');
+      match.notifyAll = body?.on === true;
+      await commit(store, state);
       return inbox(state, user);
     }
 
