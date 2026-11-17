@@ -575,3 +575,75 @@ test('opening switches between contacts even when a poll still has the previous 
     true
   );
 });
+
+test('Google web duplicate of an Apple phone account absorbs into the Apple id', async () => {
+  const api = createDeviceApi(memoryStorage());
+  const apple = await api('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-elton-subject' },
+  });
+  await api('/v1/profile', { token: apple.token, method: 'POST', body: { nickname: 'Elton' } });
+  const google = await api('/v1/session', {
+    method: 'POST',
+    body: { provider: 'google', subject: 'google-elton-firebase-uid' },
+  });
+  await api('/v1/profile', { token: google.token, method: 'POST', body: { nickname: 'Elton' } });
+  assert.notEqual(apple.user.id, google.user.id);
+
+  const friend = await api('/v1/session', {
+    method: 'POST',
+    body: { provider: 'apple', subject: 'apple-friend-subject' },
+  });
+  await api('/v1/profile', { token: friend.token, method: 'POST', body: { nickname: 'zjf' } });
+  await api('/v1/contacts', { token: apple.token, method: 'POST', body: { code: friend.user.id } });
+  await api('/v1/friend-request/accept', {
+    token: friend.token,
+    method: 'POST',
+    body: { contactId: apple.user.id },
+  });
+
+  // Self-friend the duplicate pair the way production did (PPX ↔ S36).
+  await api('/v1/contacts', { token: apple.token, method: 'POST', body: { code: google.user.id } });
+  await api('/v1/friend-request/accept', {
+    token: google.token,
+    method: 'POST',
+    body: { contactId: apple.user.id },
+  });
+
+  const again = await api('/v1/session', {
+    method: 'POST',
+    body: { provider: 'google', subject: 'google-elton-firebase-uid' },
+  });
+  assert.equal(again.user.id, apple.user.id);
+  assert.equal(again.user.provider, 'apple');
+  const inbox = await api('/v1/inbox?offset=0', { token: again.token });
+  assert.equal(
+    inbox.contacts.some((item) => item.id === friend.user.id && item.status === 'active'),
+    true
+  );
+  assert.equal(
+    inbox.contacts.some((item) => item.id === google.user.id),
+    false
+  );
+});
+
+test('email links a Google sign-in onto an existing Apple account', async () => {
+  const api = createDeviceApi(memoryStorage());
+  const apple = await api('/v1/session', {
+    method: 'POST',
+    body: {
+      provider: 'apple',
+      subject: 'apple-with-email',
+      email: 'same@example.com',
+    },
+  });
+  const google = await api('/v1/session', {
+    method: 'POST',
+    body: {
+      provider: 'google',
+      subject: 'google-with-same-email',
+      email: 'same@example.com',
+    },
+  });
+  assert.equal(google.user.id, apple.user.id);
+});

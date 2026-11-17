@@ -103,6 +103,8 @@ function keepAccount(user) {
     offsetMinutes: user.offsetMinutes,
     provider: user.provider,
     subject: user.subject,
+    identities: userIdentities(user),
+    email: user.email || '',
     pendingEffects: user.pendingEffects,
   };
 }
@@ -208,8 +210,106 @@ function userFrom(state, token) {
   return id ? state.users[id] : null;
 }
 
+function userIdentities(user) {
+  const listed = Array.isArray(user?.identities) ? user.identities : [];
+  const primary =
+    user?.provider && user?.subject ? [{ provider: user.provider, subject: user.subject }] : [];
+  const seen = new Set();
+  return [...primary, ...listed].filter((item) => {
+    if (!item?.provider || !item?.subject) return false;
+    const key = `${item.provider}:${item.subject}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function preferPrimaryIdentity(identities) {
+  return identities.find((item) => item.provider === 'apple') || identities[0] || null;
+}
+
+function attachIdentity(user, provider, subject) {
+  const identities = userIdentities(user);
+  if (identities.some((item) => item.provider === provider && item.subject === subject)) {
+    user.identities = identities;
+    return;
+  }
+  const next = [...identities, { provider, subject }];
+  const primary = preferPrimaryIdentity(next);
+  user.identities = next;
+  if (primary) {
+    user.provider = primary.provider;
+    user.subject = primary.subject;
+  }
+}
+
 function findByIdentity(state, provider, subject) {
-  return Object.values(state.users).find((user) => user.provider === provider && user.subject === subject) ?? null;
+  return (
+    Object.values(state.users).find((user) =>
+      userIdentities(user).some((item) => item.provider === provider && item.subject === subject)
+    ) ?? null
+  );
+}
+
+function findByEmail(state, email) {
+  if (!email) return null;
+  return Object.values(state.users).find((user) => user.email === email) ?? null;
+}
+
+function mergeUsers(state, host, guest) {
+  if (!host || !guest || host.id === guest.id) return host;
+  for (const identity of userIdentities(guest)) {
+    attachIdentity(host, identity.provider, identity.subject);
+  }
+  if (guest.email && !host.email) host.email = guest.email;
+  if (guest.pushToken && !host.pushToken) host.pushToken = guest.pushToken;
+  if (!host.firstName && guest.firstName) host.firstName = guest.firstName;
+  host.onboarded = Boolean(host.onboarded || guest.onboarded || host.firstName);
+
+  for (const contact of guest.contacts || []) {
+    if (contact.id === host.id || contact.id === guest.id) continue;
+    host.contacts = upsertContact(host.contacts, contact.id, contact.status || 'active');
+    const peer = state.users[contact.id];
+    if (!peer) continue;
+    peer.contacts = removeContact(peer.contacts, guest.id);
+    peer.contacts = upsertContact(peer.contacts, host.id, contact.status || 'active');
+    peer.messages = (peer.messages || []).map((message) =>
+      message.contactId === guest.id ? { ...message, contactId: host.id } : message
+    );
+    if (peer.contactId === guest.id) peer.contactId = host.id;
+  }
+
+  for (const message of guest.messages || []) {
+    if (message.contactId === host.id || message.contactId === guest.id) continue;
+    host.messages = [...(host.messages || []), message];
+  }
+
+  host.contacts = removeContact(host.contacts, guest.id);
+  if (host.contactId === guest.id) host.contactId = host.contacts[0]?.id ?? null;
+  for (const token of Object.keys(state.sessions)) {
+    if (state.sessions[token] === guest.id) state.sessions[token] = host.id;
+  }
+  state.reports = (state.reports || []).map((report) => ({
+    ...report,
+    reporterId: report.reporterId === guest.id ? host.id : report.reporterId,
+    reportedId: report.reportedId === guest.id ? host.id : report.reportedId,
+  }));
+  delete state.users[guest.id];
+  return host;
+}
+
+function absorbSelfDuplicate(state, user) {
+  const identities = userIdentities(user);
+  if (!identities.some((item) => item.provider === 'google')) return user;
+  const contacts = user.contacts || [];
+  if (contacts.length !== 1 || contactKind(contacts[0]) !== 'active') return user;
+  const other = state.users[contacts[0].id];
+  if (!other || other.provider !== 'apple') return user;
+  if (!user.firstName || user.firstName !== other.firstName) return user;
+  if (!(other.contacts || []).some((item) => item.id === user.id && contactKind(item) === 'active')) {
+    return user;
+  }
+  return mergeUsers(state, other, user);
 }
 
 export function createDeviceApi(storage, randomBytes = defaultBytes) {
@@ -323,15 +423,23 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
           ? body.provider
           : null;
       const subject = typeof body?.subject === 'string' ? body.subject.trim() : '';
+      const email =
+        typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
       if (!provider || subject.length < 4) fail('provider_subject_missing');
-      const existing = findByIdentity(state, provider, subject);
-      const user =
-        existing ??
-        {
+      let user =
+        findByIdentity(state, provider, subject) || (email ? findByEmail(state, email) : null);
+      if (user) {
+        attachIdentity(user, provider, subject);
+        if (email) user.email = email;
+        if (body?.firstName && !user.firstName) user.firstName = firstName(body.firstName);
+      } else {
+        user = {
           ...createState(),
           id: mintCode(state.users, provider, subject),
           provider,
           subject,
+          identities: [{ provider, subject }],
+          email,
           firstName: '',
           onboarded: false,
           pushToken: null,
@@ -339,6 +447,8 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
           contacts: [],
           pendingEffects: [],
         };
+      }
+      user = absorbSelfDuplicate(state, user);
       state.users[user.id] = user;
       const sessionToken = await hex(24);
       state.sessions[sessionToken] = user.id;
@@ -346,12 +456,15 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
       return { token: sessionToken, user: publicUser(user) };
     }
 
-    const user = userFrom(state, token);
+    let user = userFrom(state, token);
     if (!user) fail('sign_in_required');
+    const host = absorbSelfDuplicate(state, user);
+    const mergedSelf = host.id !== user.id;
+    user = host;
     const offset = method === 'GET' ? Number(url.searchParams.get('offset')) : body?.offsetMinutes;
     const priorOffset = user.offsetMinutes;
     applyClock(user, offset);
-    const clockDirty = user.offsetMinutes !== priorOffset;
+    const clockDirty = user.offsetMinutes !== priorOffset || mergedSelf;
 
     if (method === 'GET' && url.pathname === '/v1/person') {
       const code = normalizeCode(url.searchParams.get('code'));
