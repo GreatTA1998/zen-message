@@ -188,6 +188,10 @@ test('notify-all persists per contact and alerts on zen replies', async () => {
   await phone('/v1/friend-request/accept', { token: apple.token, method: 'POST', body: { contactId: google.user.id } });
   const on = await phone('/v1/notify-all', { token: apple.token, method: 'POST', body: { contactId: google.user.id, on: true } });
   assert.equal(on.contacts.find((item) => item.id === google.user.id).notifyAll, true);
+  for (const mode of ['relaxed', 'batched']) {
+    const next = await phone('/v1/mode', { token: apple.token, method: 'POST', body: { mode } });
+    assert.equal(next.contacts.find((item) => item.id === google.user.id).notifyAll, true);
+  }
   storage.delivered.length = 0;
   await web('/v1/messages', { token: google.token, method: 'POST', body: { contactId: apple.user.id, body: 'zen back', intent: 'anytime' } });
   const alerts = presents(storage.delivered, apple.user.id);
