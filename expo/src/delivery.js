@@ -219,8 +219,8 @@ function readContent(action) {
   return { body, photo, sticker };
 }
 
-export function immediatePlan(message) {
-  const quiet = message.intent === 'timely';
+export function immediatePlan(message, loud = false) {
+  const quiet = !loud && message.intent === 'timely';
   return {
     title: message.contactName,
     body: noticeText(message.body, message.photo, message.sticker),
@@ -355,11 +355,11 @@ function send(state, action, now) {
     direction: 'in',
   };
 
-  if (message.intent === 'realtime') {
+  if (message.intent === 'realtime' || action.notifyAll) {
     const visible = { ...message, visible: true };
     return {
       state: { ...state, messages: [...state.messages, visible] },
-      effects: [{ type: 'present', plan: immediatePlan(visible) }],
+      effects: [{ type: 'present', plan: immediatePlan(visible, Boolean(action.notifyAll)) }],
     };
   }
 

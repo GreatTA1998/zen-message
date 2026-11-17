@@ -175,6 +175,26 @@ function presents(delivered, id) {
     .filter((effect) => effect.type === 'present');
 }
 
+test('notify-all persists per contact and alerts on zen replies', async () => {
+  const storage = sharedStore();
+  const phone = createDeviceApi(storage, (length) => new Uint8Array(length).fill(4));
+  const web = createDeviceApi(storage, (length) => new Uint8Array(length).fill(5));
+  const apple = await phone('/v1/session', { method: 'POST', body: { provider: 'apple', subject: 'apple-notify-all' } });
+  const google = await web('/v1/session', { method: 'POST', body: { provider: 'google', subject: 'google-notify-all' } });
+  await phone('/v1/profile', { token: apple.token, method: 'POST', body: { nickname: 'Ada' } });
+  await web('/v1/profile', { token: google.token, method: 'POST', body: { nickname: 'Gus' } });
+  await phone('/v1/push-token', { token: apple.token, method: 'POST', body: { token: 'ExponentPushToken[notifyallphone]' } });
+  await web('/v1/contacts', { token: google.token, method: 'POST', body: { code: apple.user.id } });
+  await phone('/v1/friend-request/accept', { token: apple.token, method: 'POST', body: { contactId: google.user.id } });
+  const on = await phone('/v1/notify-all', { token: apple.token, method: 'POST', body: { contactId: google.user.id, on: true } });
+  assert.equal(on.contacts.find((item) => item.id === google.user.id).notifyAll, true);
+  storage.delivered.length = 0;
+  await web('/v1/messages', { token: google.token, method: 'POST', body: { contactId: apple.user.id, body: 'zen back', intent: 'anytime' } });
+  const alerts = presents(storage.delivered, apple.user.id);
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].plan.quiet, false);
+});
+
 test('a web realtime message alerts the signed-in phone once', async () => {
   const storage = sharedStore();
   const phone = createDeviceApi(storage, (length) => new Uint8Array(length).fill(4));

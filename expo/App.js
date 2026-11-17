@@ -403,6 +403,7 @@ function ChatScreen({
   }, [openedLoaded, contacts, state?.messages, selectedContactId, panel]);
 
   const contact = contacts.find((item) => normalizeCode(item.id) === selectedContactId) ?? null;
+  const menuContact = contacts.find((item) => item.id === contactMenuId) ?? null;
   const contactActive = contact?.status === 'active' || !contact?.status;
   const contactPendingIn = contact?.status === 'pending-in';
   const contactPendingOut = contact?.status === 'pending-out';
@@ -810,6 +811,12 @@ function ChatScreen({
           <View testID="contact-actions-popover" style={styles.contactMenuPopover}>
             <ContactActionsMenu
               contactId={contactMenuId}
+              notifyAll={menuContact?.notifyAll === true}
+              onToggleNotifyAll={
+                menuContact?.status === 'active'
+                  ? (on) => mutate('/v1/notify-all', { contactId: contactMenuId, on }).catch(() => {})
+                  : undefined
+              }
               onReport={() => reportContact(contactMenuId)}
               onBlock={() => confirmBlock(contactMenuId)}
               onClose={() => setContactMenuId(null)}
