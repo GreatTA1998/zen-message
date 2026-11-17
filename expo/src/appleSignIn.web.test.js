@@ -8,6 +8,6 @@ test('web Apple sign-in uses a Firebase popup and keeps the Apple subject', () =
   assert.match(source, /signInWithPopup/);
   assert.match(source, /OAuthProvider/);
   assert.match(source, /apple\.com/);
-  assert.match(source, /appleSubjectFromUser/);
+  assert.match(source, /sessionSubjectFromUser/);
   assert.doesNotMatch(source, /signInWithRedirect/);
 });

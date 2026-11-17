@@ -24,6 +24,7 @@ export async function finishSignIn(provider, credential, { request, saveSession,
         provider: sessionProvider,
         subject: credential.user,
         firstName: credential.firstName || '',
+        email: credential.email || '',
       },
     });
     if (!session?.token) throw new Error('session_missing');

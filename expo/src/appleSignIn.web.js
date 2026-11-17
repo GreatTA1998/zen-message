@@ -1,5 +1,5 @@
 import { OAuthProvider, signInWithPopup } from 'firebase/auth';
-import { appleSubjectFromUser, firebaseAuth } from './firebaseAuth.js';
+import { firebaseAuth, sessionSubjectFromUser } from './firebaseAuth.js';
 
 export async function signInWithApple() {
   const auth = firebaseAuth();
@@ -9,7 +9,7 @@ export async function signInWithApple() {
   provider.addScope('name');
   try {
     const result = await signInWithPopup(auth, provider);
-    const subject = appleSubjectFromUser(result?.user);
+    const subject = sessionSubjectFromUser(result?.user);
     if (!subject) return { provider: 'apple', missing: 'apple_unavailable' };
     return subject;
   } catch (error) {

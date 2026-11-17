@@ -54,6 +54,7 @@ import {
 } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
+import { restoreAuthSubject } from './src/firebaseAuth';
 import { finishSignIn } from './src/signIn';
 import { pickCameraPhoto, pickLibraryPhoto } from './src/pickPhoto';
 import { DrawModal } from './src/DrawModal';
@@ -153,7 +154,7 @@ function Root() {
           prepareNotifications(),
           new Promise((resolve) => setTimeout(resolve, 4000)),
         ]);
-        const saved = await loadSession();
+        let saved = await loadSession();
         if (!alive) return;
         if (saved) {
           tokenRef.current = saved;
@@ -165,7 +166,32 @@ function Root() {
               tokenRef.current = null;
               setToken(null);
               await saveSession(null);
+              saved = null;
             }
+          }
+        }
+        if (!saved && alive) {
+          const restored = await restoreAuthSubject();
+          if (restored?.subject && alive) {
+            await finishSignIn(
+              restored.provider,
+              {
+                user: restored.subject,
+                firstName: restored.firstName || '',
+                email: restored.email || '',
+              },
+              {
+                request: api,
+                saveSession,
+                loadSession,
+                refresh: async (session) => {
+                  tokenRef.current = session.token;
+                  setToken(session.token);
+                  setUser(session.user);
+                  await refresh();
+                },
+              }
+            );
           }
         }
       } finally {
@@ -216,7 +242,7 @@ function Root() {
     }
     const outcome = await finishSignIn(
       result.provider,
-      { user: result.subject, firstName: result.firstName || '' },
+      { user: result.subject, firstName: result.firstName || '', email: result.email || '' },
       {
         request: api,
         saveSession,
