@@ -2,7 +2,7 @@ export async function acceptAppleCredential(credential, deps) {
   return finishSignIn('apple', credential, deps);
 }
 
-const SESSION_PROVIDERS = new Set(['apple', 'google', 'phone']);
+const SESSION_PROVIDERS = new Set(['apple', 'google']);
 
 export async function finishSignIn(provider, credential, { request, saveSession, loadSession, refresh }) {
   if (!credential?.user) {

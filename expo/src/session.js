@@ -6,6 +6,7 @@ const P = 'zen-message.picked-contact';
 const D = 'zen-message.draft';
 const O = 'zen-message.opened-at';
 const X = 'zen-message.outbox';
+const M = 'zen-message.outbox-media.';
 
 async function get(key, fallback = null) {
   try {
@@ -38,10 +39,37 @@ export async function loadOutbox() {
         typeof item.id === 'string' &&
         typeof item.contactId === 'string' &&
         typeof item.createdAt === 'number' &&
-        (typeof item.body === 'string' || item.photo || item.sticker)
+        typeof item.body === 'string'
     );
   } catch {
     return [];
+  }
+}
+
+export const outboxMedia = {
+  put: async (id, media) => {
+    if (!id) return;
+    if (!media?.photo && !media?.sticker) return AsyncStorage.removeItem(M + id);
+    return AsyncStorage.setItem(M + id, JSON.stringify({ photo: media.photo || null, sticker: media.sticker || null }));
+  },
+  get: async (id) => {
+    try {
+      const parsed = JSON.parse((await AsyncStorage.getItem(M + id)) || 'null');
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  },
+  remove: async (id) => id && AsyncStorage.removeItem(M + id),
+};
+
+export async function clearOutbox() {
+  await put(X, null);
+  try {
+    const keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(M));
+    if (keys.length) await AsyncStorage.multiRemove(keys);
+  } catch {
+    /* queue already cleared */
   }
 }
 
