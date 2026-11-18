@@ -1,4 +1,5 @@
 import { normalizeCode } from './people.js';
+import { notificationPolicy } from './notificationPolicy.js';
 
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const DAY_HOURS = Array.from({ length: 24 }, (_item, hour) => hour);
@@ -355,28 +356,20 @@ function send(state, action, now) {
     direction: 'in',
   };
 
-  if (message.intent === 'realtime' || action.notifyAll) {
+  const policy = notificationPolicy({ intent: message.intent, mode: state.mode, notifyAll: action.notifyAll });
+  if (policy.path !== 'digest') {
     const visible = { ...message, visible: true };
     return {
       state: { ...state, messages: [...state.messages, visible] },
-      effects: [{ type: 'present', plan: immediatePlan(visible, Boolean(action.notifyAll)) }],
+      effects: policy.push ? [{ type: 'present', plan: immediatePlan(visible, policy.loud) }] : [],
     };
   }
-
-  if (state.mode === 'relaxed') {
-    return {
-      state: { ...state, messages: [...state.messages, { ...message, visible: true }] },
-      effects: [],
-    };
-  }
-
   const clock = dailyClock(state);
   const at =
     message.intent === 'anytime'
       ? nextDaily(new Date(now), clock.hour, clock.minute, action.offsetMinutes).getTime()
       : chosenRelease(action.releaseAt, now, action.offsetMinutes);
-  const messages = [...state.messages, { ...message, releaseAt: at }];
-  return holdDigest({ ...state, messages });
+  return holdDigest({ ...state, messages: [...state.messages, { ...message, releaseAt: at }] });
 }
 
 function chosenRelease(releaseAt, now, offsetMinutes) {

@@ -37,6 +37,7 @@ import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
 import { bubbleTone, messageBubbleParts, ZEN_FILL, ZEN_LINE } from './src/messageBubble';
+import { notificationPolicy, starColor } from './src/notificationPolicy';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -108,9 +109,6 @@ const MISSING = {
   apple_capability: 'Apple sign-in needs the Apple capability on this device.',
   apple_unavailable: 'Apple sign-in is not available in this browser.',
   google_unavailable: 'Google sign-in is not available in this browser.',
-  phone_unavailable: 'Phone sign-in is not available on this device.',
-  phone_invalid: 'That phone number could not be used.',
-  phone_code_invalid: 'That code did not work.',
 };
 
 export default function App() {
@@ -782,7 +780,7 @@ function ChatScreen({
             const selected = id === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
             const override = pendingNotify?.id === item.id ? pendingNotify.on : !!item.notifyAll;
-            const star = !pending && (override || !focused);
+            const starKind = notificationPolicy({ mode, notifyAll: override, pending }).starKind;
             const glow =
               openedAt && !pending && !selected && contactUnread(state?.messages, id, openedAt[id])
                 ? styles.avatarHalo
@@ -807,7 +805,7 @@ function ChatScreen({
                     dashed={pending}
                     style={[panel !== 'add' && selected && styles.circleOn, glow]}
                   />
-                  {star ? <Ionicons testID={`notify-star-${item.id}`} name="star" size={11} color={override ? '#b3261e' : '#c9a227'} style={styles.contactStar} importantForAccessibility="no" /> : null}
+                  {starKind ? <Ionicons testID={`notify-star-${item.id}`} name="star" size={11} color={starColor(starKind)} style={styles.contactStar} importantForAccessibility="no" /> : null}
                 </View>
                 <Text numberOfLines={1} style={styles.contactLabel}>{item.firstName || item.id}</Text>
               </Pressable>
