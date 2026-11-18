@@ -52,6 +52,7 @@ import {
   savePickedContact,
   saveSession,
 } from './src/session';
+import { createOutbox } from './src/outbox';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { ContactActionsMenu } from './src/contactActions';
 import { restoreAuthSubject } from './src/firebaseAuth';
@@ -397,7 +398,8 @@ function ChatScreen({
   const [openedAt, setOpenedAt] = useState(null);
   const focusRequest = useRef(0);
   const attachBusy = useRef(false);
-  const pendingRef = useRef([]);
+  const outboxRef = useRef(null);
+  const mutateRef = useRef(null);
   const threadRef = useRef(null);
   const keyboardInset = useKeyboardInset();
   const hideChrome = Platform.OS !== 'web' && keyboardInset > 0 && panel === 'chat';
@@ -551,72 +553,38 @@ function ChatScreen({
     setSticker(next);
   }
 
-  const outboxGate = useRef(Promise.resolve());
-  const drainBusy = useRef(false);
-
-  function setOutbox(items) {
-    pendingRef.current = items;
-    setPendingOutbound(items);
+  if (!outboxRef.current) {
+    outboxRef.current = createOutbox({
+      load: loadOutbox,
+      save: saveOutbox,
+      onChange: setPendingOutbound,
+      send: (item) =>
+        mutateRef.current('/v1/messages', {
+          clientId: item.id,
+          contactId: item.contactId,
+          body: item.body,
+          photo: item.photo,
+          sticker: item.sticker,
+          intent: item.intent,
+          releaseAt: item.releaseAt || undefined,
+        }),
+    });
   }
-
-  function persistOutbox(items) {
-    setOutbox(items);
-    const write = outboxGate.current.then(() => saveOutbox(items));
-    outboxGate.current = write.catch(() => {});
-    return write;
-  }
-
-  async function drain() {
-    if (drainBusy.current) return;
-    drainBusy.current = true;
-    try {
-      while (pendingRef.current[0] && !pendingRef.current[0].failed) {
-        const item = pendingRef.current[0];
-        try {
-          await mutate('/v1/messages', {
-            clientId: item.id,
-            contactId: item.contactId,
-            body: item.body,
-            photo: item.photo,
-            sticker: item.sticker,
-            intent: item.intent,
-            releaseAt: item.releaseAt || undefined,
-          });
-          await persistOutbox(pendingRef.current.slice(1));
-        } catch {
-          setOutbox([{ ...item, failed: true }, ...pendingRef.current.slice(1)]);
-          break;
-        }
-      }
-    } finally {
-      drainBusy.current = false;
-    }
-  }
-
-  function retryOutbox(id) {
-    persistOutbox(pendingRef.current.map((row) => (row.id === id ? { ...row, failed: false } : row))).catch(() => {});
-    drain();
-  }
+  const outbox = outboxRef.current;
+  mutateRef.current = mutate;
 
   useEffect(() => {
     let alive = true;
-    loadOutbox().then((disk) => {
-      if (!alive) return;
-      const map = new Map(disk.map((item) => [item.id, item]));
-      for (const item of pendingRef.current) map.set(item.id, item);
-      persistOutbox([...map.values()]).catch(() => {});
-      drain();
-    });
+    outbox.hydrate().catch(() => {});
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
-      setOutbox(pendingRef.current.map((row) => (row.failed ? { ...row, failed: false } : row)));
-      drain();
+      if (state !== 'active' || !alive) return;
+      outbox.resume();
     });
     return () => {
       alive = false;
       sub.remove();
     };
-  }, [token]);
+  }, [token, outbox]);
 
   async function send(text = draft) {
     const body = text.trim();
@@ -634,11 +602,9 @@ function ChatScreen({
       releaseAt: intent === 'scheduled' ? selectedAt?.getTime() : null,
       direction: 'out',
     };
-    const prev = pendingRef.current;
     try {
-      await persistOutbox([...prev, item]);
+      await outbox.enqueue(item);
     } catch {
-      setOutbox(prev);
       flashNotice('Could not save message. Try again.');
       return;
     }
@@ -647,7 +613,6 @@ function ChatScreen({
     setPhoto(null);
     setSticker(null);
     setInputHeight(44);
-    drain();
   }
 
   async function attach(source) {
@@ -937,7 +902,7 @@ function ChatScreen({
               <ThreadMessage
                 key={message.id}
                 message={message}
-                onRetry={message.failed ? () => retryOutbox(message.id) : undefined}
+                onRetry={message.failed ? () => outbox.retry(message.id) : undefined}
                 onOpenPhoto={(uri) => {
                   Keyboard.dismiss();
                   setScheduleOpen(false);
