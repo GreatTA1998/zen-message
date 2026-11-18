@@ -5,10 +5,6 @@ const API_KEY = 'AIzaSyCMj9SsNMKDI9EezOzg_jowsYUOfaCbivc';
 const ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/%28default%29/documents`;
 const DOC_PREFIX = `projects/${PROJECT}/databases/(default)/documents/zenExpoState`;
 
-function docName(docId) {
-  return `${DOC_PREFIX}/${docId}`;
-}
-
 async function firestore(path, { method = 'GET', body } = {}) {
   const response = await fetch(`${ROOT}${path}${path.includes('?') ? '&' : '?'}key=${API_KEY}`, {
     method,
@@ -25,9 +21,7 @@ async function firestore(path, { method = 'GET', body } = {}) {
   return payload;
 }
 
-function conflict(error) {
-  return error?.code === 'FAILED_PRECONDITION' || error?.code === 'ABORTED';
-}
+const conflict = (error) => error?.code === 'FAILED_PRECONDITION' || error?.code === 'ABORTED';
 
 async function sendPushes(queued) {
   if (!queued.length) return;
@@ -35,13 +29,11 @@ async function sendPushes(queued) {
     const { pushesFor, sendExpoPushes } = await import('./expoPush.js');
     const messages = queued.flatMap((item) => pushesFor(item.effects, item.recipient?.pushToken));
     if (messages.length) await sendExpoPushes(messages);
-  } catch {
-    // The open app still receives the message on its next inbox refresh.
-  }
+  } catch { /* The open app still receives the message on its next inbox refresh. */ }
 }
 
 export function createFirestoreStorage(docId = 'live') {
-  const name = docName(docId);
+  const name = `${DOC_PREFIX}/${docId}`;
   return {
     async transact(work) {
       let lastError = null;
@@ -58,31 +50,19 @@ export function createFirestoreStorage(docId = 'live') {
         let dirty = false;
         const queued = [];
         const result = await work({
-          async getItem() {
-            return next;
-          },
-          async setItem(_key, value) {
-            next = value;
-            dirty = true;
-          },
-          onDeliver(recipient, effects) {
-            queued.push({ recipient, effects });
-          },
+          async getItem() { return next; },
+          async setItem(_key, value) { next = value; dirty = true; },
+          onDeliver(recipient, effects) { queued.push({ recipient, effects }); },
         });
         if (!dirty) return result;
         try {
           await firestore(':commit', {
             method: 'POST',
             body: {
-              writes: [
-                {
-                  update: {
-                    name,
-                    fields: { json: { stringValue: next } },
-                  },
-                  currentDocument: updateTime ? { updateTime } : { exists: false },
-                },
-              ],
+              writes: [{
+                update: { name, fields: { json: { stringValue: next } } },
+                currentDocument: updateTime ? { updateTime } : { exists: false },
+              }],
             },
           });
           await sendPushes(queued);
