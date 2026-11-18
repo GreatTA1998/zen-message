@@ -10,8 +10,9 @@ test('Apple session subject uses the linked Apple user id, not the Firebase uid'
   assert.doesNotMatch(source, /linked\?\.uid \|\| user\.uid/);
 });
 
-test('session subject prefers Apple when Google is also linked', () => {
+test('session subject prefers Apple when Google is also linked; phone auth removed', () => {
   assert.match(source, /appleSubjectFromUser\(user\) \|\| googleSubjectFromUser\(user\)/);
+  assert.doesNotMatch(source, /phoneSubjectFromUser/);
 });
 
 test('hosted web origins use the site authDomain so /__/auth stays first-party', () => {

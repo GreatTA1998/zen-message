@@ -1,5 +1,5 @@
 export const CODE_LENGTH = 3;
-export const CODE_ALPHABET = '023456789ABCDEFGHJKMNOPQRSTUVWXYZ';
+const CODE_ALPHABET = '023456789ABCDEFGHJKMNOPQRSTUVWXYZ';
 const CONFUSING = new Set(['1', 'I', 'L']);
 const TONES = [
   ['#3d6b5a', '#e7f1ec'],

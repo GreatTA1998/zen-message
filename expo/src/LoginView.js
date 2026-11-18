@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ink, paper } from './chatTheme';
 import { LOGO } from './contacts';
 import { completeGoogleRedirect, signInWithGoogle } from './googleSignIn';
 import { signInWithApple } from './appleSignIn';
@@ -68,9 +69,6 @@ export function LoginView({ onSubject, notice }) {
     </View>
   );
 }
-
-const ink = '#1c1c1c';
-const paper = '#fff';
 
 const styles = StyleSheet.create({
   screen: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: paper, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 14 },

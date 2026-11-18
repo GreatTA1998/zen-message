@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-
-const ink = '#1c1c1c';
+import { ink, paper } from './chatTheme';
 
 export function ContactActionsMenu({ contactId, onReport, onBlock, onClose }) {
   if (!contactId) return null;
@@ -18,7 +17,7 @@ export function ContactActionsMenu({ contactId, onReport, onBlock, onClose }) {
 }
 
 const styles = StyleSheet.create({
-  menu: { borderWidth: 1, borderColor: ink, backgroundColor: '#fff', minWidth: 148 },
+  menu: { borderWidth: 1, borderColor: ink, backgroundColor: paper, minWidth: 148 },
   row: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
   text: { color: ink, fontSize: 16, lineHeight: 21 },
   alert: { color: '#b3261e' },

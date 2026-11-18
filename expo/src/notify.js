@@ -50,7 +50,7 @@ export async function prepareNotifications() {
   }
 }
 
-export async function presentNow(plan) {
+async function presentNow(plan) {
   try {
     await Notifications.scheduleNotificationAsync({
       ...(plan.data?.messageIds?.[0] ? { identifier: String(plan.data.messageIds[0]).slice(0, 64) } : {}),

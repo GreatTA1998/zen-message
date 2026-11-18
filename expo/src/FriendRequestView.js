@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ink, paper } from './chatTheme';
 import { PersonAvatar } from './contacts';
 
 export function FriendRequestView({ contact, onAccept, onDecline, busy }) {
@@ -36,32 +37,14 @@ export function FriendRequestView({ contact, onAccept, onDecline, busy }) {
   );
 }
 
-const ink = '#1c1c1c';
-const paper = '#fff';
-
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: paper,
-    paddingHorizontal: 20,
-    paddingTop: 28,
-    gap: 24,
-    alignItems: 'center',
-  },
+  screen: { flex: 1, width: '100%', backgroundColor: paper, paddingHorizontal: 20, paddingTop: 28, gap: 24, alignItems: 'center' },
   card: { alignItems: 'center', gap: 8 },
   name: { color: ink, fontSize: 22, lineHeight: 28, fontWeight: '600' },
   id: { color: ink, fontSize: 16, lineHeight: 20, letterSpacing: 2 },
   lead: { color: ink, fontSize: 17, lineHeight: 22, marginTop: 4 },
   actions: { width: '100%', maxWidth: 360, flexDirection: 'row', gap: 12 },
-  button: {
-    flex: 1,
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  button: { flex: 1, minHeight: 48, borderWidth: 1, borderColor: ink, alignItems: 'center', justifyContent: 'center' },
   decline: { backgroundColor: paper },
   accept: { backgroundColor: ink },
   declineText: { color: ink, fontSize: 17 },
