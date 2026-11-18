@@ -6,78 +6,31 @@ import { contactUnread } from './delivery';
 import { normalizeCode } from './people';
 import { ink, web, side } from './chatTheme';
 
-export function ContactStrip({
-  contacts,
-  selectedContactId,
-  panel,
-  mode,
-  pendingNotify,
-  openedAt,
-  messages,
-  hideChrome,
-  onPick,
-  onLongPress,
-  onToggleAdd,
-}) {
+export function ContactStrip({ contacts, selectedContactId, panel, mode, pendingNotify, openedAt, messages, hideChrome, onPick, onLongPress, onToggleAdd }) {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={[styles.contacts, web && styles.webPad]}
-      testID="contact-strip"
-      style={[styles.contactStrip, hideChrome && styles.chromeGone]}
-    >
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.contacts, web && styles.webPad]} testID="contact-strip" style={[styles.contactStrip, hideChrome && styles.chromeGone]}>
       {contacts.map((item) => {
         const id = normalizeCode(item.id);
         const selected = id === selectedContactId;
         const pending = item.status === 'pending-in' || item.status === 'pending-out';
         const override = pendingNotify?.id === item.id ? pendingNotify.on : !!item.notifyAll;
         const starKind = notificationPolicy({ mode, notifyAll: override, pending }).starKind;
-        const glow =
-          openedAt && !pending && !selected && contactUnread(messages, id, openedAt[id])
-            ? styles.avatarHalo
-            : null;
+        const glow = openedAt && !pending && !selected && contactUnread(messages, id, openedAt[id]) ? styles.avatarHalo : null;
         return (
-          <Pressable
-            key={item.id}
-            testID={`contact-${item.id}`}
-            accessibilityRole="button"
-            accessibilityLabel={item.firstName || item.id}
-            accessibilityState={{ selected: (panel === 'chat' || panel === 'request') && selected }}
-            onPress={() => onPick(item)}
-            onLongPress={() => onLongPress(item.id)}
-            style={styles.contact}
-          >
+          <Pressable key={item.id} testID={`contact-${item.id}`} accessibilityRole="button" accessibilityLabel={item.firstName || item.id} accessibilityState={{ selected: (panel === 'chat' || panel === 'request') && selected }} onPress={() => onPick(item)} onLongPress={() => onLongPress(item.id)} style={styles.contact}>
             <View>
-              <PersonAvatar
-                id={id}
-                name={item.firstName}
-                uri={item.avatar}
-                size={54}
-                dashed={pending}
-                style={[panel !== 'add' && selected && styles.circleOn, glow]}
-              />
+              <PersonAvatar id={id} name={item.firstName} uri={item.avatar} size={54} dashed={pending} style={[panel !== 'add' && selected && styles.circleOn, glow]} />
               {starKind ? <Ionicons testID={`notify-star-${item.id}`} name="star" size={11} color={starColor(starKind)} style={styles.contactStar} importantForAccessibility="no" /> : null}
             </View>
             <Text numberOfLines={1} style={styles.contactLabel}>{item.firstName || item.id}</Text>
           </Pressable>
         );
       })}
-      <Pressable
-        testID="add-person"
-        accessibilityRole="button"
-        accessibilityLabel="new contact"
-        accessibilityState={{ selected: panel === 'add' }}
-        onPress={onToggleAdd}
-        style={styles.contact}
-      >
+      <Pressable testID="add-person" accessibilityRole="button" accessibilityLabel="new contact" accessibilityState={{ selected: panel === 'add' }} onPress={onToggleAdd} style={styles.contact}>
         <View style={[styles.plus, panel === 'add' && styles.circleOn]}>
           <Text style={styles.plusMark}>+</Text>
         </View>
-        <Text numberOfLines={1} style={styles.contactLabel}>
-          new contact
-        </Text>
+        <Text numberOfLines={1} style={styles.contactLabel}>new contact</Text>
       </Pressable>
     </ScrollView>
   );

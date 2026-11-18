@@ -1,71 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ink, paper } from './chatTheme';
 import { LOGO } from './contacts';
 import { completeGoogleRedirect, signInWithGoogle } from './googleSignIn';
 import { signInWithApple } from './appleSignIn';
 
+function routeResult(onSubject, result, { pending = false } = {}) {
+  if (result?.cancelled || (pending && result?.pending) || result?.missing) {
+    if (result?.missing) onSubject(result);
+    return;
+  }
+  onSubject(result);
+}
+
 export function LoginView({ onSubject, notice }) {
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
     let alive = true;
-    completeGoogleRedirect()
-      .then((result) => {
-        if (alive && result?.subject) onSubject(result);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
+    completeGoogleRedirect().then((result) => { if (alive && result?.subject) onSubject(result); }).catch(() => {});
+    return () => { alive = false; };
   }, [onSubject]);
-
-  async function handleGoogle() {
-    const result = await signInWithGoogle();
-    if (result?.cancelled || result?.pending || result?.missing) {
-      if (result?.missing) onSubject(result);
-      return;
-    }
-    onSubject(result);
-  }
-
-  async function handleApple() {
-    const result = await signInWithApple();
-    if (result?.cancelled || result?.missing) {
-      if (result?.missing) onSubject(result);
-      return;
-    }
-    onSubject(result);
-  }
 
   return (
     <View style={styles.screen}>
       <Image source={LOGO} style={styles.mark} />
       <Text style={styles.title}>Zen Message</Text>
       <View style={styles.stack}>
-        <Pressable
-          testID="google-login"
-          accessibilityRole="button"
-          accessibilityLabel="Sign in with Google"
-          onPress={handleGoogle}
-          style={[styles.provider, styles.google]}
-        >
+        <Pressable testID="google-login" accessibilityRole="button" accessibilityLabel="Sign in with Google" onPress={async () => routeResult(onSubject, await signInWithGoogle(), { pending: true })} style={[styles.provider, styles.google]}>
           <Text style={styles.providerText}>Sign in with Google</Text>
         </Pressable>
-        <Pressable
-          testID="apple-login"
-          accessibilityRole="button"
-          accessibilityLabel="Sign in with Apple"
-          onPress={handleApple}
-          style={[styles.provider, styles.apple]}
-        >
+        <Pressable testID="apple-login" accessibilityRole="button" accessibilityLabel="Sign in with Apple" onPress={async () => routeResult(onSubject, await signInWithApple())} style={[styles.provider, styles.apple]}>
           <Text style={[styles.providerText, styles.appleText]}>Sign in with Apple</Text>
         </Pressable>
       </View>
-      {notice ? (
-        <Text testID="login-notice" style={styles.notice}>
-          {notice}
-        </Text>
-      ) : null}
+      {notice ? <Text testID="login-notice" style={styles.notice}>{notice}</Text> : null}
     </View>
   );
 }

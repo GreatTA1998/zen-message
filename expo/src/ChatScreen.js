@@ -97,11 +97,7 @@ export function ChatScreen({
   }, []);
 
   useEffect(() => {
-    if (hideChrome) {
-      setScheduleOpen(false);
-      setAccountOpen(false);
-      setContactMenuId(null);
-    }
+    if (hideChrome) closeMenus();
     if (Platform.OS === 'web' || !keyboardInset) return undefined;
     const t = setTimeout(() => threadRef.current?.scrollToEnd({ animated: false }), 16);
     return () => clearTimeout(t);
@@ -171,13 +167,7 @@ export function ChatScreen({
   }
 
   async function mutate(path, body) {
-    return onInbox(
-      await api(path, {
-        token,
-        method: 'POST',
-        body: { ...body, offsetMinutes: new Date().getTimezoneOffset() },
-      })
-    );
+    return onInbox(await api(path, { token, method: 'POST', body: { ...body, offsetMinutes: new Date().getTimezoneOffset() } }));
   }
 
   function pickContact(item) {
@@ -192,6 +182,12 @@ export function ChatScreen({
   function flashNotice(text) {
     setNotice(text);
     setTimeout(() => setNotice(''), 2800);
+  }
+
+  function closeMenus() {
+    setScheduleOpen(false);
+    setAccountOpen(false);
+    setContactMenuId(null);
   }
 
   async function reportContact(targetId, messageId) {
@@ -355,11 +351,7 @@ export function ChatScreen({
           <Pressable
             testID="schedule-backdrop"
             accessibilityLabel="Close menu"
-            onPress={() => {
-              setScheduleOpen(false);
-              setAccountOpen(false);
-              setContactMenuId(null);
-            }}
+            onPress={closeMenus}
             style={styles.backdrop}
           />
         ) : null}
@@ -460,7 +452,7 @@ export function ChatScreen({
           messages={state?.messages}
           hideChrome={hideChrome}
           onPick={pickContact}
-          onLongPress={(id) => { setScheduleOpen(false); setAccountOpen(false); setContactMenuId(id); }}
+          onLongPress={(id) => { closeMenus(); setContactMenuId(id); }}
           onToggleAdd={() => setPanel((current) => (current === 'add' ? 'chat' : 'add'))}
         />
         {contactMenuId && !hideChrome ? (
@@ -542,9 +534,7 @@ export function ChatScreen({
                 onRetry={message.failed ? () => outbox.retry(message.id) : undefined}
                 onOpenPhoto={(uri) => {
                   Keyboard.dismiss();
-                  setScheduleOpen(false);
-                  setAccountOpen(false);
-                  setContactMenuId(null);
+                  closeMenus();
                   setPhotoViewerUri(uri);
                 }}
                 onReportIncoming={(messageId) => {
@@ -652,7 +642,6 @@ const styles = StyleSheet.create({
   photoViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   photoViewerImage: { width: '100%', height: '100%' },
   photoViewerClose: { position: 'absolute', left: 12, padding: 10 },
-  menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
   menuText: { color: ink, fontSize: 16, lineHeight: 21 },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3 },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },

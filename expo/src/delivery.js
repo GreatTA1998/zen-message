@@ -8,21 +8,11 @@ export const INTENTS = ['anytime', 'scheduled', 'realtime'].map((id) => ({ id, l
 const INTENT_IDS = new Set([...INTENTS.map((item) => item.id), 'timely', 'urgent']);
 
 export function createState() {
-  return {
-    mode: 'batched',
-    dayHour: 19,
-    dayMinute: 0,
-    contactId: null,
-    messages: [],
-    digest: null,
-  };
+  return { mode: 'batched', dayHour: 19, dayMinute: 0, contactId: null, messages: [], digest: null };
 }
 
 export function dailyClock(state) {
-  return {
-    hour: clampHour(state?.dayHour, 19),
-    minute: clampMinute(state?.dayMinute),
-  };
+  return { hour: clampHour(state?.dayHour, 19), minute: clampMinute(state?.dayMinute) };
 }
 
 export function nextDaily(now, hour = 19, minute = 0, offsetMinutes) {
@@ -40,10 +30,7 @@ export function scheduledColumns(now, offsetMinutes) {
       return at;
     }
     const local = new Date(date.getTime() - offsetMinutes * 60000);
-    return new Date(
-      Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + dayOffset, hour, 0, 0, 0) +
-        offsetMinutes * 60000
-    );
+    return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + dayOffset, hour, 0, 0, 0) + offsetMinutes * 60000);
   };
   const keep = (dayOffset, hours) => hours.map((h) => slot(dayOffset, h)).filter((at) => at.getTime() > date.getTime());
   return { today: keep(0, DAY_HOURS), tomorrow: keep(1, DAY_HOURS.slice(8)) };
@@ -62,10 +49,8 @@ export function dayPhrase(hour, minute = 0, pad) {
 }
 
 export function receiptPhrase(at, now = new Date(), offsetMinutes) {
-  const atDate = at instanceof Date ? at : new Date(at);
-  const nowDate = now instanceof Date ? now : new Date(now);
-  const atParts = partsInZone(atDate, offsetMinutes);
-  const nowParts = partsInZone(nowDate, offsetMinutes);
+  const atParts = partsInZone(at instanceof Date ? at : new Date(at), offsetMinutes);
+  const nowParts = partsInZone(now instanceof Date ? now : new Date(now), offsetMinutes);
   const dayDiff = dayNumber(atParts) - dayNumber(nowParts);
   const when = dayDiff <= 0 ? 'today' : dayDiff === 1 ? 'tomorrow' : WEEKDAYS[atParts.weekday];
   return `Received at ${dayPhrase(atParts.hour, atParts.minute, true)} ${when}`;
@@ -94,13 +79,9 @@ function nextClock(now, hour, minute, offsetMinutes) {
     return candidate;
   }
   const local = new Date(date.getTime() - offsetMinutes * 60000);
-  let at =
-    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), hour, minute, 0, 0) +
-    offsetMinutes * 60000;
+  let at = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), hour, minute, 0, 0) + offsetMinutes * 60000;
   if (at <= date.getTime()) {
-    at =
-      Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, hour, minute, 0, 0) +
-      offsetMinutes * 60000;
+    at = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, hour, minute, 0, 0) + offsetMinutes * 60000;
   }
   return new Date(at);
 }
@@ -115,24 +96,10 @@ function clampMinute(value) {
 
 function partsInZone(date, offsetMinutes) {
   if (offsetMinutes == null) {
-    return {
-      year: date.getFullYear(),
-      month: date.getMonth(),
-      day: date.getDate(),
-      hour: date.getHours(),
-      minute: date.getMinutes(),
-      weekday: date.getDay(),
-    };
+    return { year: date.getFullYear(), month: date.getMonth(), day: date.getDate(), hour: date.getHours(), minute: date.getMinutes(), weekday: date.getDay() };
   }
   const local = new Date(date.getTime() - offsetMinutes * 60000);
-  return {
-    year: local.getUTCFullYear(),
-    month: local.getUTCMonth(),
-    day: local.getUTCDate(),
-    hour: local.getUTCHours(),
-    minute: local.getUTCMinutes(),
-    weekday: local.getUTCDay(),
-  };
+  return { year: local.getUTCFullYear(), month: local.getUTCMonth(), day: local.getUTCDate(), hour: local.getUTCHours(), minute: local.getUTCMinutes(), weekday: local.getUTCDay() };
 }
 
 function dayNumber(parts) {
@@ -174,18 +141,14 @@ export function syncOpenedAt(openedAt, contacts, messages, selectedId) {
   return next || openedAt;
 }
 
+const PHOTO_SUBTYPES = new Set(['jpeg', 'png', 'webp']);
+
 export function photoFromPickerAsset(asset) {
   if (!asset || asset.type === 'video' || String(asset.mimeType || '').startsWith('video/')) return null;
   const rawBase64 = typeof asset.base64 === 'string' ? asset.base64.replace(/\s+/g, '') : '';
   if (!rawBase64) return null;
-  const mime = String(asset.mimeType || 'image/jpeg');
-  let subtype = mime.slice('image/'.length).split(';')[0].trim().toLowerCase() || 'jpeg';
-  if (subtype === 'heic' || subtype === 'heif' || subtype === 'jpg') {
-    subtype = 'jpeg';
-  }
-  if (!['jpeg', 'png', 'webp'].includes(subtype)) {
-    subtype = 'jpeg';
-  }
+  let subtype = String(asset.mimeType || 'image/jpeg').slice(6).split(';')[0].trim().toLowerCase() || 'jpeg';
+  if (subtype === 'heic' || subtype === 'heif' || subtype === 'jpg' || !PHOTO_SUBTYPES.has(subtype)) subtype = 'jpeg';
   return messagePhoto(`data:image/${subtype};base64,${rawBase64}`);
 }
 
@@ -196,8 +159,7 @@ export function messagePhoto(value) {
   const payload = match[2].replace(/\s+/g, '');
   if (!payload || payload.length > 900000) return null;
   const raw = match[1].toLowerCase();
-  const type = raw === 'jpg' || raw === 'heic' || raw === 'heif' ? 'jpeg' : raw;
-  return `data:image/${type};base64,${payload}`;
+  return `data:image/${raw === 'jpg' || raw === 'heic' || raw === 'heif' ? 'jpeg' : raw};base64,${payload}`;
 }
 
 function messageBody(value) {
@@ -226,11 +188,7 @@ function immediatePlan(message, loud = false) {
     title: message.contactName,
     body: noticeText(message.body, message.photo, message.sticker),
     quiet,
-    data: {
-      kind: quiet ? 'timely' : 'realtime',
-      quiet,
-      messageIds: [message.id],
-    },
+    data: { kind: quiet ? 'timely' : 'realtime', quiet, messageIds: [message.id] },
   };
 }
 
@@ -243,19 +201,8 @@ export function digestPlan(messages) {
   const body =
     ordered.length === 1
       ? `${ordered[0].contactName}: ${noticeText(ordered[0].body, ordered[0].photo, ordered[0].sticker)}`
-      : `${ordered.length} messages · ${
-          names.length <= 3 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`
-        }`;
-  return {
-    title: 'Zen Message',
-    body,
-    quiet: false,
-    data: {
-      kind: 'digest',
-      quiet: false,
-      messageIds: ordered.map((message) => message.id),
-    },
-  };
+      : `${ordered.length} messages · ${names.length <= 3 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`}`;
+  return { title: 'Zen Message', body, quiet: false, data: { kind: 'digest', quiet: false, messageIds: ordered.map((message) => message.id) } };
 }
 
 function heldMessages(messages) {
@@ -263,16 +210,12 @@ function heldMessages(messages) {
 }
 
 function revealIds(messages, ids) {
-  return messages.map((item) =>
-    ids.has(item.id) ? { ...item, visible: true, releaseAt: null } : item
-  );
+  return messages.map((item) => (ids.has(item.id) ? { ...item, visible: true, releaseAt: null } : item));
 }
 
 export function reduce(state, action) {
   const now = action.now ?? Date.now();
   switch (action.type) {
-    case 'select-contact':
-      return { state: { ...state, contactId: action.contactId }, effects: [] };
     case 'set-mode':
       return setMode(state, action.mode);
     case 'set-schedule':
@@ -296,12 +239,7 @@ function setMode(state, mode) {
   if (mode === 'batched') return { state: { ...state, mode }, effects: [] };
   const ids = new Set(heldMessages(state.messages).map((item) => item.id));
   return {
-    state: {
-      ...state,
-      mode: 'relaxed',
-      messages: revealIds(state.messages, ids),
-      digest: null,
-    },
+    state: { ...state, mode: 'relaxed', messages: revealIds(state.messages, ids), digest: null },
     effects: state.digest ? [{ type: 'cancel-digest' }] : [],
   };
 }
@@ -310,20 +248,14 @@ function setSchedule(state, hour, minute, now, offsetMinutes) {
   const dayHour = clampHour(hour, 19);
   const dayMinute = clampMinute(minute);
   const clock = dailyClock(state);
-  if (dayHour === clock.hour && dayMinute === clock.minute) {
-    return { state, effects: [] };
-  }
+  if (dayHour === clock.hour && dayMinute === clock.minute) return { state, effects: [] };
   const at = nextDaily(new Date(now), dayHour, dayMinute, offsetMinutes).getTime();
-  const messages = state.messages.map((item) =>
-    item.intent === 'anytime' && !item.visible ? { ...item, releaseAt: at } : item
-  );
+  const messages = state.messages.map((item) => (item.intent === 'anytime' && !item.visible ? { ...item, releaseAt: at } : item));
   return holdDigest({ ...state, dayHour, dayMinute, messages });
 }
 
-function outgoing(state, action, now) {
-  const content = readContent(action);
-  if (!content) return { state, effects: [] };
-  const message = {
+function buildInboundMessage(action, now, content, patch) {
+  return {
     id: action.id,
     contactId: action.contactId,
     contactName: action.contactName,
@@ -332,30 +264,22 @@ function outgoing(state, action, now) {
     sticker: content.sticker,
     intent: action.intent === 'urgent' ? 'realtime' : action.intent,
     createdAt: now,
-    visible: true,
     releaseAt: null,
-    direction: 'out',
+    ...patch,
   };
+}
+
+function outgoing(state, action, now) {
+  const content = readContent(action);
+  if (!content) return { state, effects: [] };
+  const message = buildInboundMessage(action, now, content, { visible: true, direction: 'out' });
   return { state: { ...state, messages: [...state.messages, message] }, effects: [] };
 }
 
 function send(state, action, now) {
   const content = readContent(action);
   if (!content) return { state, effects: [] };
-  const message = {
-    id: action.id,
-    contactId: action.contactId,
-    contactName: action.contactName,
-    body: content.body,
-    photo: content.photo,
-    sticker: content.sticker,
-    intent: action.intent === 'urgent' ? 'realtime' : action.intent,
-    createdAt: now,
-    visible: false,
-    releaseAt: null,
-    direction: 'in',
-  };
-
+  const message = buildInboundMessage(action, now, content, { visible: false, direction: 'in' });
   const policy = notificationPolicy({ intent: message.intent, mode: state.mode, notifyAll: action.notifyAll });
   if (policy.path !== 'digest') {
     const visible = { ...message, visible: true };
@@ -379,29 +303,15 @@ function chosenRelease(releaseAt, now, offsetMinutes) {
 
 function holdDigest(state) {
   const held = heldMessages(state.messages).filter((item) => typeof item.releaseAt === 'number');
-  if (!held.length) {
-    return { state: { ...state, digest: null }, effects: state.digest ? [{ type: 'cancel-digest' }] : [] };
-  }
+  if (!held.length) return { state: { ...state, digest: null }, effects: state.digest ? [{ type: 'cancel-digest' }] : [] };
   const at = Math.min(...held.map((item) => item.releaseAt));
   const due = held.filter((item) => item.releaseAt === at);
   const plan = digestPlan(due);
-  return {
-    state: {
-      ...state,
-      digest: {
-        at,
-        messageIds: plan.data.messageIds,
-        presented: false,
-      },
-    },
-    effects: [{ type: 'schedule-digest', at, plan }],
-  };
+  return { state: { ...state, digest: { at, messageIds: plan.data.messageIds, presented: false } }, effects: [{ type: 'schedule-digest', at, plan }] };
 }
 
 function release(state, now) {
-  if (!state.digest || state.digest.presented || now < state.digest.at) {
-    return { state, effects: [] };
-  }
+  if (!state.digest || state.digest.presented || now < state.digest.at) return { state, effects: [] };
   return finishDigest(state);
 }
 
@@ -417,10 +327,7 @@ function finishDigest(state, effects) {
   const messages = revealIds(state.messages, ids);
   const rolled = holdDigest({ ...state, messages, digest: null });
   const digest = rolled.state.digest ?? { ...state.digest, presented: true, messageIds: [...ids] };
-  return {
-    state: { ...rolled.state, digest },
-    effects: effects ?? (plan ? [{ type: 'present', plan }] : [{ type: 'cancel-digest' }]),
-  };
+  return { state: { ...rolled.state, digest }, effects: effects ?? (plan ? [{ type: 'present', plan }] : [{ type: 'cancel-digest' }]) };
 }
 
 function isMessage(value) {
@@ -442,13 +349,7 @@ function isMessage(value) {
 }
 
 function isDigest(value) {
-  return (
-    value &&
-    typeof value.at === 'number' &&
-    Array.isArray(value.messageIds) &&
-    value.messageIds.every((id) => typeof id === 'string') &&
-    typeof value.presented === 'boolean'
-  );
+  return value && typeof value.at === 'number' && Array.isArray(value.messageIds) && value.messageIds.every((id) => typeof id === 'string') && typeof value.presented === 'boolean';
 }
 
 export function sanitize(raw) {
@@ -460,12 +361,6 @@ export function sanitize(raw) {
     dayMinute: clampMinute(raw.dayMinute),
     contactId: typeof raw.contactId === 'string' ? raw.contactId : base.contactId,
     messages: Array.isArray(raw.messages) ? raw.messages.filter(isMessage) : [],
-    digest: isDigest(raw.digest)
-      ? {
-          at: raw.digest.at,
-          messageIds: raw.digest.messageIds,
-          presented: raw.digest.presented,
-        }
-      : null,
+    digest: isDigest(raw.digest) ? { at: raw.digest.at, messageIds: raw.digest.messageIds, presented: raw.digest.presented } : null,
   };
 }

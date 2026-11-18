@@ -9,13 +9,7 @@ import { listenForDigest, prepareNotifications, runNotificationEffects } from '.
 import { paper } from './src/chatTheme';
 import { ChatScreen } from './src/ChatScreen';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
-import {
-  clearOutbox,
-  loadSession,
-  saveDraft,
-  savePickedContact,
-  saveSession,
-} from './src/session';
+import { clearOutbox, loadSession, saveDraft, savePickedContact, saveSession } from './src/session';
 import { deleteFirebaseUser } from './src/accountAuth';
 import { restoreAuthSubject } from './src/firebaseAuth';
 import { finishSignIn } from './src/signIn';
@@ -68,14 +62,23 @@ function Root() {
     return deliverInbox(current, next);
   }, [deliverInbox]);
 
+  const bindSession = useCallback(async (session) => {
+    tokenRef.current = session.token;
+    setToken(session.token);
+    setUser(session.user);
+    await refresh();
+  }, [refresh]);
+
+  const signInDeps = useCallback(
+    () => ({ request: api, saveSession, loadSession, refresh: bindSession }),
+    [bindSession]
+  );
+
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        await Promise.race([
-          prepareNotifications(),
-          new Promise((resolve) => setTimeout(resolve, 4000)),
-        ]);
+        await Promise.race([prepareNotifications(), new Promise((resolve) => setTimeout(resolve, 4000))]);
         let saved = await loadSession();
         if (!alive) return;
         if (saved) {
@@ -95,41 +98,19 @@ function Root() {
         if (!saved && alive) {
           const restored = await restoreAuthSubject();
           if (restored?.subject && alive) {
-            await finishSignIn(
-              restored.provider,
-              {
-                user: restored.subject,
-                firstName: restored.firstName || '',
-                email: restored.email || '',
-              },
-              {
-                request: api,
-                saveSession,
-                loadSession,
-                refresh: async (session) => {
-                  tokenRef.current = session.token;
-                  setToken(session.token);
-                  setUser(session.user);
-                  await refresh();
-                },
-              }
-            );
+            await finishSignIn(restored.provider, { user: restored.subject, firstName: restored.firstName || '', email: restored.email || '' }, signInDeps());
           }
         }
       } finally {
         if (alive) setReady(true);
       }
     })();
-    return () => {
-      alive = false;
-    };
-  }, [refresh]);
+    return () => { alive = false; };
+  }, [refresh, signInDeps]);
 
   useEffect(() => {
     if (!token) return undefined;
-    const handle = setInterval(() => {
-      refresh().catch(() => {});
-    }, 4000);
+    const handle = setInterval(() => { refresh().catch(() => {}); }, 4000);
     return () => clearInterval(handle);
   }, [refresh, token]);
 
@@ -141,9 +122,7 @@ function Root() {
       if (!alive || !pushToken) return;
       await api('/v1/push-token', { token, method: 'POST', body: { token: pushToken } });
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [token]);
 
   useEffect(() => {
@@ -162,21 +141,7 @@ function Root() {
       setNotice(MISSING[result.missing] || 'Sign-in is not available on this device.');
       return;
     }
-    const outcome = await finishSignIn(
-      result.provider,
-      { user: result.subject, firstName: result.firstName || '', email: result.email || '' },
-      {
-        request: api,
-        saveSession,
-        loadSession,
-        refresh: async (session) => {
-          tokenRef.current = session.token;
-          setToken(session.token);
-          setUser(session.user);
-          await refresh();
-        },
-      }
-    );
+    const outcome = await finishSignIn(result.provider, { user: result.subject, firstName: result.firstName || '', email: result.email || '' }, signInDeps());
     setNotice(outcome.notice);
     if (!outcome.token) {
       tokenRef.current = null;
@@ -216,9 +181,7 @@ function Root() {
     }
     const authResult = await deleteFirebaseUser();
     if (!authResult.ok) {
-      if (authResult.code === 'recent_login') {
-        return 'Sign in again, then delete account.';
-      }
+      if (authResult.code === 'recent_login') return 'Sign in again, then delete account.';
       return 'Account data was removed. Sign-in could not be cleared.';
     }
     await onLogout();
@@ -250,37 +213,18 @@ function Root() {
   if (!ready) return <View style={styles.boot} />;
 
   const sessionUser = user ?? inbox?.user ?? null;
-
   let body = null;
   if (!token) {
     body = <LoginView onSubject={onSubject} notice={notice} />;
   } else if (sessionUser && sessionUser.onboarded === false) {
-    body = (
-      <OnboardingView
-        userId={sessionUser.id}
-        onSaveNickname={saveNickname}
-        onContinue={refresh}
-      />
-    );
+    body = <OnboardingView userId={sessionUser.id} onSaveNickname={saveNickname} onContinue={refresh} />;
   } else {
     body = (
-      <ChatScreen
-        token={token}
-        inbox={inbox}
-        onInbox={(next) => deliverInbox(token, next, { write: true })}
-        onAdd={onAdd}
-        onLookup={onLookup}
-        onLogout={onLogout}
-        onDeleteAccount={onDeleteAccount}
-      />
+      <ChatScreen token={token} inbox={inbox} onInbox={(next) => deliverInbox(token, next, { write: true })} onAdd={onAdd} onLookup={onLookup} onLogout={onLogout} onDeleteAccount={onDeleteAccount} />
     );
   }
 
-  return (
-    <SafeAreaView style={styles.frame} edges={['top', 'bottom']}>
-      {body}
-    </SafeAreaView>
-  );
+  return <SafeAreaView style={styles.frame} edges={['top', 'bottom']}>{body}</SafeAreaView>;
 }
 
 const styles = StyleSheet.create({

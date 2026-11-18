@@ -2,11 +2,7 @@ import { getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
 export const FIREBASE_AUTH_HOST = 'project-z-e00fd.firebaseapp.com';
-const APP_AUTH_HOSTS = new Set([
-  'zen-messenger.vercel.app',
-  'zen-message.com',
-  'www.zen-message.com',
-]);
+const APP_AUTH_HOSTS = new Set(['zen-messenger.vercel.app', 'zen-message.com', 'www.zen-message.com']);
 
 export function resolveAuthDomain(hostname = '') {
   return APP_AUTH_HOSTS.has(hostname) ? hostname : FIREBASE_AUTH_HOST;
@@ -40,8 +36,7 @@ export function firebaseAuth() {
 }
 
 function firstNameFromDisplay(displayName) {
-  const word = String(displayName || '').trim().split(/\s+/)[0] || '';
-  return word.slice(0, 18);
+  return (String(displayName || '').trim().split(/\s+/)[0] || '').slice(0, 18);
 }
 
 function withEmail(subject, user) {
@@ -54,26 +49,12 @@ export function appleSubjectFromUser(user) {
   const linked = user.providerData?.find((entry) => entry.providerId === 'apple.com');
   const subject = linked?.uid;
   if (!subject || subject.length < 4) return null;
-  return withEmail(
-    {
-      provider: 'apple',
-      subject,
-      firstName: firstNameFromDisplay(linked?.displayName || user.displayName),
-    },
-    user
-  );
+  return withEmail({ provider: 'apple', subject, firstName: firstNameFromDisplay(linked?.displayName || user.displayName) }, user);
 }
 
 export function googleSubjectFromUser(user) {
   if (!user?.uid) return null;
-  return withEmail(
-    {
-      provider: 'google',
-      subject: user.uid,
-      firstName: firstNameFromDisplay(user.displayName),
-    },
-    user
-  );
+  return withEmail({ provider: 'google', subject: user.uid, firstName: firstNameFromDisplay(user.displayName) }, user);
 }
 
 export function sessionSubjectFromUser(user) {
