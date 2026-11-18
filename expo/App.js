@@ -126,12 +126,14 @@ function Root() {
   const [inbox, setInbox] = useState(null);
   const [notice, setNotice] = useState('');
   const tokenRef = useRef(null);
+  const writeGen = useRef(0);
 
   useEffect(() => {
     if (inbox?.user) setUser(inbox.user);
   }, [inbox?.user]);
 
-  const deliverInbox = useCallback(async (current, next) => {
+  const deliverInbox = useCallback(async (current, next, { write = false } = {}) => {
+    if (write) writeGen.current += 1;
     setInbox(next);
     if (next?.effects?.length) {
       await runNotificationEffects(next.effects);
@@ -143,7 +145,10 @@ function Root() {
   const refresh = useCallback(async () => {
     const current = tokenRef.current;
     if (!current) return null;
-    return deliverInbox(current, await api(inboxPath(), { token: current }));
+    const gen = writeGen.current;
+    const next = await api(inboxPath(), { token: current });
+    if (writeGen.current !== gen) return null;
+    return deliverInbox(current, next);
   }, [deliverInbox]);
 
   useEffect(() => {
@@ -229,7 +234,7 @@ function Root() {
       const current = tokenRef.current;
       if (!current) return;
       api('/v1/shown', { token: current, method: 'POST', body: {} })
-        .then((next) => deliverInbox(current, next))
+        .then((next) => deliverInbox(current, next, { write: true }))
         .catch(() => {});
     });
     return () => subscription.remove();
@@ -345,7 +350,7 @@ function Root() {
       <ChatScreen
         token={token}
         inbox={inbox}
-        onInbox={(next) => deliverInbox(token, next)}
+        onInbox={(next) => deliverInbox(token, next, { write: true })}
         onAdd={onAdd}
         onLookup={onLookup}
         onLogout={onLogout}
@@ -448,9 +453,10 @@ function ChatScreen({
   const messages = useMemo(() => {
     if (!selectedContactId || !contact || !contactActive) return [];
     const base = threadMessages(state?.messages, selectedContactId);
-    const pending = pendingOutbound.filter(
-      (item) => normalizeCode(item.contactId) === selectedContactId
-    );
+    const seen = new Set(base.map((item) => item.id));
+    const pending = pendingOutbound
+      .filter((item) => normalizeCode(item.contactId) === selectedContactId && !seen.has(item.id))
+      .map((item) => ({ ...item, _out: true }));
     return pending.length ? [...base, ...pending] : base;
   }, [selectedContactId, contact, state?.messages, contactActive, pendingOutbound]);
   const mode = pendingMode ?? state?.mode ?? 'batched';
@@ -545,38 +551,66 @@ function ChatScreen({
     setSticker(next);
   }
 
+  const outboxGate = useRef(Promise.resolve());
+  const drainBusy = useRef(false);
+
   function setOutbox(items) {
     pendingRef.current = items;
     setPendingOutbound(items);
-    saveOutbox(items).catch(() => {});
   }
 
-  async function flush(item) {
+  function persistOutbox(items) {
+    setOutbox(items);
+    const write = outboxGate.current.then(() => saveOutbox(items));
+    outboxGate.current = write.catch(() => {});
+    return write;
+  }
+
+  async function drain() {
+    if (drainBusy.current) return;
+    drainBusy.current = true;
     try {
-      await mutate('/v1/messages', {
-        clientId: item.id,
-        contactId: item.contactId,
-        body: item.body,
-        photo: item.photo,
-        sticker: item.sticker,
-        intent: item.intent,
-        releaseAt: item.releaseAt || undefined,
-      });
-      setOutbox(pendingRef.current.filter((row) => row.id !== item.id));
-    } catch {
-      flashNotice('Could not send message. Will retry.');
+      while (pendingRef.current[0] && !pendingRef.current[0].failed) {
+        const item = pendingRef.current[0];
+        try {
+          await mutate('/v1/messages', {
+            clientId: item.id,
+            contactId: item.contactId,
+            body: item.body,
+            photo: item.photo,
+            sticker: item.sticker,
+            intent: item.intent,
+            releaseAt: item.releaseAt || undefined,
+          });
+          await persistOutbox(pendingRef.current.slice(1));
+        } catch {
+          setOutbox([{ ...item, failed: true }, ...pendingRef.current.slice(1)]);
+          break;
+        }
+      }
+    } finally {
+      drainBusy.current = false;
     }
+  }
+
+  function retryOutbox(id) {
+    persistOutbox(pendingRef.current.map((row) => (row.id === id ? { ...row, failed: false } : row))).catch(() => {});
+    drain();
   }
 
   useEffect(() => {
     let alive = true;
-    loadOutbox().then((items) => {
+    loadOutbox().then((disk) => {
       if (!alive) return;
-      setOutbox(items);
-      items.forEach(flush);
+      const map = new Map(disk.map((item) => [item.id, item]));
+      for (const item of pendingRef.current) map.set(item.id, item);
+      persistOutbox([...map.values()]).catch(() => {});
+      drain();
     });
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') pendingRef.current.forEach(flush);
+      if (state !== 'active') return;
+      setOutbox(pendingRef.current.map((row) => (row.failed ? { ...row, failed: false } : row)));
+      drain();
     });
     return () => {
       alive = false;
@@ -587,28 +621,33 @@ function ChatScreen({
   async function send(text = draft) {
     const body = text.trim();
     if ((!body && !photo && !sticker) || !contact) return;
-    const stickerAsset = sticker;
-    const photoAsset = stickerAsset ? null : photo;
     const item = {
       id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       contactId: contact.id,
       contactName: contact.firstName || contact.id,
       body,
-      photo: photoAsset,
-      sticker: stickerAsset,
+      photo: sticker ? null : photo,
+      sticker,
       intent,
       createdAt: Date.now(),
       visible: true,
       releaseAt: intent === 'scheduled' ? selectedAt?.getTime() : null,
       direction: 'out',
     };
-    setOutbox([...pendingRef.current, item]);
+    const prev = pendingRef.current;
+    try {
+      await persistOutbox([...prev, item]);
+    } catch {
+      setOutbox(prev);
+      flashNotice('Could not save message. Try again.');
+      return;
+    }
     setDraft('');
     saveDraft('').catch(() => {});
     setPhoto(null);
     setSticker(null);
     setInputHeight(44);
-    flush(item);
+    drain();
   }
 
   async function attach(source) {
@@ -835,7 +874,7 @@ function ChatScreen({
 
         {panel === 'add' ? (
           <PlusView
-            code={userId(inbox)}
+            code={inbox?.user?.id}
             onLookup={onLookup}
             onAdd={async (code) => {
               const result = await onAdd(code);
@@ -898,6 +937,7 @@ function ChatScreen({
               <ThreadMessage
                 key={message.id}
                 message={message}
+                onRetry={message.failed ? () => retryOutbox(message.id) : undefined}
                 onOpenPhoto={(uri) => {
                   Keyboard.dismiss();
                   setScheduleOpen(false);
@@ -985,10 +1025,6 @@ function ChatScreen({
   );
 }
 
-function userId(inbox) {
-  return inbox?.user?.id;
-}
-
 function ComposerFooter({
   testID,
   intent,
@@ -1054,33 +1090,19 @@ function ComposerFooter({
           </View>
         ) : null}
         <View testID="composer-bar" style={[styles.composer, web && styles.webComposer]}>
-          {photo ? (
-            <View style={styles.previewWrap}>
-              <Image testID="photo-preview" source={{ uri: photo }} resizeMode="cover" style={styles.preview} />
-              <Pressable
-                testID="photo-clear"
-                accessibilityRole="button"
-                accessibilityLabel="Remove photo"
-                onPress={onClearPhoto}
-                style={styles.previewClear}
-              >
-                <Feather name="x" size={14} color={ink} />
-              </Pressable>
-            </View>
-          ) : null}
-          {!photo && sticker ? (
+          {photo || sticker ? (
             <View style={styles.previewWrap}>
               <Image
-                testID="draw-preview"
-                source={{ uri: sticker }}
-                resizeMode="contain"
+                testID={photo ? 'photo-preview' : 'draw-preview'}
+                source={{ uri: photo || sticker }}
+                resizeMode={photo ? 'cover' : 'contain'}
                 style={styles.preview}
               />
               <Pressable
-                testID="draw-clear"
+                testID={photo ? 'photo-clear' : 'draw-clear'}
                 accessibilityRole="button"
-                accessibilityLabel="Remove drawing"
-                onPress={onClearSticker}
+                accessibilityLabel={photo ? 'Remove photo' : 'Remove drawing'}
+                onPress={photo ? onClearPhoto : onClearSticker}
                 style={styles.previewClear}
               >
                 <Feather name="x" size={14} color={ink} />
@@ -1258,7 +1280,7 @@ function ScheduleSettings({ hour: selectedHour, minute: selectedMinute, onChoose
   );
 }
 
-function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
+function ThreadMessage({ message, onRetry, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
   const incoming = message.direction === 'in';
   const parts = messageBubbleParts(message);
   if (parts.length === 0) return null;
@@ -1286,7 +1308,12 @@ function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming
     <Pressable
       onLongPress={incoming ? onLongPress : undefined}
       delayLongPress={420}
-      style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut]}
+      onPress={message.failed ? onRetry : undefined}
+      style={[
+        styles.messageStack,
+        incoming ? styles.messageStackIn : styles.messageStackOut,
+        message._out && { opacity: 0.72 },
+      ]}
     >
       {parts.map((kind) =>
         kind === 'text' ? (
@@ -1301,6 +1328,11 @@ function ThreadMessage({ message, onOpenPhoto, onReportIncoming, onBlockIncoming
           />
         ),
       )}
+      {message._out ? (
+        <Text testID={`outbox-${message.id}`} style={[styles.menuTextQuiet, { alignSelf: 'flex-end' }]}>
+          {message.failed ? 'Not sent · Tap to retry' : 'Sending…'}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }

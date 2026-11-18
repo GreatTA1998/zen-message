@@ -31,9 +31,15 @@ export const saveOutbox = (items) => put(X, items?.length ? JSON.stringify(items
 export async function loadOutbox() {
   try {
     const parsed = JSON.parse((await get(X, '[]')) || '[]');
-    return Array.isArray(parsed)
-      ? parsed.filter((item) => item && typeof item.id === 'string' && typeof item.contactId === 'string')
-      : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item) =>
+        item &&
+        typeof item.id === 'string' &&
+        typeof item.contactId === 'string' &&
+        typeof item.createdAt === 'number' &&
+        (typeof item.body === 'string' || item.photo || item.sticker)
+    );
   } catch {
     return [];
   }
