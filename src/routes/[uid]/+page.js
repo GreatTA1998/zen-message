@@ -1,5 +1,6 @@
-export async function load ({ params }) {
-    return {
-      uid: params.uid
-    }
-  }
+import { redirect } from '@sveltejs/kit';
+
+/** Old Svelte chat URLs → Expo host. */
+export function load() {
+  throw redirect(307, '/app');
+}

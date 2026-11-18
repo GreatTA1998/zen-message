@@ -1,6 +1,6 @@
+import { redirect } from '@sveltejs/kit';
 
-export function load ({ params }) {
-  return {
-    uid: params.uid
-  }
-}  
+/** Legacy invite-by-uid page retired — Expo handles friend adds. */
+export function load() {
+  throw redirect(307, '/app');
+}
