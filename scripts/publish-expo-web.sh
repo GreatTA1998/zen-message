@@ -11,7 +11,7 @@ rm -rf "$out"
 mkdir -p "$out"
 cp -a "$expo/dist/." "$out/"
 
-# Expo HTML references /_expo/...; SvelteKit serves this tree at /app/_expo/...
+# Expo HTML/JS reference /_expo and /assets at site root; SvelteKit serves this tree under /app.
 if [[ -f "$out/index.html" ]]; then
   sed -i 's|src="/_expo/|src="/app/_expo/|g' "$out/index.html"
   sed -i 's|href="/favicon.ico"|href="/app/favicon.ico"|g' "$out/index.html"
@@ -21,5 +21,9 @@ bundle=$(ls -S "$out"/_expo/static/js/web/index-*.js 2>/dev/null | head -1 | xar
 # Expo may emit extra small index-*.js chunks; keep only the HTML entry bundle.
 for f in "$out"/_expo/static/js/web/index-*.js; do
   [[ "$(basename "$f")" == "$bundle" ]] || rm -f "$f"
+done
+# Bundle asset URLs must hit /app/assets/... (logo lives at static/app/assets/...).
+for f in "$out"/_expo/static/js/web/*.js; do
+  sed -i 's|"/assets/|"/app/assets/|g' "$f"
 done
 echo "Published web bundle: $bundle"
