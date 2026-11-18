@@ -8,4 +8,4 @@ node_modules
 !.env.example
 
 functions/adminCredentials.json
-functions/twilioCredentials.json
+functions/twilioCredentials.json.vercel
