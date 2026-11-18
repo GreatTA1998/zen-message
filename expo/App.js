@@ -43,9 +43,11 @@ import { readExpoPushToken } from './src/push';
 import {
   loadDraft,
   loadOpenedAt,
+  clearOutbox,
   loadOutbox,
   loadPickedContact,
   loadSession,
+  outboxMedia,
   saveDraft,
   saveOpenedAt,
   saveOutbox,
@@ -283,7 +285,7 @@ function Root() {
     await saveSession(null);
     await savePickedContact(null);
     await saveDraft('');
-    await saveOutbox([]);
+    await clearOutbox();
     tokenRef.current = null;
     setToken(null);
     setUser(null);
@@ -557,6 +559,7 @@ function ChatScreen({
     outboxRef.current = createOutbox({
       load: loadOutbox,
       save: saveOutbox,
+      media: outboxMedia,
       onChange: setPendingOutbound,
       send: (item) =>
         mutateRef.current('/v1/messages', {
