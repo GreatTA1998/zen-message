@@ -11,22 +11,16 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, inboxPath } from './src/api';
 import { PersonAvatar } from './src/contacts';
 import {
-  DAY_HOURS,
-  INTENTS,
-  choiceLabel,
-  composerPlaceholder,
   dailyClock,
   dayPhrase,
-  contactUnread,
   messageSticker,
   scheduledColumns,
   syncOpenedAt,
@@ -36,8 +30,11 @@ import { FriendRequestView } from './src/FriendRequestView';
 import { LoginView } from './src/LoginView';
 import { OnboardingView } from './src/OnboardingView';
 import { listenForDigest, prepareNotifications, runNotificationEffects } from './src/notify';
-import { bubbleTone, messageBubbleParts, ZEN_FILL, ZEN_LINE } from './src/messageBubble';
-import { notificationPolicy, starColor } from './src/notificationPolicy';
+import { ink, paper, moon, web, side } from './src/chatTheme';
+import { ComposerFooter } from './src/ComposerFooter';
+import { ThreadMessage } from './src/ThreadMessage';
+import { ContactStrip } from './src/ContactStrip';
+import { AccountMenu, ScheduleSettings } from './src/ChatSettings';
 import { hasConfusingCharacter, isCode, normalizeCode } from './src/people';
 import { PlusView } from './src/PlusView';
 import { readExpoPushToken } from './src/push';
@@ -62,13 +59,6 @@ import { restoreAuthSubject } from './src/firebaseAuth';
 import { finishSignIn } from './src/signIn';
 import { pickCameraPhoto, pickLibraryPhoto } from './src/pickPhoto';
 import { DrawModal } from './src/DrawModal';
-
-const ink = '#1c1c1c';
-const paper = '#fff';
-const moon = '#5E5CE6';
-const web = Platform.OS === 'web';
-const side = 32;
-const photoMaxWidth = web ? 320 : 280;
 
 function useKeyboardInset() {
   const [keyboard, setKeyboard] = useState(0);
@@ -767,66 +757,19 @@ function ChatScreen({
           </View>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={[styles.contacts, web && styles.webPad]}
-          testID="contact-strip"
-          style={[styles.contactStrip, hideChrome && styles.chromeGone]}
-        >
-          {contacts.map((item) => {
-            const id = normalizeCode(item.id);
-            const selected = id === selectedContactId;
-            const pending = item.status === 'pending-in' || item.status === 'pending-out';
-            const override = pendingNotify?.id === item.id ? pendingNotify.on : !!item.notifyAll;
-            const starKind = notificationPolicy({ mode, notifyAll: override, pending }).starKind;
-            const glow =
-              openedAt && !pending && !selected && contactUnread(state?.messages, id, openedAt[id])
-                ? styles.avatarHalo
-                : null;
-            return (
-              <Pressable
-                key={item.id}
-                testID={`contact-${item.id}`}
-                accessibilityRole="button"
-                accessibilityLabel={item.firstName || item.id}
-                accessibilityState={{ selected: (panel === 'chat' || panel === 'request') && selected }}
-                onPress={() => pickContact(item)}
-                onLongPress={() => { setScheduleOpen(false); setAccountOpen(false); setContactMenuId(item.id); }}
-                style={styles.contact}
-              >
-                <View>
-                  <PersonAvatar
-                    id={id}
-                    name={item.firstName}
-                    uri={item.avatar}
-                    size={54}
-                    dashed={pending}
-                    style={[panel !== 'add' && selected && styles.circleOn, glow]}
-                  />
-                  {starKind ? <Ionicons testID={`notify-star-${item.id}`} name="star" size={11} color={starColor(starKind)} style={styles.contactStar} importantForAccessibility="no" /> : null}
-                </View>
-                <Text numberOfLines={1} style={styles.contactLabel}>{item.firstName || item.id}</Text>
-              </Pressable>
-            );
-          })}
-          <Pressable
-            testID="add-person"
-            accessibilityRole="button"
-            accessibilityLabel="new contact"
-            accessibilityState={{ selected: panel === 'add' }}
-            onPress={() => setPanel((current) => (current === 'add' ? 'chat' : 'add'))}
-            style={styles.contact}
-          >
-            <View style={[styles.plus, panel === 'add' && styles.circleOn]}>
-              <Text style={styles.plusMark}>+</Text>
-            </View>
-            <Text numberOfLines={1} style={styles.contactLabel}>
-              new contact
-            </Text>
-          </Pressable>
-        </ScrollView>
+        <ContactStrip
+          contacts={contacts}
+          selectedContactId={selectedContactId}
+          panel={panel}
+          mode={mode}
+          pendingNotify={pendingNotify}
+          openedAt={openedAt}
+          messages={state?.messages}
+          hideChrome={hideChrome}
+          onPick={pickContact}
+          onLongPress={(id) => { setScheduleOpen(false); setAccountOpen(false); setContactMenuId(id); }}
+          onToggleAdd={() => setPanel((current) => (current === 'add' ? 'chat' : 'add'))}
+        />
         {contactMenuId && !hideChrome ? (
           <View testID="contact-actions-popover" style={styles.contactMenuPopover}>
             <ContactActionsMenu
@@ -991,361 +934,6 @@ function ChatScreen({
   );
 }
 
-function ComposerFooter({
-  testID,
-  intent,
-  onIntent,
-  choiceAt,
-  onChoice,
-  columns,
-  now,
-  photo,
-  onClearPhoto,
-  sticker,
-  onClearSticker,
-  onDraw,
-  draft,
-  onChangeDraft,
-  onInputSize,
-  inputHeight,
-  contactName,
-  selectedAt,
-  canSend,
-  onSend,
-  onAttach,
-  onAttachCamera,
-}) {
-  const [timesOpen, setTimesOpen] = useState(false);
-  const drawEnabled = Platform.OS === 'web' || Platform.OS === 'ios';
-
-  function chooseIntent(id) {
-    onIntent(id);
-    setTimesOpen(id === 'scheduled');
-  }
-
-  function choiceCell(at, index) {
-    const on = (choiceAt ?? selectedAt?.getTime()) === at.getTime();
-    return (
-      <Pressable
-        key={at.getTime()}
-        testID={`choice-${index}`}
-        accessibilityRole="button"
-        accessibilityState={{ selected: on }}
-        onPress={() => { onChoice(at.getTime()); setTimesOpen(false); }}
-        style={[styles.choiceRow, on && styles.choiceRowOn]}
-      >
-        <Text numberOfLines={1} style={[styles.choiceText, on && styles.choiceTextOn]}>
-          {dayPhrase(at.getHours()).replace(' ', '')}
-        </Text>
-      </Pressable>
-    );
-  }
-
-  return (
-    <View style={styles.composerWrap}>
-        {timesOpen ? (
-          <View testID="scheduled-choices" style={[styles.choicePopover, web && styles.webChoices]}>
-            <View style={styles.choiceColumns}>
-              {[['Today', columns.today, 0], ['Tomorrow', columns.tomorrow, columns.today.length]].map(([title, slots, offset], col) => (
-                <View key={title} style={[{ flex: 1 }, col > 0 && styles.choiceColRight]}>
-                  <Text style={[styles.choiceText, styles.choiceTextOn, styles.choiceRow, styles.choiceRowFirst]}>{title}</Text>
-                  <ScrollView style={styles.choiceCol} keyboardShouldPersistTaps="handled">{slots.map((at, i) => choiceCell(at, offset + i))}</ScrollView>
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : null}
-        <View testID="composer-bar" style={[styles.composer, web && styles.webComposer]}>
-          {photo || sticker ? (
-            <View style={styles.previewWrap}>
-              <Image
-                testID={photo ? 'photo-preview' : 'draw-preview'}
-                source={{ uri: photo || sticker }}
-                resizeMode={photo ? 'cover' : 'contain'}
-                style={styles.preview}
-              />
-              <Pressable
-                testID={photo ? 'photo-clear' : 'draw-clear'}
-                accessibilityRole="button"
-                accessibilityLabel={photo ? 'Remove photo' : 'Remove drawing'}
-                onPress={photo ? onClearPhoto : onClearSticker}
-                style={styles.previewClear}
-              >
-                <Feather name="x" size={14} color={ink} />
-              </Pressable>
-            </View>
-          ) : null}
-          <TextInput
-            testID={testID}
-            value={draft}
-            onChangeText={onChangeDraft}
-            onContentSizeChange={onInputSize}
-            placeholder={composerPlaceholder(contactName, intent, selectedAt)}
-            placeholderTextColor="#8a8a8a"
-            multiline
-            numberOfLines={2}
-            style={[styles.input, { height: inputHeight }]}
-          />
-          <View style={styles.boxTools}>
-            {drawEnabled ? (
-              <Pressable
-                testID="attach-draw"
-                accessibilityRole="button"
-                accessibilityLabel="Draw"
-                onPress={onDraw}
-                style={styles.photoButton}
-              >
-                <MaterialCommunityIcons name="draw-pen" size={22} color={ink} />
-              </Pressable>
-            ) : null}
-            {[
-              ['attach-camera', 'Camera', onAttachCamera, 'camera'],
-              ['attach-photo', 'Photo', onAttach, 'image'],
-            ].map(([id, label, press, icon]) => (
-              <Pressable
-                key={id}
-                testID={id}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                onPress={press}
-                style={styles.photoButton}
-              >
-                <Feather name={icon} size={22} color={ink} />
-              </Pressable>
-            ))}
-            <View style={styles.intentSlot}>
-              {INTENTS.map((item) => {
-                const selected = item.id === intent;
-                return (
-                  <Pressable
-                    key={item.id}
-                    testID={`intent-${item.id}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected, expanded: item.id === 'scheduled' ? timesOpen : undefined }}
-                    onPress={() => chooseIntent(item.id)}
-                    style={styles.intentWord}
-                  >
-                    <Text numberOfLines={1} style={[styles.intentText, selected && styles.intentTextSelected]}>
-                      {item.id === 'scheduled' && selected ? choiceLabel(selectedAt, now) : item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Pressable
-              testID="send"
-              accessibilityRole="button"
-              accessibilityLabel="Send"
-              disabled={!canSend}
-              onPress={onSend}
-              style={[styles.send, canSend && styles.sendReady]}
-            >
-              <Feather name="send" size={18} color={canSend ? paper : '#9a9a9a'} />
-            </Pressable>
-          </View>
-        </View>
-    </View>
-  );
-}
-
-const DELETE_ACCOUNT_CONSEQUENCE =
-  'Your account, contacts, and messages are permanently removed from Zen Message and sign-in is cleared. This cannot be undone.';
-
-function AccountMenu({ userId, onLogout, onDeleteAccount }) {
-  const [armingDelete, setArmingDelete] = useState(false);
-
-  return (
-    <View testID="account-menu" style={armingDelete ? styles.accountMenuWide : null}>
-      <View style={styles.menuRow}>
-        <Text testID="account-id" style={styles.menuText}>
-          ID {userId}
-        </Text>
-      </View>
-      <Pressable
-        testID="logout-button"
-        accessibilityRole="button"
-        accessibilityLabel="Log out"
-        onPress={onLogout}
-        style={styles.menuRow}
-      >
-        <Text style={styles.menuText}>Log out</Text>
-      </Pressable>
-      {armingDelete ? (
-        <View testID="delete-account-confirm-step" style={styles.menuFooter}>
-          <Text style={styles.menuConsequence}>{DELETE_ACCOUNT_CONSEQUENCE}</Text>
-          <Pressable
-            testID="delete-account-confirm"
-            accessibilityRole="button"
-            accessibilityLabel="Delete account permanently"
-            onPress={() => {
-              setArmingDelete(false);
-              onDeleteAccount();
-            }}
-            style={styles.menuRow}
-          >
-            <Text style={[styles.menuTextQuiet, styles.menuTextAlert]}>Delete account permanently</Text>
-          </Pressable>
-          <Pressable
-            testID="delete-account-cancel"
-            accessibilityRole="button"
-            accessibilityLabel="Cancel delete account"
-            onPress={() => setArmingDelete(false)}
-            style={styles.menuRow}
-          >
-            <Text style={styles.menuTextQuiet}>Cancel</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.menuFooter}>
-          <Pressable
-            testID="delete-account-button"
-            accessibilityRole="button"
-            accessibilityLabel="Delete account"
-            onPress={() => setArmingDelete(true)}
-            style={styles.menuRowQuiet}
-            hitSlop={4}
-          >
-            <Text style={styles.menuTextQuiet}>Delete account</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function ScheduleSettings({ hour: selectedHour, minute: selectedMinute, onChoose }) {
-  const [hour, setHour] = useState(selectedHour);
-  const row = (testID, label, on, press) => (
-    <Pressable
-      key={testID}
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityState={{ selected: on }}
-      onPress={press}
-      style={[styles.menuRow, on && styles.menuRowSelected]}
-    >
-      <Text style={[styles.menuText, on && styles.menuTextSelected]}>{label}</Text>
-    </Pressable>
-  );
-  return (
-    <View testID="schedule-menu" style={styles.choiceColumns}>
-      <ScrollView style={styles.choiceCol} keyboardShouldPersistTaps="handled">
-        {DAY_HOURS.map((value) => row(`schedule-hour-${value}`, dayPhrase(value), value === hour, () => setHour(value)))}
-      </ScrollView>
-      <ScrollView style={[styles.choiceCol, styles.choiceColRight]} keyboardShouldPersistTaps="handled">
-        {Array.from({ length: 60 }, (_, minute) =>
-          row(
-            `schedule-minute-${minute}`,
-            String(minute).padStart(2, '0'),
-            hour === selectedHour && minute === selectedMinute,
-            () => onChoose(hour, minute)
-          )
-        )}
-      </ScrollView>
-    </View>
-  );
-}
-
-function ThreadMessage({ message, onRetry, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
-  const incoming = message.direction === 'in';
-  const parts = messageBubbleParts(message);
-  if (parts.length === 0) return null;
-
-  function onLongPress() {
-    if (!incoming) return;
-    if (Platform.OS === 'web') {
-      const report = window.confirm('Report this message?');
-      if (report) {
-        onReportIncoming?.(message.id);
-        return;
-      }
-      const block = window.confirm('Block this contact?');
-      if (block) onBlockIncoming?.();
-      return;
-    }
-    Alert.alert('Message', 'Choose an action.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Report', onPress: () => onReportIncoming?.(message.id) },
-      { text: 'Block contact', style: 'destructive', onPress: () => onBlockIncoming?.() },
-    ]);
-  }
-
-  return (
-    <Pressable
-      onLongPress={incoming ? onLongPress : undefined}
-      delayLongPress={420}
-      onPress={message.failed ? onRetry : undefined}
-      style={[
-        styles.messageStack,
-        incoming ? styles.messageStackIn : styles.messageStackOut,
-        message._out && { opacity: 0.72 },
-      ]}
-    >
-      {parts.map((kind) =>
-        kind === 'text' ? (
-          <TextBubble key={`${message.id}-text`} message={message} incoming={incoming} />
-        ) : (
-          <MediaBubble
-            key={`${message.id}-${kind}`}
-            kind={kind}
-            uri={kind === 'sticker' ? message.sticker : message.photo}
-            incoming={incoming}
-            onOpenPhoto={onOpenPhoto}
-          />
-        ),
-      )}
-      {message._out ? (
-        <Text testID={`outbox-${message.id}`} style={[styles.menuTextQuiet, { alignSelf: 'flex-end' }]}>
-          {message.failed ? 'Not sent · Tap to retry' : 'Sending…'}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function TextBubble({ message, incoming }) {
-  const tone = bubbleTone(message.intent);
-  const zen = tone === 'zen';
-  const fill = zen ? ZEN_FILL : paper;
-  return (
-    <View
-      testID={incoming ? 'bubble-in' : 'bubble-out'}
-      style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, zen && styles.bubbleZen, tone === 'scheduled' && styles.bubbleScheduled, web && styles.bubbleRead]}
-    >
-      <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut]}>
-        <View style={styles.tailStem} />
-        <View style={[styles.tailFill, { borderBottomColor: fill }]} />
-        <View style={[styles.tailJoin, { backgroundColor: fill }]} />
-        <View style={styles.tailClip}>
-          <View style={styles.tailEdge} />
-        </View>
-      </View>
-      {zen ? <View pointerEvents="none" testID="zen-mark" style={styles.zenMark} /> : null}
-      <Text style={styles.bubbleText}>{message.body}</Text>
-    </View>
-  );
-}
-
-function MediaBubble({ kind, uri, incoming, onOpenPhoto }) {
-  const sticker = kind === 'sticker';
-  return (
-    <Pressable
-      testID={incoming ? `${kind}-in` : `${kind}-out`}
-      accessibilityRole="button"
-      accessibilityLabel={sticker ? 'View drawing' : 'View photo'}
-      onPress={() => onOpenPhoto?.(uri)}
-      style={[styles.mediaBubble, sticker && styles.stickerBubble, incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut]}
-    >
-      <Image
-        testID={sticker ? 'bubble-sticker' : 'bubble-photo'}
-        source={{ uri }}
-        resizeMode={sticker ? 'contain' : 'cover'}
-        style={styles.mediaImage}
-      />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   boot: { flex: 1, backgroundColor: paper },
   provider: { flex: 1, backgroundColor: paper },
@@ -1356,8 +944,6 @@ const styles = StyleSheet.create({
   webPad: { paddingLeft: side, paddingRight: side },
   webThread: { paddingHorizontal: side },
   webFill: { minHeight: 0 },
-  webComposer: { marginHorizontal: side },
-  webChoices: { left: side, right: side, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' },
   top: { zIndex: 4, backgroundColor: paper },
   chromeGone: { display: 'none' },
   header: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: ink, paddingLeft: 14, paddingRight: 16, paddingVertical: 8, gap: 8, position: 'relative' },
@@ -1371,83 +957,19 @@ const styles = StyleSheet.create({
   schedulePrefix: { flexShrink: 1 },
   scheduleTime: { flexShrink: 0, textDecorationLine: 'underline' },
   contactMenuPopover: { position: 'absolute', top: 124, left: side, zIndex: 6 },
-  accountMenuWide: { width: 248 },
-  menuFooter: { borderTopWidth: 1, borderTopColor: '#e6e3dc' },
-  menuRowQuiet: { paddingVertical: 10, paddingHorizontal: 18 },
-  menuTextQuiet: { color: '#6a6a6a', fontSize: 13, lineHeight: 17 },
-  menuConsequence: { color: ink, fontSize: 13, lineHeight: 18, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 6 },
-  menuTextAlert: { color: '#b3261e' },
   chatNotice: { position: 'absolute', left: side, right: side, bottom: 18, alignItems: 'center', zIndex: 12 },
   chatNoticeText: { color: ink, backgroundColor: paper, borderWidth: 1, borderColor: ink, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, lineHeight: 18 },
   photoViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   photoViewerImage: { width: '100%', height: '100%' },
   photoViewerClose: { position: 'absolute', left: 12, padding: 10 },
   menuRow: { paddingVertical: 13, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: ink },
-  menuRowSelected: { backgroundColor: '#f6f3ee' },
   menuText: { color: ink, fontSize: 16, lineHeight: 21 },
-  menuTextSelected: { fontWeight: '700' },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3 },
-  contactStrip: { flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: ink, zIndex: 0 },
-  contacts: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 10, gap: 8 },
-  contact: { alignItems: 'center' },
-  contactStar: { position: 'absolute', top: -1, right: -1 },
-  avatarHalo: { borderColor: 'rgba(72, 158, 118, 0.7)', shadowColor: '#3f9a6e', shadowOpacity: 0.5, shadowRadius: 9, shadowOffset: { width: 0, height: 0 } },
-  circleOn: { borderWidth: 2, borderColor: ink },
   pendingMain: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   pendingText: { color: ink, fontSize: 17, lineHeight: 22, textAlign: 'center' },
-  contactLabel: { marginTop: 4, color: ink, fontSize: 11, lineHeight: 14, textAlign: 'center' },
-  plus: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, borderColor: ink, alignItems: 'center', justifyContent: 'center' },
-  plusMark: { color: ink, fontSize: 32, lineHeight: 34 },
   main: { flex: 1, backgroundColor: paper },
   thread: { flex: 1 },
   threadContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 16, gap: 14 },
-  messageStack: { gap: 6, maxWidth: '100%' },
-  messageStackIn: { alignSelf: 'flex-start', marginTop: 10 },
-  messageStackOut: { alignSelf: 'flex-end' },
-  mediaBubble: { width: photoMaxWidth, maxWidth: '84%', aspectRatio: 4 / 3, borderRadius: 16, overflow: 'hidden', backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
-  stickerBubble: { width: 148, height: 148, aspectRatio: 1, backgroundColor: 'transparent', borderWidth: 0 },
-  mediaBubbleIn: { alignSelf: 'flex-start' },
-  mediaBubbleOut: { alignSelf: 'flex-end' },
-  mediaImage: { width: '100%', height: '100%' },
-  bubble: { alignSelf: 'flex-end', maxWidth: '84%', borderWidth: 1, borderColor: ink, borderRadius: 18, backgroundColor: paper, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 4 },
-  bubbleOut: { borderBottomRightRadius: 2 },
-  bubbleIn: { alignSelf: 'flex-start', maxWidth: '78%', marginTop: 10, marginBottom: 0, borderTopLeftRadius: 2 },
-  bubbleZen: { backgroundColor: ZEN_FILL, borderColor: ZEN_LINE },
-  bubbleScheduled: { borderStyle: 'dashed' },
-  bubbleRead: { maxWidth: 'min(560px, 100%)' },
-  zenMark: { position: 'absolute', right: 9, bottom: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: ZEN_LINE, opacity: 0.55 },
-  tail: { position: 'absolute', width: 24, height: 20 },
-  tailIn: { left: -1, top: -12 },
-  tailOut: { right: -1, bottom: -12, transform: [{ rotate: '180deg' }] },
-  tailStem: { position: 'absolute', left: 0, top: 0, width: 1, height: 14, backgroundColor: ink },
-  tailFill: { position: 'absolute', left: 1, top: 0, width: 0, height: 0, borderRightWidth: 16, borderBottomWidth: 13, borderRightColor: 'transparent', borderBottomColor: paper },
-  tailJoin: { position: 'absolute', left: 1, top: 11, width: 16, height: 8, backgroundColor: paper },
-  tailClip: { position: 'absolute', left: 0, top: 0, width: 24, height: 12, overflow: 'hidden' },
-  tailEdge: { position: 'absolute', left: 0, top: 0, width: 28, height: 1, backgroundColor: ink, transformOrigin: 'left center', transform: [{ rotate: '36deg' }] },
-  bubbleText: { color: ink, fontSize: 17, lineHeight: 22 },
   footer: { backgroundColor: paper },
   notifyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 8 },
-  composerWrap: { position: 'relative', zIndex: 2 },
-  intentSlot: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 },
-  intentWord: { paddingVertical: 6, paddingHorizontal: 2 },
-  intentText: { color: ink, fontSize: 14, lineHeight: 18 },
-  intentTextSelected: { fontWeight: '700' },
-  choicePopover: { position: 'absolute', left: 24, right: 24, bottom: '100%', marginBottom: 6, backgroundColor: paper, borderWidth: 1, borderColor: ink, zIndex: 6 },
-  choiceColumns: { flexDirection: 'row' },
-  choiceCol: { maxHeight: 220 },
-  choiceColRight: { borderLeftWidth: 1, borderLeftColor: ink },
-  choiceRow: { paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: ink },
-  choiceRowFirst: { borderTopWidth: 0 },
-  choiceRowOn: { backgroundColor: '#f6f3ee' },
-  choiceText: { color: ink, fontSize: 15, lineHeight: 20 },
-  choiceTextOn: { fontWeight: '700' },
-  composer: { marginHorizontal: 12, marginTop: 10, marginBottom: 10, borderWidth: 1, borderColor: ink, borderRadius: 22, backgroundColor: paper, overflow: 'hidden' },
-  previewWrap: { paddingTop: 12, paddingHorizontal: 12 },
-  preview: { width: 120, height: 88, borderRadius: 12, backgroundColor: '#f3f3f3' },
-  previewClear: { position: 'absolute', top: 18, left: 104, width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: ink, backgroundColor: paper, alignItems: 'center', justifyContent: 'center' },
-  input: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, fontSize: 17, lineHeight: 22, color: ink, borderWidth: 0, outlineStyle: 'none' },
-  boxTools: { flexDirection: 'row', alignItems: 'center', paddingLeft: 6, paddingRight: 8, paddingBottom: 8 },
-  photoButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  send: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f2' },
-  sendReady: { backgroundColor: ink },
 });

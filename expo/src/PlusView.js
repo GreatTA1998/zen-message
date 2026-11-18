@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { ink, paper } from './chatTheme';
 import { CODE_LENGTH, normalizeCode } from './people';
 
 export function PlusView({ code, onLookup, onAdd }) {
@@ -99,32 +100,14 @@ export function PlusView({ code, onLookup, onAdd }) {
   );
 }
 
-const ink = '#1c1c1c';
-const paper = '#fff';
-
 const styles = StyleSheet.create({
   screen: { flex: 1, width: '100%', backgroundColor: paper },
   body: { padding: 20, gap: 12 },
   title: { color: ink, fontSize: 18, lineHeight: 24, fontWeight: '600' },
   row: { height: 44, flexDirection: 'row', alignItems: 'stretch', gap: 12 },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    fontSize: 24,
-    letterSpacing: 3,
-    color: ink,
-  },
+  input: { flex: 1, borderWidth: 1, borderColor: ink, borderRadius: 8, paddingHorizontal: 14, fontSize: 24, letterSpacing: 3, color: ink },
   lookup: { flex: 1, color: ink, fontSize: 18, lineHeight: 24 },
-  add: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: '#bdbdbd',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  add: { minHeight: 48, borderWidth: 1, borderColor: '#bdbdbd', alignItems: 'center', justifyContent: 'center' },
   addReady: { backgroundColor: ink, borderColor: ink },
   addText: { color: '#9a9a9a', fontSize: 17, letterSpacing: 1 },
   addTextReady: { color: paper },

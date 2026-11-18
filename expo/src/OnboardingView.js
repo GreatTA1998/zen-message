@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { ink, paper } from './chatTheme';
 import { LOGO } from './contacts';
 import { firstName } from './people';
 
@@ -96,47 +97,13 @@ export function OnboardingView({ userId, onSaveNickname, onContinue }) {
   );
 }
 
-const ink = '#1c1c1c';
-const paper = '#fff';
-
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-    backgroundColor: paper,
-    alignItems: 'stretch',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    gap: 14,
-  },
-  mark: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 1,
-    borderColor: ink,
-    alignSelf: 'center',
-  },
+  screen: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: paper, alignItems: 'stretch', justifyContent: 'center', paddingHorizontal: 28, gap: 14 },
+  mark: { width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: ink, alignSelf: 'center' },
   title: { color: ink, fontSize: 24, lineHeight: 30, fontWeight: '600', textAlign: 'center' },
   hint: { color: ink, fontSize: 16, lineHeight: 21, textAlign: 'center' },
-  input: {
-    borderWidth: 1,
-    borderColor: ink,
-    borderRadius: 8,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    fontSize: 18,
-    color: ink,
-  },
-  submit: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: '#bdbdbd',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  input: { borderWidth: 1, borderColor: ink, borderRadius: 8, minHeight: 48, paddingHorizontal: 14, fontSize: 18, color: ink },
+  submit: { minHeight: 48, borderWidth: 1, borderColor: '#bdbdbd', alignItems: 'center', justifyContent: 'center' },
   submitReady: { backgroundColor: ink, borderColor: ink },
   submitText: { color: '#9a9a9a', fontSize: 17 },
   submitTextReady: { color: paper },
@@ -144,13 +111,6 @@ const styles = StyleSheet.create({
   shareRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   code: { color: ink, fontSize: 40, letterSpacing: 4, fontVariant: ['tabular-nums'] },
   copy: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  continue: {
-    minHeight: 48,
-    backgroundColor: ink,
-    borderWidth: 1,
-    borderColor: ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  continue: { minHeight: 48, backgroundColor: ink, borderWidth: 1, borderColor: ink, alignItems: 'center', justifyContent: 'center' },
   continueText: { color: paper, fontSize: 17 },
 });
