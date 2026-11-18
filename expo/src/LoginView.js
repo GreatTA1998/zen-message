@@ -5,13 +5,10 @@ import { LOGO } from './contacts';
 import { completeGoogleRedirect, signInWithGoogle } from './googleSignIn';
 import { signInWithApple } from './appleSignIn';
 
-function routeResult(onSubject, result, { pending = false } = {}) {
-  if (result?.cancelled || (pending && result?.pending) || result?.missing) {
-    if (result?.missing) onSubject(result);
-    return;
-  }
-  onSubject(result);
-}
+const routeSubject = (onSubject, result) => {
+  if (result?.cancelled) return;
+  if (result?.missing || result?.subject || result?.provider) onSubject(result);
+};
 
 export function LoginView({ onSubject, notice }) {
   useEffect(() => {
@@ -26,10 +23,10 @@ export function LoginView({ onSubject, notice }) {
       <Image source={LOGO} style={styles.mark} />
       <Text style={styles.title}>Zen Message</Text>
       <View style={styles.stack}>
-        <Pressable testID="google-login" accessibilityRole="button" accessibilityLabel="Sign in with Google" onPress={async () => routeResult(onSubject, await signInWithGoogle(), { pending: true })} style={[styles.provider, styles.google]}>
+        <Pressable testID="google-login" accessibilityRole="button" accessibilityLabel="Sign in with Google" onPress={async () => routeSubject(onSubject, await signInWithGoogle())} style={[styles.provider, styles.google]}>
           <Text style={styles.providerText}>Sign in with Google</Text>
         </Pressable>
-        <Pressable testID="apple-login" accessibilityRole="button" accessibilityLabel="Sign in with Apple" onPress={async () => routeResult(onSubject, await signInWithApple())} style={[styles.provider, styles.apple]}>
+        <Pressable testID="apple-login" accessibilityRole="button" accessibilityLabel="Sign in with Apple" onPress={async () => routeSubject(onSubject, await signInWithApple())} style={[styles.provider, styles.apple]}>
           <Text style={[styles.providerText, styles.appleText]}>Sign in with Apple</Text>
         </Pressable>
       </View>

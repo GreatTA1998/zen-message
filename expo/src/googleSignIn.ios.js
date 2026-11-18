@@ -6,42 +6,26 @@ import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from './googleOAuth.js';
 let configured = false;
 
 function ensureConfigured() {
-  if (configured) return;
-  if (!GOOGLE_IOS_CLIENT_ID) return;
-  GoogleSignin.configure({
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-    iosClientId: GOOGLE_IOS_CLIENT_ID,
-    offlineAccess: false,
-  });
+  if (configured || !GOOGLE_IOS_CLIENT_ID) return;
+  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID, iosClientId: GOOGLE_IOS_CLIENT_ID, offlineAccess: false });
   configured = true;
 }
 
-export async function completeGoogleRedirect() {
-  return null;
-}
+export const completeGoogleRedirect = async () => null;
 
 export async function signInWithGoogle() {
   const auth = firebaseAuth();
-  if (!auth) return { provider: 'google', missing: 'google_unavailable' };
-  if (!GOOGLE_IOS_CLIENT_ID) return { provider: 'google', missing: 'google_unavailable' };
+  if (!auth || !GOOGLE_IOS_CLIENT_ID) return { provider: 'google', missing: 'google_unavailable' };
   ensureConfigured();
   try {
-    if (await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: false }).catch(() => true)) {
-      // iOS ignores Play Services; Android should not use this module per product scope.
-    }
-    const result = await GoogleSignin.signIn();
-    const idToken = result?.data?.idToken;
+    const idToken = (await GoogleSignin.signIn())?.data?.idToken;
     if (!idToken) return { provider: 'google', missing: 'google_unavailable' };
-    const credential = GoogleAuthProvider.credential(idToken);
-    const userResult = await signInWithCredential(auth, credential);
-    const subject = googleSubjectFromUser(userResult?.user);
+    const subject = googleSubjectFromUser((await signInWithCredential(auth, GoogleAuthProvider.credential(idToken)))?.user);
     if (!subject) return { provider: 'google', missing: 'google_unavailable' };
     return subject;
   } catch (error) {
     const code = error?.code;
-    if (code === 'SIGN_IN_CANCELLED' || code === '-5') {
-      return { provider: 'google', cancelled: true };
-    }
+    if (code === 'SIGN_IN_CANCELLED' || code === '-5') return { provider: 'google', cancelled: true };
     return { provider: 'google', missing: 'google_unavailable' };
   }
 }

@@ -10,17 +10,14 @@ Notifications.setNotificationHandler({
   },
 });
 
-function contentFrom(plan) {
-  const quiet = plan.quiet;
-  return {
-    title: plan.title,
-    body: plan.body,
-    data: plan.data,
-    sound: quiet ? false : 'default',
-    interruptionLevel: quiet ? 'passive' : 'active',
-    priority: quiet ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidNotificationPriority.HIGH,
-  };
-}
+const contentFrom = (plan) => ({
+  title: plan.title,
+  body: plan.body,
+  data: plan.data,
+  sound: plan.quiet ? false : 'default',
+  interruptionLevel: plan.quiet ? 'passive' : 'active',
+  priority: plan.quiet ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidNotificationPriority.HIGH,
+});
 
 export async function prepareNotifications() {
   try {
@@ -28,31 +25,10 @@ export async function prepareNotifications() {
       await Notifications.setNotificationChannelAsync('zen-normal', { name: 'Messages', importance: Notifications.AndroidImportance.HIGH, sound: 'default' });
       await Notifications.setNotificationChannelAsync('zen-quiet', { name: 'Quiet messages', importance: Notifications.AndroidImportance.LOW, sound: null, enableVibrate: false });
     }
-    const current = await Notifications.getPermissionsAsync();
-    if (current.status !== 'granted') await Notifications.requestPermissionsAsync();
+    if ((await Notifications.getPermissionsAsync()).status !== 'granted') await Notifications.requestPermissionsAsync();
   } catch {
-    // Permissions or channels can fail on web / simulators.
+    /* web / simulators */
   }
-}
-
-async function presentNow(plan) {
-  try {
-    await Notifications.scheduleNotificationAsync({
-      ...(plan.data?.messageIds?.[0] ? { identifier: String(plan.data.messageIds[0]).slice(0, 64) } : {}),
-      content: contentFrom(plan),
-      trigger: Platform.OS === 'android' ? { channelId: plan.quiet ? 'zen-quiet' : 'zen-normal' } : null,
-    });
-    return { ok: true };
-  } catch {
-    return { ok: false };
-  }
-}
-
-async function cancelDigest() {
-  if (Platform.OS === 'web') return;
-  try {
-    await Notifications.cancelScheduledNotificationAsync(DIGEST_ID);
-  } catch {}
 }
 
 export function listenForDigest(onDigest) {
@@ -63,7 +39,21 @@ export function listenForDigest(onDigest) {
 
 export async function runNotificationEffects(effects) {
   for (const effect of effects || []) {
-    if (effect.type === 'present') await presentNow(effect.plan);
-    else if (effect.type === 'cancel-digest') await cancelDigest();
+    if (effect.type === 'present') {
+      try {
+        const plan = effect.plan;
+        await Notifications.scheduleNotificationAsync({
+          ...(plan.data?.messageIds?.[0] ? { identifier: String(plan.data.messageIds[0]).slice(0, 64) } : {}),
+          content: contentFrom(plan),
+          trigger: Platform.OS === 'android' ? { channelId: plan.quiet ? 'zen-quiet' : 'zen-normal' } : null,
+        });
+      } catch {
+        /* present failed */
+      }
+    } else if (effect.type === 'cancel-digest' && Platform.OS !== 'web') {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(DIGEST_ID);
+      } catch {}
+    }
   }
 }

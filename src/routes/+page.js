@@ -1,6 +1,5 @@
 import { redirect } from '@sveltejs/kit';
 
-/** Legacy home/login UI retired — Expo web app is the product. */
-export function load() {
+export const load = () => {
   throw redirect(307, '/app');
-}
+};
