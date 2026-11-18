@@ -1,30 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  AppState,
-  Image,
-  Keyboard,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, AppState, Image, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from './api';
 import { PersonAvatar } from './contacts';
-import {
-  dailyClock,
-  dayPhrase,
-  messageSticker,
-  scheduledColumns,
-  syncOpenedAt,
-  threadMessages,
-} from './delivery';
+import { dailyClock, dayPhrase, messageSticker, scheduledColumns, syncOpenedAt, threadMessages } from './delivery';
 import { FriendRequestView } from './FriendRequestView';
 import { ink, paper, moon, web, side } from './chatTheme';
 import { ComposerFooter } from './ComposerFooter';
@@ -33,32 +13,14 @@ import { ContactStrip } from './ContactStrip';
 import { AccountMenu, ScheduleSettings } from './ChatSettings';
 import { normalizeCode } from './people';
 import { PlusView } from './PlusView';
-import {
-  loadDraft,
-  loadOpenedAt,
-  loadOutbox,
-  loadPickedContact,
-  outboxMedia,
-  saveDraft,
-  saveOpenedAt,
-  saveOutbox,
-  savePickedContact,
-} from './session';
+import { loadDraft, loadOpenedAt, loadOutbox, loadPickedContact, outboxMedia, saveDraft, saveOpenedAt, saveOutbox, savePickedContact } from './session';
 import { createOutbox } from './outbox';
 import { ContactActionsMenu } from './contactActions';
 import { pickCameraPhoto, pickLibraryPhoto } from './pickPhoto';
 import { DrawModal } from './DrawModal';
 import { useKeyboardInset } from './useKeyboardInset';
 
-export function ChatScreen({
-  token,
-  inbox,
-  onInbox,
-  onAdd,
-  onLookup,
-  onLogout,
-  onDeleteAccount,
-}) {
+export function ChatScreen({ token, inbox, onInbox, onAdd, onLookup, onLogout, onDeleteAccount }) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState(null);
   const [sticker, setSticker] = useState(null);
@@ -89,9 +51,7 @@ export function ChatScreen({
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    loadPickedContact().then((id) => {
-      if (id) setPickedId(id);
-    });
+    loadPickedContact().then((id) => { if (id) setPickedId(id); });
     loadDraft().then(setDraft);
     loadOpenedAt().then(setOpenedAt);
   }, []);
@@ -105,23 +65,13 @@ export function ChatScreen({
 
   const state = inbox?.state;
   const contacts = inbox?.contacts ?? [];
-  const selectedContactId =
-    normalizeCode(pickedId) || normalizeCode(contacts[0]?.id) || null;
+  const selectedContactId = normalizeCode(pickedId) || normalizeCode(contacts[0]?.id) || null;
   const openedLoaded = openedAt != null;
-
-  useEffect(() => {
-    threadRef.current?.scrollToEnd({ animated: false });
-  }, [selectedContactId]);
-
+  useEffect(() => { threadRef.current?.scrollToEnd({ animated: false }); }, [selectedContactId]);
   useEffect(() => {
     if (!openedLoaded) return;
     setOpenedAt((current) => {
-      const next = syncOpenedAt(
-        current || {},
-        contacts,
-        state?.messages,
-        panel === 'chat' ? selectedContactId : null
-      );
+      const next = syncOpenedAt(current || {}, contacts, state?.messages, panel === 'chat' ? selectedContactId : null);
       if (next !== current) saveOpenedAt(next).catch(() => {});
       return next;
     });
@@ -143,27 +93,21 @@ export function ChatScreen({
   const mode = pendingMode ?? state?.mode ?? 'batched';
   const focused = mode !== 'relaxed';
   const serverClock = dailyClock(state);
-  const clock =
-    pendingClock && (pendingClock.hour !== serverClock.hour || pendingClock.minute !== serverClock.minute)
-      ? pendingClock
-      : serverClock;
-  const summaryTime = mode !== 'relaxed' ? dayPhrase(clock.hour, clock.minute, true).replace(/ /g, '') : '';
+  const clock = pendingClock && (pendingClock.hour !== serverClock.hour || pendingClock.minute !== serverClock.minute) ? pendingClock : serverClock;
+  const summaryTime = focused ? dayPhrase(clock.hour, clock.minute, true).replace(/ /g, '') : '';
   const accountId = inbox?.user?.id ?? '';
   const now = new Date();
   const columns = scheduledColumns(now);
   const choices = columns.today.concat(columns.tomorrow);
   const selectedAt = choices.find((at) => at.getTime() === choiceAt) ?? choices[0];
-  const canSend =
-    contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
+  const canSend = contactActive && Boolean(contact) && (draft.trim().length > 0 || Boolean(photo) || Boolean(sticker));
 
   function onToggleFocus() {
     const next = focused ? 'relaxed' : 'batched';
     const request = focusRequest.current + 1;
     focusRequest.current = request;
     setPendingMode(next);
-    mutate('/v1/mode', { mode: next }).finally(() => {
-      if (focusRequest.current === request) setPendingMode(null);
-    });
+    mutate('/v1/mode', { mode: next }).finally(() => { if (focusRequest.current === request) setPendingMode(null); });
   }
 
   async function mutate(path, body) {
@@ -190,6 +134,18 @@ export function ChatScreen({
     setContactMenuId(null);
   }
 
+  function syncPickedAfterRemoval(targetId, nextInbox) {
+    if (normalizeCode(pickedId) !== normalizeCode(targetId)) return;
+    const nextId = normalizeCode(nextInbox?.contacts?.[0]?.id) || null;
+    setPickedId(nextId);
+    savePickedContact(nextId).catch(() => {});
+  }
+
+  async function withRequestBusy(fn) {
+    setRequestBusy(true);
+    try { await fn(); } finally { setRequestBusy(false); }
+  }
+
   async function reportContact(targetId, messageId) {
     try {
       await api('/v1/report', { token, method: 'POST', body: { contactId: targetId, messageId } });
@@ -204,11 +160,7 @@ export function ChatScreen({
       try {
         const next = await api('/v1/block', { token, method: 'POST', body: { contactId: targetId } });
         onInbox(next);
-        if (normalizeCode(pickedId) === normalizeCode(targetId)) {
-          const nextId = normalizeCode(next?.contacts?.[0]?.id) || null;
-          setPickedId(nextId);
-          savePickedContact(nextId).catch(() => {});
-        }
+        syncPickedAfterRemoval(targetId, next);
         setPanel('chat');
         flashNotice('Contact blocked.');
       } catch {
@@ -260,10 +212,7 @@ export function ChatScreen({
       if (state !== 'active' || !alive) return;
       outbox.resume();
     });
-    return () => {
-      alive = false;
-      sub.remove();
-    };
+    return () => { alive = false; sub.remove(); };
   }, [token, outbox]);
 
   async function send(text = draft) {
@@ -300,97 +249,52 @@ export function ChatScreen({
     attachBusy.current = true;
     try {
       const next = source === 'camera' ? await pickCameraPhoto() : await pickLibraryPhoto();
-      if (next) {
-        setSticker(null);
-        setPhoto(next);
-      }
+      if (next) { setSticker(null); setPhoto(next); }
     } finally {
       attachBusy.current = false;
     }
   }
 
-  function onInputSize(event) {
-    const measured = event.nativeEvent.contentSize.height;
-    setInputHeight(Math.max(44, Math.min(Math.ceil(measured), 176)));
-  }
+  const onInputSize = (event) => setInputHeight(Math.max(44, Math.min(Math.ceil(event.nativeEvent.contentSize.height), 176)));
+  const toggleSchedule = () => { setAccountOpen(false); setScheduleOpen((v) => !v); };
+  const toggleAccount = () => { setScheduleOpen(false); setAccountOpen((v) => !v); };
+  const openPhoto = (uri) => { Keyboard.dismiss(); closeMenus(); setPhotoViewerUri(uri); };
+  const notifyOn = pendingNotify?.id === contact?.id ? pendingNotify.on : !!contact?.notifyAll;
+  const onNotifyAll = (on) => {
+    if (!contact) return;
+    setPendingNotify({ id: contact.id, on });
+    mutate('/v1/notify-all', { contactId: contact.id, on }).catch(() => {}).finally(() => setPendingNotify(null));
+  };
 
   const composerProps = {
-    intent,
-    onIntent: setIntent,
-    choiceAt,
-    onChoice: setChoiceAt,
-    columns,
-    now,
-    photo,
-    onClearPhoto: () => setPhoto(null),
-    sticker,
-    onClearSticker: () => setSticker(null),
-    onDraw: () => {
-      Keyboard.dismiss();
-      setDrawOpen(true);
-    },
-    draft,
-    onChangeDraft: (value) => {
-      setDraft(value);
-      saveDraft(value).catch(() => {});
-    },
-    onInputSize,
-    inputHeight,
-    contactName: contact?.firstName || contact?.id || selectedContactId,
-    selectedAt,
-    canSend,
-    onSend: () => send(),
-    onAttach: () => attach('library'),
-    onAttachCamera: () => attach('camera'),
+    intent, onIntent: setIntent, choiceAt, onChoice: setChoiceAt, columns, now, photo,
+    onClearPhoto: () => setPhoto(null), sticker, onClearSticker: () => setSticker(null),
+    onDraw: () => { Keyboard.dismiss(); setDrawOpen(true); },
+    draft, onChangeDraft: (value) => { setDraft(value); saveDraft(value).catch(() => {}); },
+    onInputSize, inputHeight, contactName: contact?.firstName || contact?.id || selectedContactId,
+    selectedAt, canSend, onSend: () => send(), onAttach: () => attach('library'), onAttachCamera: () => attach('camera'),
   };
+
+  const menuOpen = scheduleOpen || accountOpen || contactMenuId;
 
   return (
     <View style={styles.root}>
       <View style={[styles.phone, web && styles.webScreen, { paddingBottom: keyboardInset }]}>
-        {scheduleOpen || accountOpen || contactMenuId ? (
-          <Pressable
-            testID="schedule-backdrop"
-            accessibilityLabel="Close menu"
-            onPress={closeMenus}
-            style={styles.backdrop}
-          />
-        ) : null}
+        {menuOpen ? <Pressable testID="schedule-backdrop" accessibilityLabel="Close menu" onPress={closeMenus} style={styles.backdrop} /> : null}
         <View testID="schedule-panel" style={[styles.top, hideChrome && styles.chromeGone]}>
           <View testID="top-bar" style={[styles.header, web && styles.webPad]}>
             <View style={styles.headerMain}>
-              <Pressable
-                testID="mode-toggle"
-                accessibilityRole="button"
-                accessibilityLabel="Focus"
-                accessibilityState={{ selected: focused }}
-                hitSlop={8}
-                onPress={onToggleFocus}
-                style={styles.focus}
-              >
+              <Pressable testID="mode-toggle" accessibilityRole="button" accessibilityLabel="Focus" accessibilityState={{ selected: focused }} hitSlop={8} onPress={onToggleFocus} style={styles.focus}>
                 <Ionicons name={focused ? 'moon' : 'moon-outline'} size={26} color={focused ? moon : ink} />
                 {focused ? <Text style={styles.focusText}>Focus</Text> : null}
               </Pressable>
               <View style={styles.scheduleWrap}>
                 {mode === 'relaxed' ? (
-                  <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>
-                    notified by any message
-                  </Text>
+                  <Text testID="schedule-label" numberOfLines={1} style={styles.scheduleLine}>notified by any message</Text>
                 ) : (
                   <View style={styles.schedulePhrase}>
-                    <Text testID="schedule-label" numberOfLines={1} style={[styles.scheduleLine, styles.schedulePrefix]}>
-                      receiving summary at{' '}
-                    </Text>
-                    <Pressable
-                      testID="schedule-time"
-                      accessibilityRole="button"
-                      accessibilityLabel={`Change summary time, ${summaryTime}`}
-                      accessibilityState={{ expanded: scheduleOpen }}
-                      hitSlop={4}
-                      onPress={() => {
-                        setAccountOpen(false);
-                        setScheduleOpen((current) => !current);
-                      }}
-                    >
+                    <Text testID="schedule-label" numberOfLines={1} style={[styles.scheduleLine, styles.schedulePrefix]}>receiving summary at{' '}</Text>
+                    <Pressable testID="schedule-time" accessibilityRole="button" accessibilityLabel={`Change summary time, ${summaryTime}`} accessibilityState={{ expanded: scheduleOpen }} hitSlop={4} onPress={toggleSchedule}>
                       <Text style={[styles.scheduleLine, styles.scheduleTime]}>{summaryTime}</Text>
                     </Pressable>
                   </View>
@@ -410,27 +314,14 @@ export function ChatScreen({
                 ) : null}
               </View>
             </View>
-            <Pressable
-              testID="account-settings-button"
-              accessibilityRole="button"
-              accessibilityLabel="Account settings"
-              accessibilityState={{ expanded: accountOpen }}
-              hitSlop={6}
-              onPress={() => {
-                setScheduleOpen(false);
-                setAccountOpen((current) => !current);
-              }}
-            >
+            <Pressable testID="account-settings-button" accessibilityRole="button" accessibilityLabel="Account settings" accessibilityState={{ expanded: accountOpen }} hitSlop={6} onPress={toggleAccount}>
               <PersonAvatar id={accountId} name={inbox?.user?.firstName} uri={inbox?.user?.avatar} size={32} />
             </Pressable>
             {accountOpen ? (
               <View testID="account-popover" style={styles.popover}>
                 <AccountMenu
                   userId={accountId}
-                  onLogout={async () => {
-                    setAccountOpen(false);
-                    await onLogout();
-                  }}
+                  onLogout={async () => { setAccountOpen(false); await onLogout(); }}
                   onDeleteAccount={async () => {
                     setAccountOpen(false);
                     const message = await onDeleteAccount();
@@ -457,152 +348,76 @@ export function ChatScreen({
         />
         {contactMenuId && !hideChrome ? (
           <View testID="contact-actions-popover" style={styles.contactMenuPopover}>
-            <ContactActionsMenu
-              contactId={contactMenuId}
-              onReport={() => reportContact(contactMenuId)}
-              onBlock={() => confirmBlock(contactMenuId)}
-              onClose={() => setContactMenuId(null)}
-            />
+            <ContactActionsMenu contactId={contactMenuId} onReport={() => reportContact(contactMenuId)} onBlock={() => confirmBlock(contactMenuId)} onClose={() => setContactMenuId(null)} />
           </View>
         ) : null}
 
         {panel === 'add' ? (
-          <PlusView
-            code={inbox?.user?.id}
-            onLookup={onLookup}
-            onAdd={async (code) => {
-              const result = await onAdd(code);
-              if (!result) setPanel('chat');
-              return result;
-            }}
-          />
+          <PlusView code={inbox?.user?.id} onLookup={onLookup} onAdd={async (code) => { const result = await onAdd(code); if (!result) setPanel('chat'); return result; }} />
         ) : null}
         {panel === 'request' && contactPendingIn && contact ? (
           <FriendRequestView
             contact={contact}
             busy={requestBusy}
-            onAccept={async () => {
-              setRequestBusy(true);
-              try {
-                await mutate('/v1/friend-request/accept', { contactId: contact.id });
-                setPanel('chat');
-              } finally {
-                setRequestBusy(false);
-              }
-            }}
-            onDecline={async () => {
-              setRequestBusy(true);
-              try {
-                const declinedId = contact.id;
-                const next = await mutate('/v1/friend-request/decline', { contactId: declinedId });
-                if (normalizeCode(pickedId) === normalizeCode(declinedId)) {
-                  const nextId = normalizeCode(next?.contacts?.[0]?.id) || null;
-                  setPickedId(nextId);
-                  savePickedContact(nextId).catch(() => {});
-                }
-                setPanel('chat');
-              } finally {
-                setRequestBusy(false);
-              }
-            }}
+            onAccept={() => withRequestBusy(async () => { await mutate('/v1/friend-request/accept', { contactId: contact.id }); setPanel('chat'); })}
+            onDecline={() => withRequestBusy(async () => {
+              const declinedId = contact.id;
+              const next = await mutate('/v1/friend-request/decline', { contactId: declinedId });
+              syncPickedAfterRemoval(declinedId, next);
+              setPanel('chat');
+            })}
           />
         ) : null}
         {panel === 'chat' ? (
-        <View style={[styles.main, web && styles.webFill]}>
-        {contactPendingOut ? (
-          <View style={styles.pendingMain}>
-            <Text style={styles.pendingText}>Waiting for {contact.firstName || contact.id} to accept.</Text>
-          </View>
-        ) : (
-        <>
-        <View style={[styles.thread, web && styles.webFill]}>
-          <ScrollView
-            ref={threadRef}
-            style={styles.thread}
-            contentContainerStyle={[styles.threadContent, web && styles.webThread]}
-            keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets={false}
-            contentInsetAdjustmentBehavior="never"
-            onContentSizeChange={() => {
-              threadRef.current?.scrollToEnd({ animated: false });
-            }}
-          >
-            {messages.map((message) => (
-              <ThreadMessage
-                key={message.id}
-                message={message}
-                onRetry={message.failed ? () => outbox.retry(message.id) : undefined}
-                onOpenPhoto={(uri) => {
-                  Keyboard.dismiss();
-                  closeMenus();
-                  setPhotoViewerUri(uri);
-                }}
-                onReportIncoming={(messageId) => {
-                  if (!contact?.id) return;
-                  reportContact(contact.id, messageId);
-                }}
-                onBlockIncoming={() => {
-                  if (!contact?.id) return;
-                  confirmBlock(contact.id);
-                }}
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        {contactActive ? (
-          <View style={styles.footer}>
-            {contact ? (
-              <View style={styles.notifyRow}>
-                <Text style={styles.menuText}>Get all notifications</Text>
-                <Switch testID={`notify-all-${contact.id}`} accessibilityLabel="Get all notifications" value={pendingNotify?.id === contact.id ? pendingNotify.on : !!contact.notifyAll} onValueChange={(on) => { setPendingNotify({ id: contact.id, on }); mutate('/v1/notify-all', { contactId: contact.id, on }).catch(() => {}).finally(() => setPendingNotify(null)); }} trackColor={{ false: '#d1d1d6', true: '#34c759' }} />
+          <View style={[styles.main, web && styles.webFill]}>
+            {contactPendingOut ? (
+              <View style={styles.pendingMain}>
+                <Text style={styles.pendingText}>Waiting for {contact.firstName || contact.id} to accept.</Text>
               </View>
-            ) : null}
-            <ComposerFooter testID="composer" {...composerProps} />
+            ) : (
+              <>
+                <View style={[styles.thread, web && styles.webFill]}>
+                  <ScrollView
+                    ref={threadRef}
+                    style={styles.thread}
+                    contentContainerStyle={[styles.threadContent, web && styles.webThread]}
+                    keyboardShouldPersistTaps="handled"
+                    automaticallyAdjustKeyboardInsets={false}
+                    contentInsetAdjustmentBehavior="never"
+                    onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
+                  >
+                    {messages.map((message) => (
+                      <ThreadMessage
+                        key={message.id}
+                        message={message}
+                        onRetry={message.failed ? () => outbox.retry(message.id) : undefined}
+                        onOpenPhoto={openPhoto}
+                        onReportIncoming={(messageId) => { if (contact?.id) reportContact(contact.id, messageId); }}
+                        onBlockIncoming={() => { if (contact?.id) confirmBlock(contact.id); }}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+                {contactActive ? (
+                  <View style={styles.footer}>
+                    {contact ? (
+                      <View style={styles.notifyRow}>
+                        <Text style={styles.menuText}>Get all notifications</Text>
+                        <Switch testID={`notify-all-${contact.id}`} accessibilityLabel="Get all notifications" value={notifyOn} onValueChange={onNotifyAll} trackColor={{ false: '#d1d1d6', true: '#34c759' }} />
+                      </View>
+                    ) : null}
+                    <ComposerFooter testID="composer" {...composerProps} />
+                  </View>
+                ) : null}
+              </>
+            )}
           </View>
         ) : null}
-        </>
-        )}
-        </View>
-        ) : null}
-        <DrawModal
-          visible={drawOpen}
-          onCancel={() => setDrawOpen(false)}
-          onDone={(dataUri) => {
-            setDrawOpen(false);
-            adoptSticker(dataUri);
-          }}
-        />
-        <Modal
-          visible={Boolean(photoViewerUri)}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPhotoViewerUri(null)}
-        >
-          <Pressable
-            testID="photo-viewer"
-            accessibilityRole="button"
-            accessibilityLabel="Close photo"
-            onPress={() => setPhotoViewerUri(null)}
-            style={styles.photoViewer}
-          >
-            {photoViewerUri ? (
-              <Image
-                testID="photo-viewer-image"
-                source={{ uri: photoViewerUri }}
-                resizeMode="contain"
-                style={styles.photoViewerImage}
-                pointerEvents="none"
-              />
-            ) : null}
-            <Pressable
-              testID="photo-viewer-close"
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              onPress={() => setPhotoViewerUri(null)}
-              style={[styles.photoViewerClose, { top: insets.top + 8 }]}
-              hitSlop={8}
-            >
+        <DrawModal visible={drawOpen} onCancel={() => setDrawOpen(false)} onDone={(dataUri) => { setDrawOpen(false); adoptSticker(dataUri); }} />
+        <Modal visible={Boolean(photoViewerUri)} transparent animationType="fade" onRequestClose={() => setPhotoViewerUri(null)}>
+          <Pressable testID="photo-viewer" accessibilityRole="button" accessibilityLabel="Close photo" onPress={() => setPhotoViewerUri(null)} style={styles.photoViewer}>
+            {photoViewerUri ? <Image testID="photo-viewer-image" source={{ uri: photoViewerUri }} resizeMode="contain" style={styles.photoViewerImage} pointerEvents="none" /> : null}
+            <Pressable testID="photo-viewer-close" accessibilityRole="button" accessibilityLabel="Close" onPress={() => setPhotoViewerUri(null)} style={[styles.photoViewerClose, { top: insets.top + 8 }]} hitSlop={8}>
               <Feather name="x" size={28} color={paper} />
             </Pressable>
           </Pressable>
