@@ -1,7 +1,7 @@
 import { normalizeCode } from './people.js';
 import { notificationPolicy } from './notificationPolicy.js';
 
-export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const DAY_HOURS = Array.from({ length: 24 }, (_item, hour) => hour);
 
 export const INTENTS = ['anytime', 'scheduled', 'realtime'].map((id) => ({ id, label: id === 'anytime' ? 'zen' : id === 'realtime' ? 'urgent' : id }));
@@ -220,7 +220,7 @@ function readContent(action) {
   return { body, photo, sticker };
 }
 
-export function immediatePlan(message, loud = false) {
+function immediatePlan(message, loud = false) {
   const quiet = !loud && message.intent === 'timely';
   return {
     title: message.contactName,

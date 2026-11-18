@@ -3,9 +3,8 @@ import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { applyCropDrag, clampCrop, hasDrawnInk, paintStrokes, STROKE_WIDTH } from './stickerExport.js';
+import { ink, paper } from './chatTheme.js';
 
-const ink = '#1c1c1c';
-const paper = '#fff';
 const pad = 20;
 const hit = 44;
 const pathProps = {
@@ -166,7 +165,7 @@ function CropOverlay({ crop, canvas, onChange }) {
   );
 }
 
-export async function exportDrawnSticker(strokes, captureView, size, crop) {
+async function exportDrawnSticker(strokes, captureView, size, crop) {
   if (!hasDrawnInk(strokes)) return null;
   const rect = crop?.width > 0 && crop?.height > 0 ? crop : { x: 0, y: 0, width: size.width, height: size.height };
 
@@ -312,17 +311,7 @@ export function DrawModal({ visible, onCancel, onDone }) {
 const styles = StyleSheet.create({
   webOverlay: { position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 2000, backgroundColor: '#f4f4f4' },
   sheet: { flex: 1, backgroundColor: '#f4f4f4' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    backgroundColor: paper,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-    zIndex: 2,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 10, backgroundColor: paper, borderBottomWidth: 1, borderBottomColor: '#e5e5e5', zIndex: 2 },
   headerButton: { minWidth: 64, paddingVertical: 8, zIndex: 3 },
   headerAction: { color: ink, fontSize: 16, lineHeight: 22 },
   headerActionRight: { textAlign: 'right' },
@@ -337,13 +326,6 @@ const styles = StyleSheet.create({
   cropKnobEdgeH: { width: 24, height: 5 },
   cropKnobEdgeV: { width: 5, height: 24 },
   exportCapture: { position: 'absolute', left: -10000, top: 0, backgroundColor: paper, overflow: 'hidden' },
-  done: {
-    marginHorizontal: pad,
-    borderRadius: 14,
-    backgroundColor: ink,
-    paddingVertical: 14,
-    alignItems: 'center',
-    zIndex: 2,
-  },
+  done: { marginHorizontal: pad, borderRadius: 14, backgroundColor: ink, paddingVertical: 14, alignItems: 'center', zIndex: 2 },
   doneText: { color: paper, fontSize: 17, fontWeight: '600' },
 });

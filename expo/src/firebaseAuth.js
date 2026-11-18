@@ -39,7 +39,7 @@ export function firebaseAuth() {
   return getAuth(app);
 }
 
-export function firstNameFromDisplay(displayName) {
+function firstNameFromDisplay(displayName) {
   const word = String(displayName || '').trim().split(/\s+/)[0] || '';
   return word.slice(0, 18);
 }
@@ -76,20 +76,8 @@ export function googleSubjectFromUser(user) {
   );
 }
 
-export function phoneSubjectFromUser(user) {
-  if (!user?.uid) return null;
-  return withEmail(
-    {
-      provider: 'phone',
-      subject: user.uid,
-      firstName: firstNameFromDisplay(user.displayName),
-    },
-    user
-  );
-}
-
 export function sessionSubjectFromUser(user) {
-  return appleSubjectFromUser(user) || googleSubjectFromUser(user) || phoneSubjectFromUser(user);
+  return appleSubjectFromUser(user) || googleSubjectFromUser(user);
 }
 
 export async function restoreAuthSubject() {
@@ -103,6 +91,4 @@ export async function restoreAuthSubject() {
   }
 }
 
-/** @deprecated use authHandlerUrl() — kept for older web tests */
-export const AUTH_DOMAIN = FIREBASE_AUTH_HOST;
 export const GOOGLE_REDIRECT_URI = `https://${FIREBASE_AUTH_HOST}/__/auth/handler`;
