@@ -2,53 +2,40 @@ import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from 'react
 import { bubbleTone, messageBubbleParts, ZEN_FILL, ZEN_LINE } from './messageBubble';
 import { ink, paper, web, photoMaxWidth } from './chatTheme';
 
+function onLongPressIncoming(message, onReportIncoming, onBlockIncoming) {
+  if (Platform.OS === 'web') {
+    if (window.confirm('Report this message?')) {
+      onReportIncoming?.(message.id);
+      return;
+    }
+    if (window.confirm('Block this contact?')) onBlockIncoming?.();
+    return;
+  }
+  Alert.alert('Message', 'Choose an action.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Report', onPress: () => onReportIncoming?.(message.id) },
+    { text: 'Block contact', style: 'destructive', onPress: () => onBlockIncoming?.() },
+  ]);
+}
+
 export function ThreadMessage({ message, onRetry, onOpenPhoto, onReportIncoming, onBlockIncoming }) {
   const incoming = message.direction === 'in';
   const parts = messageBubbleParts(message);
   if (parts.length === 0) return null;
 
-  function onLongPress() {
-    if (!incoming) return;
-    if (Platform.OS === 'web') {
-      const report = window.confirm('Report this message?');
-      if (report) {
-        onReportIncoming?.(message.id);
-        return;
-      }
-      const block = window.confirm('Block this contact?');
-      if (block) onBlockIncoming?.();
-      return;
-    }
-    Alert.alert('Message', 'Choose an action.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Report', onPress: () => onReportIncoming?.(message.id) },
-      { text: 'Block contact', style: 'destructive', onPress: () => onBlockIncoming?.() },
-    ]);
-  }
-
   return (
     <Pressable
-      onLongPress={incoming ? onLongPress : undefined}
+      onLongPress={incoming ? () => onLongPressIncoming(message, onReportIncoming, onBlockIncoming) : undefined}
       delayLongPress={420}
       onPress={message.failed ? onRetry : undefined}
-      style={[
-        styles.messageStack,
-        incoming ? styles.messageStackIn : styles.messageStackOut,
-        message._out && { opacity: 0.72 },
-      ]}
+      style={[styles.messageStack, incoming ? styles.messageStackIn : styles.messageStackOut, message._out && { opacity: 0.72 }]}
     >
       {parts.map((kind) =>
         kind === 'text' ? (
           <TextBubble key={`${message.id}-text`} message={message} incoming={incoming} />
         ) : (
-          <MediaBubble
-            key={`${message.id}-${kind}`}
-            kind={kind}
-            uri={kind === 'sticker' ? message.sticker : message.photo}
-            incoming={incoming}
-            onOpenPhoto={onOpenPhoto}
-          />
-        ),
+          <MediaBubble key={`${message.id}-${kind}`} kind={kind} uri={kind === 'sticker' ? message.sticker : message.photo} incoming={incoming} onOpenPhoto={onOpenPhoto} />
+        )
       )}
       {message._out ? (
         <Text testID={`outbox-${message.id}`} style={[styles.menuTextQuiet, { alignSelf: 'flex-end' }]}>
@@ -64,17 +51,12 @@ function TextBubble({ message, incoming }) {
   const zen = tone === 'zen';
   const fill = zen ? ZEN_FILL : paper;
   return (
-    <View
-      testID={incoming ? 'bubble-in' : 'bubble-out'}
-      style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, zen && styles.bubbleZen, tone === 'scheduled' && styles.bubbleScheduled, web && styles.bubbleRead]}
-    >
+    <View testID={incoming ? 'bubble-in' : 'bubble-out'} style={[styles.bubble, incoming ? styles.bubbleIn : styles.bubbleOut, zen && styles.bubbleZen, tone === 'scheduled' && styles.bubbleScheduled, web && styles.bubbleRead]}>
       <View pointerEvents="none" testID={incoming ? 'tail-in' : 'tail-own'} style={[styles.tail, incoming ? styles.tailIn : styles.tailOut]}>
         <View style={styles.tailStem} />
         <View style={[styles.tailFill, { borderBottomColor: fill }]} />
         <View style={[styles.tailJoin, { backgroundColor: fill }]} />
-        <View style={styles.tailClip}>
-          <View style={styles.tailEdge} />
-        </View>
+        <View style={styles.tailClip}><View style={styles.tailEdge} /></View>
       </View>
       {zen ? <View pointerEvents="none" testID="zen-mark" style={styles.zenMark} /> : null}
       <Text style={styles.bubbleText}>{message.body}</Text>
@@ -85,19 +67,8 @@ function TextBubble({ message, incoming }) {
 function MediaBubble({ kind, uri, incoming, onOpenPhoto }) {
   const sticker = kind === 'sticker';
   return (
-    <Pressable
-      testID={incoming ? `${kind}-in` : `${kind}-out`}
-      accessibilityRole="button"
-      accessibilityLabel={sticker ? 'View drawing' : 'View photo'}
-      onPress={() => onOpenPhoto?.(uri)}
-      style={[styles.mediaBubble, sticker && styles.stickerBubble, incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut]}
-    >
-      <Image
-        testID={sticker ? 'bubble-sticker' : 'bubble-photo'}
-        source={{ uri }}
-        resizeMode={sticker ? 'contain' : 'cover'}
-        style={styles.mediaImage}
-      />
+    <Pressable testID={incoming ? `${kind}-in` : `${kind}-out`} accessibilityRole="button" accessibilityLabel={sticker ? 'View drawing' : 'View photo'} onPress={() => onOpenPhoto?.(uri)} style={[styles.mediaBubble, sticker && styles.stickerBubble, incoming ? styles.mediaBubbleIn : styles.mediaBubbleOut]}>
+      <Image testID={sticker ? 'bubble-sticker' : 'bubble-photo'} source={{ uri }} resizeMode={sticker ? 'contain' : 'cover'} style={styles.mediaImage} />
     </Pressable>
   );
 }

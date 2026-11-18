@@ -27,36 +27,18 @@ export function OnboardingView({ userId, onSaveNickname, onContinue }) {
     }
   }
 
-  async function copy() {
-    await Clipboard.setStringAsync(userId);
-  }
-
   if (step === 'share') {
     return (
       <View style={styles.screen}>
         <Text style={styles.title}>You&apos;re {userId}</Text>
         <Text style={styles.hint}>Send this to your friend to add you.</Text>
         <View style={styles.shareRow}>
-          <Text testID="onboarding-id" selectable style={styles.code}>
-            {userId}
-          </Text>
-          <Pressable
-            testID="onboarding-copy"
-            accessibilityRole="button"
-            accessibilityLabel="Copy your ID"
-            onPress={copy}
-            style={styles.copy}
-          >
+          <Text testID="onboarding-id" selectable style={styles.code}>{userId}</Text>
+          <Pressable testID="onboarding-copy" accessibilityRole="button" accessibilityLabel="Copy your ID" onPress={() => Clipboard.setStringAsync(userId)} style={styles.copy}>
             <Feather name="copy" size={22} color={ink} />
           </Pressable>
         </View>
-        <Pressable
-          testID="onboarding-continue"
-          accessibilityRole="button"
-          accessibilityLabel="Continue"
-          onPress={onContinue}
-          style={styles.continue}
-        >
+        <Pressable testID="onboarding-continue" accessibilityRole="button" accessibilityLabel="Continue" onPress={onContinue} style={styles.continue}>
           <Text style={styles.continueText}>Continue</Text>
         </Pressable>
       </View>
@@ -68,29 +50,9 @@ export function OnboardingView({ userId, onSaveNickname, onContinue }) {
       <Image source={LOGO} style={styles.mark} />
       <Text style={styles.title}>Choose a nickname</Text>
       <Text style={styles.hint}>This shows under your bird.</Text>
-      <TextInput
-        testID="onboarding-nickname"
-        value={value}
-        autoCorrect={false}
-        autoCapitalize="words"
-        maxLength={18}
-        onChangeText={setValue}
-        placeholder="Nickname"
-        placeholderTextColor="#8a8a8a"
-        style={styles.input}
-        onSubmitEditing={submitNickname}
-        returnKeyType="done"
-      />
+      <TextInput testID="onboarding-nickname" value={value} autoCorrect={false} autoCapitalize="words" maxLength={18} onChangeText={setValue} placeholder="Nickname" placeholderTextColor="#8a8a8a" style={styles.input} onSubmitEditing={submitNickname} returnKeyType="done" />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable
-        testID="onboarding-submit"
-        accessibilityRole="button"
-        accessibilityLabel="Submit nickname"
-        accessibilityState={{ disabled: !ready || busy }}
-        disabled={!ready || busy}
-        onPress={submitNickname}
-        style={[styles.submit, ready && styles.submitReady]}
-      >
+      <Pressable testID="onboarding-submit" accessibilityRole="button" accessibilityLabel="Submit nickname" accessibilityState={{ disabled: !ready || busy }} disabled={!ready || busy} onPress={submitNickname} style={[styles.submit, ready && styles.submitReady]}>
         <Text style={[styles.submitText, ready && styles.submitTextReady]}>Submit</Text>
       </Pressable>
     </View>

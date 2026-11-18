@@ -23,26 +23,11 @@ export function PlusView({ code, onLookup, onAdd }) {
         if (alive) setMatch(result?.found ? result : { found: false });
       });
     }, 120);
-    return () => {
-      alive = false;
-      clearTimeout(handle);
-    };
+    return () => { alive = false; clearTimeout(handle); };
   }, [normalized, onLookup]);
 
-  async function copy() {
-    await Clipboard.setStringAsync(code);
-  }
-
   const lookup =
-    normalized.length < CODE_LENGTH
-      ? ''
-      : match === undefined
-        ? '…'
-        : match?.found
-          ? match.name
-          : match
-            ? 'not found'
-            : '';
+  normalized.length < CODE_LENGTH ? '' : match === undefined ? '…' : match?.found ? match.name : match ? 'not found' : '';
 
   return (
     <View style={styles.screen}>
@@ -60,37 +45,16 @@ export function PlusView({ code, onLookup, onAdd }) {
             placeholderTextColor="#8a8a8a"
             style={styles.input}
           />
-          <Text testID="person-lookup" numberOfLines={1} style={styles.lookup}>
-            {lookup}
-          </Text>
+          <Text testID="person-lookup" numberOfLines={1} style={styles.lookup}>{lookup}</Text>
         </View>
-        <Pressable
-          testID="add-code"
-          accessibilityRole="button"
-          accessibilityLabel="ADD"
-          accessibilityState={{ disabled: !ready }}
-          disabled={!ready}
-          onPress={async () => {
-            if (!ready) return;
-            await onAdd(normalized);
-          }}
-          style={[styles.add, ready && styles.addReady]}
-        >
+        <Pressable testID="add-code" accessibilityRole="button" accessibilityLabel="ADD" accessibilityState={{ disabled: !ready }} disabled={!ready} onPress={async () => { if (ready) await onAdd(normalized); }} style={[styles.add, ready && styles.addReady]}>
           <Text style={[styles.addText, ready && styles.addTextReady]}>ADD</Text>
         </Pressable>
         <View style={styles.own}>
           <Text style={styles.title}>Your ID</Text>
           <View style={styles.share}>
-            <Text testID="my-code" selectable style={styles.code}>
-              {code}
-            </Text>
-            <Pressable
-              testID="copy-code"
-              accessibilityRole="button"
-              accessibilityLabel="Copy your ID"
-              onPress={copy}
-              style={styles.copy}
-            >
+            <Text testID="my-code" selectable style={styles.code}>{code}</Text>
+            <Pressable testID="copy-code" accessibilityRole="button" accessibilityLabel="Copy your ID" onPress={() => Clipboard.setStringAsync(code)} style={styles.copy}>
               <Feather name="copy" size={22} color={ink} />
             </Pressable>
           </View>

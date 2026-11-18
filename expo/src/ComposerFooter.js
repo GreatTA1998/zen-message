@@ -5,54 +5,20 @@ import { INTENTS, choiceLabel, composerPlaceholder, dayPhrase } from './delivery
 import { ink, paper, web, side } from './chatTheme';
 
 export function ComposerFooter({
-  testID,
-  intent,
-  onIntent,
-  choiceAt,
-  onChoice,
-  columns,
-  now,
-  photo,
-  onClearPhoto,
-  sticker,
-  onClearSticker,
-  onDraw,
-  draft,
-  onChangeDraft,
-  onInputSize,
-  inputHeight,
-  contactName,
-  selectedAt,
-  canSend,
-  onSend,
-  onAttach,
-  onAttachCamera,
+  testID, intent, onIntent, choiceAt, onChoice, columns, now, photo, onClearPhoto, sticker, onClearSticker, onDraw,
+  draft, onChangeDraft, onInputSize, inputHeight, contactName, selectedAt, canSend, onSend, onAttach, onAttachCamera,
 }) {
   const [timesOpen, setTimesOpen] = useState(false);
   const drawEnabled = Platform.OS === 'web' || Platform.OS === 'ios';
-
-  function chooseIntent(id) {
-    onIntent(id);
-    setTimesOpen(id === 'scheduled');
-  }
-
-  function choiceCell(at, index) {
+  const chooseIntent = (id) => { onIntent(id); setTimesOpen(id === 'scheduled'); };
+  const choiceCell = (at, index) => {
     const on = (choiceAt ?? selectedAt?.getTime()) === at.getTime();
     return (
-      <Pressable
-        key={at.getTime()}
-        testID={`choice-${index}`}
-        accessibilityRole="button"
-        accessibilityState={{ selected: on }}
-        onPress={() => { onChoice(at.getTime()); setTimesOpen(false); }}
-        style={[styles.choiceRow, on && styles.choiceRowOn]}
-      >
-        <Text numberOfLines={1} style={[styles.choiceText, on && styles.choiceTextOn]}>
-          {dayPhrase(at.getHours()).replace(' ', '')}
-        </Text>
+      <Pressable key={at.getTime()} testID={`choice-${index}`} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => { onChoice(at.getTime()); setTimesOpen(false); }} style={[styles.choiceRow, on && styles.choiceRowOn]}>
+        <Text numberOfLines={1} style={[styles.choiceText, on && styles.choiceTextOn]}>{dayPhrase(at.getHours()).replace(' ', '')}</Text>
       </Pressable>
     );
-  }
+  };
 
   return (
     <View style={styles.composerWrap}>
@@ -71,58 +37,21 @@ export function ComposerFooter({
       <View testID="composer-bar" style={[styles.composer, web && styles.webComposer]}>
         {photo || sticker ? (
           <View style={styles.previewWrap}>
-            <Image
-              testID={photo ? 'photo-preview' : 'draw-preview'}
-              source={{ uri: photo || sticker }}
-              resizeMode={photo ? 'cover' : 'contain'}
-              style={styles.preview}
-            />
-            <Pressable
-              testID={photo ? 'photo-clear' : 'draw-clear'}
-              accessibilityRole="button"
-              accessibilityLabel={photo ? 'Remove photo' : 'Remove drawing'}
-              onPress={photo ? onClearPhoto : onClearSticker}
-              style={styles.previewClear}
-            >
+            <Image testID={photo ? 'photo-preview' : 'draw-preview'} source={{ uri: photo || sticker }} resizeMode={photo ? 'cover' : 'contain'} style={styles.preview} />
+            <Pressable testID={photo ? 'photo-clear' : 'draw-clear'} accessibilityRole="button" accessibilityLabel={photo ? 'Remove photo' : 'Remove drawing'} onPress={photo ? onClearPhoto : onClearSticker} style={styles.previewClear}>
               <Feather name="x" size={14} color={ink} />
             </Pressable>
           </View>
         ) : null}
-        <TextInput
-          testID={testID}
-          value={draft}
-          onChangeText={onChangeDraft}
-          onContentSizeChange={onInputSize}
-          placeholder={composerPlaceholder(contactName, intent, selectedAt)}
-          placeholderTextColor="#8a8a8a"
-          multiline
-          numberOfLines={2}
-          style={[styles.input, { height: inputHeight }]}
-        />
+        <TextInput testID={testID} value={draft} onChangeText={onChangeDraft} onContentSizeChange={onInputSize} placeholder={composerPlaceholder(contactName, intent, selectedAt)} placeholderTextColor="#8a8a8a" multiline numberOfLines={2} style={[styles.input, { height: inputHeight }]} />
         <View style={styles.boxTools}>
           {drawEnabled ? (
-            <Pressable
-              testID="attach-draw"
-              accessibilityRole="button"
-              accessibilityLabel="Draw"
-              onPress={onDraw}
-              style={styles.photoButton}
-            >
+            <Pressable testID="attach-draw" accessibilityRole="button" accessibilityLabel="Draw" onPress={onDraw} style={styles.photoButton}>
               <MaterialCommunityIcons name="draw-pen" size={22} color={ink} />
             </Pressable>
           ) : null}
-          {[
-            ['attach-camera', 'Camera', onAttachCamera, 'camera'],
-            ['attach-photo', 'Photo', onAttach, 'image'],
-          ].map(([id, label, press, icon]) => (
-            <Pressable
-              key={id}
-              testID={id}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              onPress={press}
-              style={styles.photoButton}
-            >
+          {[['attach-camera', 'Camera', onAttachCamera, 'camera'], ['attach-photo', 'Photo', onAttach, 'image']].map(([id, label, press, icon]) => (
+            <Pressable key={id} testID={id} accessibilityRole="button" accessibilityLabel={label} onPress={press} style={styles.photoButton}>
               <Feather name={icon} size={22} color={ink} />
             </Pressable>
           ))}
@@ -130,14 +59,7 @@ export function ComposerFooter({
             {INTENTS.map((item) => {
               const selected = item.id === intent;
               return (
-                <Pressable
-                  key={item.id}
-                  testID={`intent-${item.id}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected, expanded: item.id === 'scheduled' ? timesOpen : undefined }}
-                  onPress={() => chooseIntent(item.id)}
-                  style={styles.intentWord}
-                >
+                <Pressable key={item.id} testID={`intent-${item.id}`} accessibilityRole="button" accessibilityState={{ selected, expanded: item.id === 'scheduled' ? timesOpen : undefined }} onPress={() => chooseIntent(item.id)} style={styles.intentWord}>
                   <Text numberOfLines={1} style={[styles.intentText, selected && styles.intentTextSelected]}>
                     {item.id === 'scheduled' && selected ? choiceLabel(selectedAt, now) : item.label}
                   </Text>
@@ -145,14 +67,7 @@ export function ComposerFooter({
               );
             })}
           </View>
-          <Pressable
-            testID="send"
-            accessibilityRole="button"
-            accessibilityLabel="Send"
-            disabled={!canSend}
-            onPress={onSend}
-            style={[styles.send, canSend && styles.sendReady]}
-          >
+          <Pressable testID="send" accessibilityRole="button" accessibilityLabel="Send" disabled={!canSend} onPress={onSend} style={[styles.send, canSend && styles.sendReady]}>
             <Feather name="send" size={18} color={canSend ? paper : '#9a9a9a'} />
           </Pressable>
         </View>

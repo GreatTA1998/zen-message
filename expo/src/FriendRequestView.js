@@ -12,24 +12,10 @@ export function FriendRequestView({ contact, onAccept, onDecline, busy }) {
         <Text style={styles.lead}>wants to be your contact</Text>
       </View>
       <View style={styles.actions}>
-        <Pressable
-          testID="friend-decline"
-          accessibilityRole="button"
-          accessibilityLabel="Decline"
-          disabled={busy}
-          onPress={onDecline}
-          style={[styles.button, styles.decline]}
-        >
+        <Pressable testID="friend-decline" accessibilityRole="button" accessibilityLabel="Decline" disabled={busy} onPress={onDecline} style={[styles.button, styles.decline]}>
           <Text style={styles.declineText}>Decline</Text>
         </Pressable>
-        <Pressable
-          testID="friend-accept"
-          accessibilityRole="button"
-          accessibilityLabel="Accept"
-          disabled={busy}
-          onPress={onAccept}
-          style={[styles.button, styles.accept]}
-        >
+        <Pressable testID="friend-accept" accessibilityRole="button" accessibilityLabel="Accept" disabled={busy} onPress={onAccept} style={[styles.button, styles.accept]}>
           <Text style={styles.acceptText}>Accept</Text>
         </Pressable>
       </View>

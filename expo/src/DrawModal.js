@@ -7,13 +7,7 @@ import { ink, paper } from './chatTheme.js';
 
 const pad = 20;
 const hit = 44;
-const pathProps = {
-  stroke: ink,
-  strokeWidth: STROKE_WIDTH,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  fill: 'none',
-};
+const pathProps = { stroke: ink, strokeWidth: STROKE_WIDTH, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' };
 
 function pointsToPath(points) {
   if (!points.length) return '';
@@ -96,12 +90,8 @@ function useCropDrag(crop, canvas, onChange) {
         ),
       );
     },
-    onResponderRelease: () => {
-      drag.current = null;
-    },
-    onResponderTerminate: () => {
-      drag.current = null;
-    },
+    onResponderRelease: () => { drag.current = null; },
+    onResponderTerminate: () => { drag.current = null; },
   });
 }
 

@@ -2,6 +2,7 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const KINDS = new Set(['realtime', 'digest', 'timely']);
 const MAX_MESSAGES = 20;
 const MAX_TEXT = 240;
+const TOKEN_RE = /^ExponentPushToken\[[A-Za-z0-9_-]{8,160}\]$/;
 
 export function sanitizePushMessages(body) {
   if (!Array.isArray(body) || body.length === 0 || body.length > MAX_MESSAGES) return null;
@@ -16,7 +17,7 @@ export function sanitizePushMessages(body) {
 
 function sanitizePushMessage(item) {
   if (!item || typeof item !== 'object') return null;
-  if (typeof item.to !== 'string' || !/^ExponentPushToken\[[A-Za-z0-9_-]{8,160}\]$/.test(item.to)) return null;
+  if (typeof item.to !== 'string' || !TOKEN_RE.test(item.to)) return null;
   if (typeof item.title !== 'string' || typeof item.body !== 'string') return null;
   const title = item.title.trim();
   const body = item.body.trim();
@@ -26,10 +27,7 @@ function sanitizePushMessage(item) {
   const messageIds = Array.isArray(data.messageIds)
     ? data.messageIds.filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 80).slice(0, 40)
     : [];
-  const collapseId =
-    typeof item.collapseId === 'string'
-      ? item.collapseId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64)
-      : '';
+  const collapseId = typeof item.collapseId === 'string' ? item.collapseId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) : '';
   const message = {
     to: item.to,
     title,
@@ -39,15 +37,15 @@ function sanitizePushMessage(item) {
     interruptionLevel: item.interruptionLevel === 'passive' ? 'passive' : 'active',
     channelId: item.channelId === 'zen-quiet' ? 'zen-quiet' : 'zen-normal',
     ...(collapseId ? { collapseId } : {}),
-    data: {
-      kind: data.kind,
-      quiet: data.quiet === true,
-      messageIds,
-    },
+    data: { kind: data.kind, quiet: data.quiet === true, messageIds },
   };
   const encoded = JSON.stringify(message);
   if (encoded.includes('relax') || encoded.includes('batched')) return null;
   return message;
+}
+
+function json(body, status) {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 }
 
 export async function forwardExpoPush(request, fetchImpl = fetch) {
@@ -58,30 +56,11 @@ export async function forwardExpoPush(request, fetchImpl = fetch) {
     payload = null;
   }
   const messages = sanitizePushMessages(payload);
-  if (!messages) {
-    return json({ error: 'invalid' }, 400);
-  }
-  const upstream = await fetchImpl(EXPO_PUSH_URL, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(messages),
-  });
+  if (!messages) return json({ error: 'invalid' }, 400);
+  const upstream = await fetchImpl(EXPO_PUSH_URL, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(messages) });
   const text = await upstream.text();
   return new Response(text, {
     status: upstream.status,
-    headers: {
-      'content-type': upstream.headers.get('content-type') || 'application/json',
-      'cache-control': 'no-store',
-    },
-  });
-}
-
-function json(body, status) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    headers: { 'content-type': upstream.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' },
   });
 }

@@ -29,18 +29,17 @@ export const loadDraft = async () => (await get(D, '')) || '';
 export const saveDraft = (text) => put(D, text || null);
 export const saveOutbox = (items) => put(X, items?.length ? JSON.stringify(items) : null);
 
+const outboxOk = (item) =>
+  item &&
+  typeof item.id === 'string' &&
+  typeof item.contactId === 'string' &&
+  typeof item.createdAt === 'number' &&
+  typeof item.body === 'string';
+
 export async function loadOutbox() {
   try {
     const parsed = JSON.parse((await get(X, '[]')) || '[]');
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item) =>
-        item &&
-        typeof item.id === 'string' &&
-        typeof item.contactId === 'string' &&
-        typeof item.createdAt === 'number' &&
-        typeof item.body === 'string'
-    );
+    return Array.isArray(parsed) ? parsed.filter(outboxOk) : [];
   } catch {
     return [];
   }

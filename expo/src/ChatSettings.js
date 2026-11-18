@@ -3,63 +3,34 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DAY_HOURS, dayPhrase } from './delivery';
 import { ink, paper } from './chatTheme';
 
-const DELETE_ACCOUNT_CONSEQUENCE =
-  'Your account, contacts, and messages are permanently removed from Zen Message and sign-in is cleared. This cannot be undone.';
+const DELETE_ACCOUNT_CONSEQUENCE = 'Your account, contacts, and messages are permanently removed from Zen Message and sign-in is cleared. This cannot be undone.';
+
+const menuPress = (testID, label, onPress, style) => (
+  <Pressable key={testID} testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={style}>
+    <Text style={styles.menuText}>{label}</Text>
+  </Pressable>
+);
 
 export function AccountMenu({ userId, onLogout, onDeleteAccount }) {
   const [armingDelete, setArmingDelete] = useState(false);
 
   return (
     <View testID="account-menu" style={armingDelete ? styles.accountMenuWide : null}>
-      <View style={styles.menuRow}>
-        <Text testID="account-id" style={styles.menuText}>
-          ID {userId}
-        </Text>
-      </View>
-      <Pressable
-        testID="logout-button"
-        accessibilityRole="button"
-        accessibilityLabel="Log out"
-        onPress={onLogout}
-        style={styles.menuRow}
-      >
-        <Text style={styles.menuText}>Log out</Text>
-      </Pressable>
+      <View style={styles.menuRow}><Text testID="account-id" style={styles.menuText}>ID {userId}</Text></View>
+      {menuPress('logout-button', 'Log out', onLogout, styles.menuRow)}
       {armingDelete ? (
         <View testID="delete-account-confirm-step" style={styles.menuFooter}>
           <Text style={styles.menuConsequence}>{DELETE_ACCOUNT_CONSEQUENCE}</Text>
-          <Pressable
-            testID="delete-account-confirm"
-            accessibilityRole="button"
-            accessibilityLabel="Delete account permanently"
-            onPress={() => {
-              setArmingDelete(false);
-              onDeleteAccount();
-            }}
-            style={styles.menuRow}
-          >
+          <Pressable testID="delete-account-confirm" accessibilityRole="button" accessibilityLabel="Delete account permanently" onPress={() => { setArmingDelete(false); onDeleteAccount(); }} style={styles.menuRow}>
             <Text style={[styles.menuTextQuiet, styles.menuTextAlert]}>Delete account permanently</Text>
           </Pressable>
-          <Pressable
-            testID="delete-account-cancel"
-            accessibilityRole="button"
-            accessibilityLabel="Cancel delete account"
-            onPress={() => setArmingDelete(false)}
-            style={styles.menuRow}
-          >
+          <Pressable testID="delete-account-cancel" accessibilityRole="button" accessibilityLabel="Cancel delete account" onPress={() => setArmingDelete(false)} style={styles.menuRow}>
             <Text style={styles.menuTextQuiet}>Cancel</Text>
           </Pressable>
         </View>
       ) : (
         <View style={styles.menuFooter}>
-          <Pressable
-            testID="delete-account-button"
-            accessibilityRole="button"
-            accessibilityLabel="Delete account"
-            onPress={() => setArmingDelete(true)}
-            style={styles.menuRowQuiet}
-            hitSlop={4}
-          >
+          <Pressable testID="delete-account-button" accessibilityRole="button" accessibilityLabel="Delete account" onPress={() => setArmingDelete(true)} style={styles.menuRowQuiet} hitSlop={4}>
             <Text style={styles.menuTextQuiet}>Delete account</Text>
           </Pressable>
         </View>
@@ -71,14 +42,7 @@ export function AccountMenu({ userId, onLogout, onDeleteAccount }) {
 export function ScheduleSettings({ hour: selectedHour, minute: selectedMinute, onChoose }) {
   const [hour, setHour] = useState(selectedHour);
   const row = (testID, label, on, press) => (
-    <Pressable
-      key={testID}
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityState={{ selected: on }}
-      onPress={press}
-      style={[styles.menuRow, on && styles.menuRowSelected]}
-    >
+    <Pressable key={testID} testID={testID} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={press} style={[styles.menuRow, on && styles.menuRowSelected]}>
       <Text style={[styles.menuText, on && styles.menuTextSelected]}>{label}</Text>
     </Pressable>
   );
@@ -89,12 +53,7 @@ export function ScheduleSettings({ hour: selectedHour, minute: selectedMinute, o
       </ScrollView>
       <ScrollView style={[styles.choiceCol, styles.choiceColRight]} keyboardShouldPersistTaps="handled">
         {Array.from({ length: 60 }, (_, minute) =>
-          row(
-            `schedule-minute-${minute}`,
-            String(minute).padStart(2, '0'),
-            hour === selectedHour && minute === selectedMinute,
-            () => onChoose(hour, minute)
-          )
+          row(`schedule-minute-${minute}`, String(minute).padStart(2, '0'), hour === selectedHour && minute === selectedMinute, () => onChoose(hour, minute))
         )}
       </ScrollView>
     </View>

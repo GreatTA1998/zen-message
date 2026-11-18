@@ -6,42 +6,27 @@ const DIGEST_ID = 'zen-digest';
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const quiet = notification?.request?.content?.data?.quiet === true;
-    return {
-      shouldPlaySound: !quiet,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    };
+    return { shouldPlaySound: !quiet, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
   },
 });
 
 function contentFrom(plan) {
+  const quiet = plan.quiet;
   return {
     title: plan.title,
     body: plan.body,
     data: plan.data,
-    sound: plan.quiet ? false : 'default',
-    interruptionLevel: plan.quiet ? 'passive' : 'active',
-    priority: plan.quiet
-      ? Notifications.AndroidNotificationPriority.LOW
-      : Notifications.AndroidNotificationPriority.HIGH,
+    sound: quiet ? false : 'default',
+    interruptionLevel: quiet ? 'passive' : 'active',
+    priority: quiet ? Notifications.AndroidNotificationPriority.LOW : Notifications.AndroidNotificationPriority.HIGH,
   };
 }
 
 export async function prepareNotifications() {
   try {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('zen-normal', {
-        name: 'Messages',
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
-      });
-      await Notifications.setNotificationChannelAsync('zen-quiet', {
-        name: 'Quiet messages',
-        importance: Notifications.AndroidImportance.LOW,
-        sound: null,
-        enableVibrate: false,
-      });
+      await Notifications.setNotificationChannelAsync('zen-normal', { name: 'Messages', importance: Notifications.AndroidImportance.HIGH, sound: 'default' });
+      await Notifications.setNotificationChannelAsync('zen-quiet', { name: 'Quiet messages', importance: Notifications.AndroidImportance.LOW, sound: null, enableVibrate: false });
     }
     const current = await Notifications.getPermissionsAsync();
     if (current.status !== 'granted') await Notifications.requestPermissionsAsync();
