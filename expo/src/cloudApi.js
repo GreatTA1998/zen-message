@@ -32,7 +32,7 @@ function conflict(error) {
 async function sendPushes(queued) {
   if (!queued.length) return;
   try {
-    const { pushesFor, sendExpoPushes } = await import('../server/push.js');
+    const { pushesFor, sendExpoPushes } = await import('./expoPush.js');
     const messages = queued.flatMap((item) => pushesFor(item.effects, item.recipient?.pushToken));
     if (messages.length) await sendExpoPushes(messages);
   } catch {
