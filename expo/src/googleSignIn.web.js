@@ -1,26 +1,16 @@
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { firebaseAuth, sessionSubjectFromUser } from './firebaseAuth.js';
+import { GoogleAuthProvider } from 'firebase/auth';
+import { authHandlerUrl } from './firebaseAuth.js';
+import { popupFirebaseSignIn } from './popupFirebaseSignIn.js';
 
-export { authHandlerUrl as GOOGLE_REDIRECT_URI } from './firebaseAuth.js';
+export const GOOGLE_REDIRECT_URI = authHandlerUrl;
 
 export async function completeGoogleRedirect() {
   return null;
 }
 
 export async function signInWithGoogle() {
-  const auth = firebaseAuth();
-  if (!auth) return { provider: 'google', missing: 'google_unavailable' };
-  const provider = new GoogleAuthProvider();
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const subject = sessionSubjectFromUser(result?.user);
-    if (!subject) return { provider: 'google', missing: 'google_unavailable' };
-    return subject;
-  } catch (error) {
-    const code = error?.code;
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-      return { provider: 'google', cancelled: true };
-    }
-    return { provider: 'google', missing: 'google_unavailable' };
-  }
+  const result = await popupFirebaseSignIn(() => new GoogleAuthProvider());
+  if (result?.cancelled) return { provider: 'google', cancelled: true };
+  if (result?.provider) return result;
+  return { provider: 'google', missing: 'google_unavailable' };
 }

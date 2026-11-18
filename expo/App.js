@@ -69,10 +69,7 @@ function Root() {
     await refresh();
   }, [refresh]);
 
-  const signInDeps = useCallback(
-    () => ({ request: api, saveSession, loadSession, refresh: bindSession }),
-    [bindSession]
-  );
+  const signInDeps = useCallback(() => ({ request: api, saveSession, loadSession, refresh: bindSession }), [bindSession]);
 
   useEffect(() => {
     let alive = true;
@@ -119,8 +116,7 @@ function Root() {
     let alive = true;
     (async () => {
       const pushToken = await readExpoPushToken();
-      if (!alive || !pushToken) return;
-      await api('/v1/push-token', { token, method: 'POST', body: { token: pushToken } });
+      if (alive && pushToken) await api('/v1/push-token', { token, method: 'POST', body: { token: pushToken } });
     })();
     return () => { alive = false; };
   }, [token]);
@@ -136,7 +132,7 @@ function Root() {
     return () => subscription.remove();
   }, [deliverInbox]);
 
-  async function onSubject(result) {
+  const onSubject = async (result) => {
     if (result.missing) {
       setNotice(MISSING[result.missing] || 'Sign-in is not available on this device.');
       return;
@@ -148,7 +144,7 @@ function Root() {
       setToken(null);
       setUser(null);
     }
-  }
+  };
 
   const onLookup = useCallback(async (raw) => {
     const code = normalizeCode(raw);
@@ -160,7 +156,7 @@ function Root() {
     }
   }, [user?.id]);
 
-  async function onLogout() {
+  const onLogout = async () => {
     await saveSession(null);
     await savePickedContact(null);
     await saveDraft('');
@@ -169,9 +165,9 @@ function Root() {
     setToken(null);
     setUser(null);
     setInbox(null);
-  }
+  };
 
-  async function onDeleteAccount() {
+  const onDeleteAccount = async () => {
     const current = tokenRef.current;
     if (!current) return 'Could not delete account.';
     try {
@@ -186,29 +182,28 @@ function Root() {
     }
     await onLogout();
     return '';
-  }
+  };
 
-  async function onAdd(raw) {
+  const onAdd = async (raw) => {
     const code = normalizeCode(raw);
     if (hasConfusingCharacter(code)) return '1, I, and L are not used.';
     if (!isCode(code)) return 'Enter a 3-character ID.';
     if (code === user?.id) return 'That is your ID.';
     try {
-      const next = await api('/v1/contacts', { token, method: 'POST', body: { code } });
-      setInbox(next);
+      setInbox(await api('/v1/contacts', { token, method: 'POST', body: { code } }));
       return '';
     } catch (error) {
       if (error.code === 'code_invalid') return '1, I, and L are not used.';
       if (error.code === 'person_not_found') return 'No one has that ID.';
       return 'Could not add that ID.';
     }
-  }
+  };
 
-  async function saveNickname(nickname) {
+  const saveNickname = async (nickname) => {
     const next = await api('/v1/profile', { token, method: 'POST', body: { nickname } });
     if (next?.user) setUser(next.user);
     await refresh();
-  }
+  };
 
   if (!ready) return <View style={styles.boot} />;
 

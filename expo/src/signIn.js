@@ -1,27 +1,16 @@
-export async function acceptAppleCredential(credential, deps) {
-  return finishSignIn('apple', credential, deps);
-}
-
 const SESSION_PROVIDERS = new Set(['apple', 'google']);
+const signInFail = (notice = 'Could not finish sign-in.') => ({ screen: 'login', notice, token: null, user: null });
+
+export const acceptAppleCredential = (credential, deps) => finishSignIn('apple', credential, deps);
 
 export async function finishSignIn(provider, credential, { request, saveSession, loadSession, refresh }) {
-  if (!credential?.user) {
-    return {
-      screen: 'login',
-      notice: 'Sign-in could not be completed on this device.',
-      token: null,
-      user: null,
-    };
-  }
-  const sessionProvider = SESSION_PROVIDERS.has(provider) ? provider : null;
-  if (!sessionProvider) {
-    return { screen: 'login', notice: 'Could not finish sign-in.', token: null, user: null };
-  }
+  if (!credential?.user) return signInFail('Sign-in could not be completed on this device.');
+  if (!SESSION_PROVIDERS.has(provider)) return signInFail();
   try {
     const session = await request('/v1/session', {
       method: 'POST',
       body: {
-        provider: sessionProvider,
+        provider,
         subject: credential.user,
         firstName: credential.firstName || '',
         email: credential.email || '',
@@ -29,12 +18,10 @@ export async function finishSignIn(provider, credential, { request, saveSession,
     });
     if (!session?.token) throw new Error('session_missing');
     await saveSession(session.token);
-    const saved = await loadSession();
-    if (saved !== session.token) throw new Error('session_not_saved');
+    if ((await loadSession()) !== session.token) throw new Error('session_not_saved');
     await refresh(session);
-    const screen = session.user?.onboarded ? 'main' : 'onboarding';
-    return { screen, notice: '', token: session.token, user: session.user };
+    return { screen: session.user?.onboarded ? 'main' : 'onboarding', notice: '', token: session.token, user: session.user };
   } catch {
-    return { screen: 'login', notice: 'Could not finish sign-in.', token: null, user: null };
+    return signInFail();
   }
 }

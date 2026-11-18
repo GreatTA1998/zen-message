@@ -1,22 +1,14 @@
-import { OAuthProvider, signInWithPopup } from 'firebase/auth';
-import { firebaseAuth, sessionSubjectFromUser } from './firebaseAuth.js';
+import { OAuthProvider } from 'firebase/auth';
+import { popupFirebaseSignIn } from './popupFirebaseSignIn.js';
 
 export async function signInWithApple() {
-  const auth = firebaseAuth();
-  if (!auth) return { provider: 'apple', missing: 'apple_unavailable' };
-  const provider = new OAuthProvider('apple.com');
-  provider.addScope('email');
-  provider.addScope('name');
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const subject = sessionSubjectFromUser(result?.user);
-    if (!subject) return { provider: 'apple', missing: 'apple_unavailable' };
-    return subject;
-  } catch (error) {
-    const code = error?.code;
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-      return { provider: 'apple', cancelled: true };
-    }
-    return { provider: 'apple', missing: 'apple_unavailable' };
-  }
+  const result = await popupFirebaseSignIn(() => {
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    return provider;
+  });
+  if (result?.cancelled) return { provider: 'apple', cancelled: true };
+  if (result?.provider) return result;
+  return { provider: 'apple', missing: 'apple_unavailable' };
 }
