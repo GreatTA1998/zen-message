@@ -73,61 +73,14 @@ const ink = '#1c1c1c';
 const paper = '#fff';
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-    backgroundColor: paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    gap: 14,
-  },
-  stack: {
-    width: '100%',
-    gap: 12,
-  },
-  mark: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 1,
-    borderColor: ink,
-  },
-  title: {
-    color: ink,
-    fontSize: 28,
-    lineHeight: 34,
-    marginBottom: 8,
-  },
-  provider: {
-    width: '100%',
-    minHeight: 52,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  google: {
-    backgroundColor: paper,
-    borderColor: ink,
-  },
-  apple: {
-    backgroundColor: ink,
-    borderColor: ink,
-  },
-  providerText: {
-    color: ink,
-    fontSize: 17,
-  },
-  appleText: {
-    color: paper,
-  },
-  notice: {
-    color: ink,
-    fontSize: 15,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
+  screen: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: paper, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 14 },
+  stack: { width: '100%', gap: 12 },
+  mark: { width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: ink },
+  title: { color: ink, fontSize: 28, lineHeight: 34, marginBottom: 8 },
+  provider: { width: '100%', minHeight: 52, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  google: { backgroundColor: paper, borderColor: ink },
+  apple: { backgroundColor: ink, borderColor: ink },
+  providerText: { color: ink, fontSize: 17 },
+  appleText: { color: paper },
+  notice: { color: ink, fontSize: 15, lineHeight: 20, textAlign: 'center' },
 });

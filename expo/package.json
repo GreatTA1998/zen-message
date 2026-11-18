@@ -33,7 +33,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js src/googleSignIn.web.test.js src/googleSignIn.ios.test.js src/appleSignIn.web.test.js src/firebaseAuth.test.js src/LoginView.test.js src/messageBubble.test.js src/pickPhoto.test.js src/stickerExport.test.js src/deliver.test.js src/outbox.test.js"
+    "test": "node --experimental-detect-module --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/delivery.test.js src/people.test.js src/deviceApi.test.js src/signIn.cloud.test.js src/cloudApi.test.js src/googleSignIn.web.test.js src/googleSignIn.ios.test.js src/appleSignIn.web.test.js src/firebaseAuth.test.js src/LoginView.test.js src/messageBubble.test.js src/pickPhoto.test.js src/stickerExport.test.js src/deliver.test.js src/outbox.test.js src/notificationPolicy.test.js"
   },
   "expo": {
     "autolinking": {
