@@ -774,8 +774,8 @@ function ChatScreen({
             const id = normalizeCode(item.id);
             const selected = id === selectedContactId;
             const pending = item.status === 'pending-in' || item.status === 'pending-out';
-            const notify = pendingNotify?.id === item.id ? pendingNotify.on : !!item.notifyAll;
-            const star = !pending && notify;
+            const override = pendingNotify?.id === item.id ? pendingNotify.on : !!item.notifyAll;
+            const star = !pending && (override || !focused);
             const glow =
               openedAt && !pending && !selected && contactUnread(state?.messages, id, openedAt[id])
                 ? styles.avatarHalo
@@ -800,7 +800,7 @@ function ChatScreen({
                     dashed={pending}
                     style={[panel !== 'add' && selected && styles.circleOn, glow]}
                   />
-                  {star ? <Ionicons testID={`notify-star-${item.id}`} name="star" size={11} color={focused ? '#b3261e' : ink} style={styles.contactStar} importantForAccessibility="no" /> : null}
+                  {star ? <Ionicons testID={`notify-star-${item.id}`} name="star" size={11} color={override ? '#b3261e' : '#c9a227'} style={styles.contactStar} importantForAccessibility="no" /> : null}
                 </View>
                 <Text numberOfLines={1} style={styles.contactLabel}>{item.firstName || item.id}</Text>
               </Pressable>
