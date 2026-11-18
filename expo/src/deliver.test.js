@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createState } from '../src/delivery.js';
+import { createState } from './delivery.js';
 import { deliverMessage, changeMode, releaseDue } from './deliver.js';
-import { expoPushEndpoint, pushMessage, pushesFor } from './push.js';
+import { expoPushEndpoint, pushMessage, pushesFor } from './expoPush.js';
 
 function person(fields) {
   return {

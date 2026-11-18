@@ -1,5 +1,5 @@
-import { reduce } from '../src/delivery.js';
-import { pushesFor } from './push.js';
+import { reduce } from './delivery.js';
+import { pushesFor } from './expoPush.js';
 
 function displayName(person) {
   return person.firstName || person.id;

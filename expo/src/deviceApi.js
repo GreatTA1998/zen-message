@@ -1,6 +1,6 @@
 import { createState, reduce } from './delivery.js';
 import { accountCode, firstName, hasConfusingCharacter, isCode, normalizeCode } from './people.js';
-import { changeMode, changeSchedule, deliverMessage, releaseDue } from '../server/deliver.js';
+import { changeMode, changeSchedule, deliverMessage, releaseDue } from './deliver.js';
 
 const STORE_KEY = 'zen-message.device';
 
