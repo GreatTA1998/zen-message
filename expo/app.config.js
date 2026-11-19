@@ -6,11 +6,15 @@ const GOOGLE_IOS_CLIENT_ID = process.env.GOOGLE_IOS_CLIENT_ID || '';
 function withGoogleIosPlugin(plugins) {
   const scheme = googleIosUrlScheme(GOOGLE_IOS_CLIENT_ID);
   if (!GOOGLE_IOS_CLIENT_ID || !scheme) return plugins;
-  return plugins.map((plugin) =>
-    Array.isArray(plugin) && plugin[0] === '@react-native-google-signin/google-signin'
-      ? [plugin[0], { ...(plugin[1] || {}), iosUrlScheme: scheme }]
-      : plugin
-  );
+  return plugins.map((plugin) => {
+    if (plugin === '@react-native-google-signin/google-signin') {
+      return [plugin, { iosUrlScheme: scheme }];
+    }
+    if (Array.isArray(plugin) && plugin[0] === '@react-native-google-signin/google-signin') {
+      return [plugin[0], { ...(plugin[1] || {}), iosUrlScheme: scheme }];
+    }
+    return plugin;
+  });
 }
 
 module.exports = () => {
@@ -37,6 +41,11 @@ module.exports = () => {
     ]);
   }
   expo.plugins = plugins;
+  // Bake iOS Google client into the manifest — EAS non-EXPO_PUBLIC_ vars are not inlined into JS.
+  expo.extra = {
+    ...(expo.extra || {}),
+    googleIosClientId: GOOGLE_IOS_CLIENT_ID,
+  };
   expo.ios = {
     ...(expo.ios || {}),
     usesAppleSignIn: true,

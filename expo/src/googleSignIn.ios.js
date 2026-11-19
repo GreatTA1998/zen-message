@@ -1,7 +1,11 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import Constants from 'expo-constants';
 import { firebaseAuth, googleSubjectFromUser } from './firebaseAuth.js';
-import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from './googleOAuth.js';
+import { GOOGLE_IOS_CLIENT_ID as ENV_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from './googleOAuth.js';
+
+const GOOGLE_IOS_CLIENT_ID =
+  ENV_IOS_CLIENT_ID || Constants.expoConfig?.extra?.googleIosClientId || '';
 
 let configured = false;
 
