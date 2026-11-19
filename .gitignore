@@ -10,3 +10,5 @@ node_modules
 
 functions/adminCredentials.json
 functions/twilioCredentials.json
+
+.env.eas-simulator
