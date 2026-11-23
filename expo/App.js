@@ -47,8 +47,8 @@ function Root() {
     if (write) writeGen.current += 1;
     setInbox(next);
     if (next?.effects?.length) {
-      await runNotificationEffects(next.effects);
-      await api('/v1/effects/ack', { token: current, method: 'POST', body: {} });
+      const armedDigest = await runNotificationEffects(next.effects);
+      await api('/v1/effects/ack', { token: current, method: 'POST', body: { armedDigest } });
     }
     return next;
   }, []);

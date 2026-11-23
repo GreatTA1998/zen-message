@@ -151,15 +151,22 @@ function holdDigest(state) {
   const held = heldMessages(state.messages).filter((i) => typeof i.releaseAt === 'number');
   if (!held.length) return { state: { ...state, digest: null }, effects: state.digest ? [{ type: 'cancel-digest' }] : [] };
   const at = Math.min(...held.map((i) => i.releaseAt)), due = held.filter((i) => i.releaseAt === at), plan = digestPlan(due);
-  return { state: { ...state, digest: { at, messageIds: plan.data.messageIds, presented: false } }, effects: [{ type: 'schedule-digest', at, plan }] };
+  const prev = state.digest;
+  const digest = { at, messageIds: plan.data.messageIds, presented: false };
+  if (prev && prev.at === at && prev.platformScheduled) digest.platformScheduled = true;
+  return { state: { ...state, digest }, effects: [{ type: 'schedule-digest', at, plan }] };
 }
 function release(state, now) { return !state.digest || state.digest.presented || now < state.digest.at ? { state, effects: [] } : finishDigest(state); }
 function shown(state) { return !state.digest || state.digest.presented ? { state, effects: [] } : finishDigest(state, []); }
 function finishDigest(state, effects) {
   const ids = new Set(state.digest.messageIds), held = state.messages.filter((i) => ids.has(i.id)), plan = held.length ? digestPlan(held) : null;
+  const localArmed = state.digest?.platformScheduled === true;
   const rolled = holdDigest({ ...state, messages: revealIds(state.messages, ids), digest: null });
-  const digest = rolled.state.digest ?? { ...state.digest, presented: true, messageIds: [...ids] };
-  return { state: { ...rolled.state, digest }, effects: effects ?? (plan ? [{ type: 'present', plan }] : [{ type: 'cancel-digest' }]) };
+  const digest = rolled.state.digest ?? { at: state.digest.at, messageIds: [...ids], presented: true };
+  if (effects !== undefined) return { state: { ...rolled.state, digest }, effects };
+  // Local DATE already armed: reveal only (wake notice fires). Else Expo-push current batch plan.
+  if (localArmed) return { state: { ...rolled.state, digest }, effects: [] };
+  return { state: { ...rolled.state, digest }, effects: plan ? [{ type: 'present', plan }] : [{ type: 'cancel-digest' }] };
 }
 const isMessage = (v) => {
   const photo = v?.photo == null || v.photo === '' ? null : messagePhoto(v.photo), sticker = v?.sticker == null || v.sticker === '' ? null : messageSticker(v.sticker);
