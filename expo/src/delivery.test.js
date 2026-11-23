@@ -166,6 +166,18 @@ test('notifyAll alerts immediately for zen in focus and relaxed', () => {
   assert.equal(reduce(reduce(createState(), { type: 'set-mode', mode: 'relaxed' }).state, action).effects[0].plan.quiet, false);
 });
 
+test('local-armed digest reveals without Expo present; keeps flag across batch growth', () => {
+  const first = send(createState(), { id: 'a', body: 'One', intent: 'anytime' }, at(10, 15));
+  const armed = { ...first.state, digest: { ...first.state.digest, platformScheduled: true } };
+  const second = send(armed, { id: 'b', contactId: 'pip', contactName: 'Pip', body: 'Two', intent: 'anytime' }, at(11, 0));
+  assert.equal(second.state.digest.platformScheduled, true);
+  assert.deepEqual(second.state.digest.messageIds, ['a', 'b']);
+  const due = reduce(second.state, { type: 'release', now: at(19, 0).getTime() });
+  assert.deepEqual(due.effects, []);
+  assert.equal(due.state.messages.every((m) => m.visible), true);
+  assert.equal(due.state.digest.presented, true);
+});
+
 test('relaxed scheduled is readable sooner and stays private', () => {
   const relaxed = reduce(createState(), { type: 'set-mode', mode: 'relaxed' }).state;
   const scheduled = reduce(relaxed, {

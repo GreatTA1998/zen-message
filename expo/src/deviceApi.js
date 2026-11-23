@@ -127,17 +127,24 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
   const holdEffects = (p, effects) => { p.pendingEffects = p.pushToken ? effects.filter((e) => e.type !== 'present') : effects; };
   function releaseDueAlerts(state, now) {
     const queued = [];
+    let dirty = false;
     for (const p of Object.values(state.users)) {
-      const released = releaseDue(p, now); if (!released.effects.length) continue;
-      adopt(p, released.state); holdEffects(p, released.effects); queued.push({ recipient: p, effects: released.effects });
+      const released = releaseDue(p, now);
+      if (released.state === p) continue;
+      dirty = true;
+      adopt(p, released.state);
+      if (released.effects.length) {
+        holdEffects(p, released.effects);
+        queued.push({ recipient: p, effects: released.effects });
+      }
     }
-    return queued;
+    return { queued, dirty };
   }
   async function commit(store, state, { force = true } = {}) {
-    const due = releaseDueAlerts(state, Date.now());
-    if (force || due.length) await save(store, state);
-    if (typeof store.onDeliver === 'function') for (const item of due) store.onDeliver(item.recipient, item.effects);
-    return due;
+    const { queued, dirty } = releaseDueAlerts(state, Date.now());
+    if (force || dirty || queued.length) await save(store, state);
+    if (typeof store.onDeliver === 'function') for (const item of queued) store.onDeliver(item.recipient, item.effects);
+    return queued;
   }
   const commitInbox = async (store, state, user, opts) => { await commit(store, state, opts); return inbox(state, user); };
   const adoptCommitInbox = async (store, state, user, result) => { adopt(user, result.state); if (result.effects.length) user.pendingEffects = result.effects; return commitInbox(store, state, user); };
@@ -219,7 +226,11 @@ export function createDeviceApi(storage, randomBytes = defaultBytes) {
     if (method === 'POST' && p === '/v1/mode') return adoptCommitInbox(store, state, user, changeMode(user, body?.mode));
     if (method === 'POST' && p === '/v1/schedule') return adoptCommitInbox(store, state, user, changeSchedule(user, body?.dayHour, body?.dayMinute, Date.now()));
     if (method === 'POST' && (p === '/v1/push-token' || p === '/v1/effects/ack')) {
-      if (p === '/v1/push-token') user.pushToken = expoPushToken(body?.token); else user.pendingEffects = [];
+      if (p === '/v1/push-token') user.pushToken = expoPushToken(body?.token);
+      else {
+        if (body?.armedDigest && user.digest && !user.digest.presented) user.digest = { ...user.digest, platformScheduled: true };
+        user.pendingEffects = [];
+      }
       return commitOk(store, state);
     }
     if (method === 'POST' && p === '/v1/shown') return adoptCommitInbox(store, state, user, reduce(user, { type: 'shown', now: Date.now() }));

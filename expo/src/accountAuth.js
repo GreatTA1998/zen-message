@@ -1,3 +1,1 @@
-export async function deleteFirebaseUser() {
-  return { ok: true };
-}
+export { deleteFirebaseUser } from './accountAuthDelete.js';

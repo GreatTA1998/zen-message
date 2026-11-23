@@ -279,22 +279,23 @@ test('batched anytime waits for one digest, and relaxed stays private', async ()
   assert.equal(presents(storage.delivered, apple.user.id).length, 0);
   const hidden = await phone('/v1/inbox?offset=0', { token: apple.token });
   assert.equal(hidden.state.messages.every((message) => message.visible === false), true);
+  assert.equal(hidden.effects.some((e) => e.type === 'schedule-digest'), true);
   assert.equal(presents(storage.delivered, apple.user.id).length, 0);
+  await phone('/v1/effects/ack', { token: apple.token, method: 'POST', body: { armedDigest: true } });
 
   await storage.transact(async (store) => {
     const state = JSON.parse(await store.getItem('zen-message.device'));
+    assert.equal(state.users[apple.user.id].digest.platformScheduled, true);
     state.users[apple.user.id].digest.at = Date.now() - 1000;
     await store.setItem('zen-message.device', JSON.stringify(state));
   });
   const opened = await web('/v1/inbox?offset=0', { token: google.token });
   assert.equal(JSON.stringify(opened).includes('relax'), false);
-  const digests = presents(storage.delivered, apple.user.id);
-  assert.equal(digests.length, 1);
-  assert.equal(digests[0].plan.data.kind, 'digest');
-  assert.equal(digests[0].plan.data.messageIds.length, 2);
+  // Local DATE armed → release reveals without a second Expo digest push.
+  assert.equal(presents(storage.delivered, apple.user.id).length, 0);
   const revealed = await phone('/v1/inbox?offset=0', { token: apple.token });
   assert.equal(revealed.state.messages.every((message) => message.visible), true);
-  assert.equal(presents(storage.delivered, apple.user.id).length, 1);
+  assert.equal(presents(storage.delivered, apple.user.id).length, 0);
 
   await phone('/v1/mode', { token: apple.token, method: 'POST', body: { mode: 'relaxed' } });
   const quiet = await web('/v1/messages', {
@@ -303,7 +304,7 @@ test('batched anytime waits for one digest, and relaxed stays private', async ()
     body: { contactId: apple.user.id, body: 'readable now', intent: 'anytime' },
   });
   assert.equal(JSON.stringify(quiet).includes('relax'), false);
-  assert.equal(presents(storage.delivered, apple.user.id).length, 1);
+  assert.equal(presents(storage.delivered, apple.user.id).length, 0);
   const readable = await phone('/v1/inbox?offset=0', { token: apple.token });
   assert.equal(readable.state.messages.some((message) => message.body === 'readable now' && message.visible), true);
 });
